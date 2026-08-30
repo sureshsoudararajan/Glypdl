@@ -73,11 +73,85 @@ class YtDlpService:
             if custom_path and shutil.which(custom_path):
                 return custom_path
 
-        return shutil.which('ffmpeg')
+        found = shutil.which('ffmpeg')
+        if found:
+            return found
+
+        # Check local data bin dir and platform/bundled locations
+        from glypdl.utils.paths import get_bin_dir
+        candidates = [
+            str(get_bin_dir() / "ffmpeg"),
+            "/app/bin/ffmpeg",
+            "/usr/share/glypdl/bin/ffmpeg",
+            "/usr/local/bin/ffmpeg",
+            "/usr/bin/ffmpeg",
+            os.path.expanduser("~/.local/bin/ffmpeg"),
+        ]
+        for c in candidates:
+            if os.path.isfile(c) and os.access(c, os.X_OK):
+                return c
+
+        return None
 
     def ffmpeg_available(self) -> bool:
         """Check if ffmpeg is available."""
         return self.detect_ffmpeg() is not None
+
+    def install_ffmpeg_async(self, on_progress=None, on_done=None, on_error=None):
+        """Asynchronously download and extract standalone static ffmpeg into user data bin dir."""
+        import threading
+        import platform
+        import urllib.request
+        import tarfile
+        import tempfile
+        from gi.repository import GLib
+        from glypdl.utils.paths import get_bin_dir
+
+        def _worker():
+            try:
+                machine = platform.machine().lower()
+                if "aarch64" in machine or "arm64" in machine:
+                    url = "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linuxarm64-gpl.tar.xz"
+                else:
+                    url = "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"
+
+                bin_dir = get_bin_dir()
+                bin_dir.mkdir(parents=True, exist_ok=True)
+                target_ffmpeg = bin_dir / "ffmpeg"
+                target_ffprobe = bin_dir / "ffprobe"
+
+                if target_ffmpeg.exists() and os.access(target_ffmpeg, os.X_OK):
+                    if on_done:
+                        GLib.idle_add(on_done, str(target_ffmpeg))
+                    return
+
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    archive_path = os.path.join(tmpdir, "ffmpeg.tar.xz")
+                    urllib.request.urlretrieve(url, archive_path)
+
+                    with tarfile.open(archive_path, "r:xz") as tar:
+                        for member in tar.getmembers():
+                            basename = os.path.basename(member.name)
+                            if basename in ("ffmpeg", "ffprobe") and member.isfile():
+                                member_file = tar.extractfile(member)
+                                if member_file:
+                                    dest_path = bin_dir / basename
+                                    with open(dest_path, "wb") as f:
+                                        f.write(member_file.read())
+                                    dest_path.chmod(0o755)
+
+                if target_ffmpeg.exists():
+                    if on_done:
+                        GLib.idle_add(on_done, str(target_ffmpeg))
+                else:
+                    raise RuntimeError("FFmpeg extraction completed but binary was not found.")
+
+            except Exception as exc:
+                if on_error:
+                    GLib.idle_add(on_error, str(exc))
+
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
 
     def build_download_args(self, url: str, format_spec: Optional[str] = None, 
                             output_template: Optional[str] = None, 

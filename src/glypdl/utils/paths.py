@@ -8,6 +8,9 @@ APP_NAME = 'glypdl'
 def get_data_dir() -> pathlib.Path:
     return pathlib.Path(GLib.get_user_data_dir()) / APP_NAME
 
+def get_bin_dir() -> pathlib.Path:
+    return get_data_dir() / "bin"
+
 def get_cache_dir() -> pathlib.Path:
     return pathlib.Path(GLib.get_user_cache_dir()) / APP_NAME
 
@@ -32,6 +35,7 @@ def get_database_path() -> pathlib.Path:
 def ensure_dirs() -> None:
     dirs = [
         get_data_dir(),
+        get_bin_dir(),
         get_cache_dir(),
         get_config_dir(),
         get_thumbnail_cache_dir(),

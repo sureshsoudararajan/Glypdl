@@ -89,6 +89,10 @@ class GlypdlApp(Adw.Application):
         if not self.ytdlp_service.is_available():
             self._show_missing_ytdlp_dialog()
 
+        # Automatically download standalone FFmpeg in background if not installed
+        if not self.ytdlp_service.ffmpeg_available():
+            self.ytdlp_service.install_ffmpeg_async()
+
     def _apply_theme(self):
         style_manager = Adw.StyleManager.get_default()
         color_scheme = self.settings.get_color_scheme()
