@@ -8,18 +8,19 @@
   <description>
     <p>
       Glypdl is a fast, native GTK4/libadwaita download manager that interfaces seamlessly
-      with the system-installed yt-dlp tool. Designed for modern GNOME desktop environments,
-      it offers rich download controls, format selection, network throughput metrics,
-      download queuing, and complete download history tracking.
+      with yt-dlp. Designed for modern GNOME desktop environments, it offers rich download
+      controls, format selection, network throughput metrics, download queuing, playlist
+      batch management, and complete download history tracking.
     </p>
     <p>Features include:</p>
     <ul>
       <li>Native GNOME/libadwaita look and feel with dark/light mode support</li>
       <li>Audio-only, Video-only, and Video+Audio download modes</li>
+      <li>Interactive YouTube playlist downloading with selective checkboxes</li>
       <li>Smooth real-time network throughput and ETA calculations</li>
       <li>Concurrent download queue management</li>
       <li>History tracking powered by a local SQLite database</li>
-      <li>Cookie and profile authentication support</li>
+      <li>Saved Netscape cookie profiles and authentication recovery dialog</li>
       <li>Zero web wrappers or heavy runtimes</li>
     </ul>
   </description>
@@ -31,8 +32,24 @@
   </developer>
   <screenshots>
     <screenshot type="default">
-      <caption>Glypdl main window managing active and queued downloads</caption>
+      <caption>Active downloads queue with live speed and progress metrics</caption>
+      <image>https://raw.githubusercontent.com/sureshsoudararajan/Glypdl/main/data/screenshots/active-downloads.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Video metadata preview and format selection</caption>
+      <image>https://raw.githubusercontent.com/sureshsoudararajan/Glypdl/main/data/screenshots/metadata-preview.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Clean main window with quick URL input</caption>
       <image>https://raw.githubusercontent.com/sureshsoudararajan/Glypdl/main/data/screenshots/main-window.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Persistent download history with instant search and context actions</caption>
+      <image>https://raw.githubusercontent.com/sureshsoudararajan/Glypdl/main/data/screenshots/download-history.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Preferences and cookie profile manager</caption>
+      <image>https://raw.githubusercontent.com/sureshsoudararajan/Glypdl/main/data/screenshots/preferences-settings.png</image>
     </screenshot>
   </screenshots>
   <provides>
@@ -41,7 +58,7 @@
   <releases>
     <release version="1.0.0" date="2026-08-30">
       <description>
-        <p>Initial release of Glypdl native download manager.</p>
+        <p>Initial release of Glypdl native GTK4/libadwaita yt-dlp download manager.</p>
       </description>
     </release>
   </releases>

@@ -12,6 +12,21 @@
     <img src="https://img.shields.io/badge/libadwaita-1.0+-blue.svg?style=flat-square&color=1c71d8" alt="libadwaita" />
     <img src="https://img.shields.io/badge/Python-3.10+-yellow.svg?style=flat-square&color=f6d32d" alt="Python 3.10+" />
   </p>
+---
+
+## 📸 Screenshots
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center"><b>Active Downloads Queue</b><br/><img src="data/screenshots/active-downloads.png" width="400" alt="Active Downloads" /></td>
+      <td align="center"><b>Metadata & Format Selection</b><br/><img src="data/screenshots/metadata-preview.png" width="400" alt="Metadata Preview" /></td>
+    </tr>
+    <tr>
+      <td align="center"><b>Persistent Download History</b><br/><img src="data/screenshots/download-history.png" width="400" alt="Download History" /></td>
+      <td align="center"><b>Preferences & Settings</b><br/><img src="data/screenshots/preferences-settings.png" width="400" alt="Preferences" /></td>
+    </tr>
+  </table>
 </div>
 
 ---
