@@ -35,4 +35,4 @@ jobs:
         NO_AT_BRIDGE: 1
         LIBGL_ALWAYS_SOFTWARE: 1
       run: |
-        xvfb-run -a python3 -m unittest discover -s tests -v
+        xvfb-run -a python3 -m tests
