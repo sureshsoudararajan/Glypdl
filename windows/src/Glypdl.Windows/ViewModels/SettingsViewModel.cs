@@ -16,7 +16,7 @@ public partial class SettingsViewModel : ObservableObject
     private string _downloadDirectory = string.Empty;
 
     [ObservableProperty]
-    private int _maxConcurrentDownloads = 2;
+    private double _maxConcurrentDownloads = 2;
 
     [ObservableProperty]
     private bool _enableNotifications = true;
@@ -91,7 +91,7 @@ public partial class SettingsViewModel : ObservableObject
         var s = new AppSettings
         {
             DownloadDirectory = DownloadDirectory,
-            MaxConcurrentDownloads = MaxConcurrentDownloads,
+            MaxConcurrentDownloads = (int)MaxConcurrentDownloads,
             EnableNotifications = EnableNotifications,
             Theme = SelectedTheme,
             FilenameTemplate = FilenameTemplate,
