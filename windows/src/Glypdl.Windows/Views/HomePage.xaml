@@ -1,0 +1,115 @@
+<Page
+    x:Class="Glypdl.Windows.Views.HomePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:Glypdl.Windows.ViewModels"
+    mc:Ignorable="d">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24">
+        <StackPanel Spacing="20" MaxWidth="800" HorizontalAlignment="Stretch">
+            <!-- Header -->
+            <TextBlock Text="Add Download" Style="{ThemeResource TitleTextBlockStyle}" FontWeight="SemiBold" />
+
+            <!-- URL Input Bar -->
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBox
+                    Grid.Column="0"
+                    PlaceholderText="Paste video or playlist URL (e.g. YouTube, Vimeo, Twitter)..."
+                    Text="{x:Bind ViewModel.UrlInput, Mode=TwoWay}"
+                    KeyDown="UrlTextBox_KeyDown" />
+
+                <Button
+                    Grid.Column="1"
+                    Style="{ThemeResource AccentButtonStyle}"
+                    Command="{x:Bind ViewModel.FetchMetadataCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE721;" />
+                        <TextBlock Text="Fetch" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <!-- Loading Spinner -->
+            <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}" />
+
+            <!-- Status Message -->
+            <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Foreground="{ThemeResource SystemAccentColor}" Visibility="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
+
+            <!-- Metadata Preview Card -->
+            <Border
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="16"
+                Visibility="{x:Bind ViewModel.PreviewMetadata, Mode=OneWay}">
+                <StackPanel Spacing="16">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Thumbnail -->
+                        <Image
+                            Grid.Column="0"
+                            Source="{x:Bind ViewModel.PreviewMetadata.ThumbnailUrl, Mode=OneWay}"
+                            Stretch="UniformToFill"
+                            Height="100"
+                            CornerRadius="6" />
+
+                        <!-- Info -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                            <TextBlock Text="{x:Bind ViewModel.PreviewMetadata.Title, Mode=OneWay}" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="Bold" TextWrapping="Wrap" />
+                            <TextBlock Text="{x:Bind ViewModel.PreviewMetadata.Uploader, Mode=OneWay}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Separator />
+
+                    <!-- Format & Quality Options -->
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Download Options" FontWeight="SemiBold" />
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <ComboBox
+                                Grid.Column="0"
+                                Header="Mode"
+                                HorizontalAlignment="Stretch"
+                                SelectedIndex="0">
+                                <ComboBoxItem Content="Video + Audio" />
+                                <ComboBoxItem Content="Video Only" />
+                                <ComboBoxItem Content="Audio Only" />
+                            </ComboBox>
+
+                            <ComboBox
+                                Grid.Column="1"
+                                Header="Quality"
+                                HorizontalAlignment="Stretch"
+                                ItemsSource="{x:Bind ViewModel.AvailableQualities, Mode=OneWay}"
+                                SelectedItem="{x:Bind ViewModel.SelectedQuality, Mode=TwoWay}" />
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Download Trigger Button -->
+                    <Button
+                        Content="Start Download"
+                        Style="{ThemeResource AccentButtonStyle}"
+                        HorizontalAlignment="Right"
+                        Command="{x:Bind ViewModel.StartDownloadCommand}" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
