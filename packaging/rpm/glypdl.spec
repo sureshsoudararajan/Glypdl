@@ -37,6 +37,9 @@ Includes the latest bundled standalone yt-dlp engine.
 
 %install
 %pyproject_install
+install -d %{buildroot}%{_datadir}/glypdl
+cp -r src/glypdl %{buildroot}%{_datadir}/glypdl/
+install -Dm755 bin/glypdl %{buildroot}%{_bindir}/glypdl
 install -Dm755 %{SOURCE1} %{buildroot}%{_datadir}/glypdl/bin/yt-dlp
 install -Dm755 %{SOURCE1} %{buildroot}%{_bindir}/yt-dlp
 install -Dm644 data/desktop/io.github.sureshsoudararajan.Glypdl.desktop %{buildroot}%{_datadir}/applications/io.github.sureshsoudararajan.Glypdl.desktop
@@ -49,8 +52,8 @@ install -Dm644 data/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glyp
 %doc README.md
 %{_bindir}/glypdl
 %{_bindir}/yt-dlp
+%{_datadir}/glypdl
 %{python3_sitelib}/glypdl*
-%{_datadir}/glypdl/bin/yt-dlp
 %{_datadir}/applications/io.github.sureshsoudararajan.Glypdl.desktop
 %{_datadir}/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml
 %{_datadir}/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg
@@ -58,4 +61,4 @@ install -Dm644 data/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glyp
 
 %changelog
 * Sun Aug 30 2026 Suresh Soundararajan <sureshsoundararajan18@gmail.com> - 1.0.0-1
-- Initial release of Glypdl for Fedora / RHEL / Rocky Linux with bundled yt-dlp
+- Universal cross-distribution release of Glypdl with bundled yt-dlp engine

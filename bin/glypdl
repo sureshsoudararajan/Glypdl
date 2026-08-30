@@ -3,6 +3,7 @@
 
 import sys
 import os
+import glob
 from pathlib import Path
 
 # Dynamically resolve relative to binary location (handles /app in Flatpak, /usr, /usr/local, etc.)
@@ -11,13 +12,16 @@ prefix_share = bin_dir.parent / "share" / "glypdl"
 
 search_paths = [
     str(prefix_share),
-    "/app/share/glypdl",
-    "/app/lib/python3.11/site-packages",
     "/usr/share/glypdl",
-    "/usr/share/glypdl/src",
-    "/usr/lib/python3/dist-packages",
+    "/usr/share/glypdl/glypdl",
+    "/app/share/glypdl",
     "/usr/local/share/glypdl",
+    "/usr/lib/python3/dist-packages",
 ]
+
+# Add any python3.X/site-packages in /usr/lib or /usr/lib64 for multi-python EL/Fedora compatibility
+for pattern in ["/usr/lib/python3*/site-packages", "/usr/lib64/python3*/site-packages"]:
+    search_paths.extend(glob.glob(pattern))
 
 for p in search_paths:
     if os.path.isdir(p) and p not in sys.path:
