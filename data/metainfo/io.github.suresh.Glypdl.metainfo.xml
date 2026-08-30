@@ -24,9 +24,9 @@
     </ul>
   </description>
   <launchable type="desktop-id">io.github.suresh.Glypdl.desktop</launchable>
-  <url type="homepage">https://github.com/sureshsoundararajan/Glypdl</url>
-  <url type="bugtracker">https://github.com/sureshsoundararajan/Glypdl/issues</url>
-  <developer id="io.github.sureshsoundararajan">
+  <url type="homepage">https://github.com/sureshsoudararajan/Glypdl</url>
+  <url type="bugtracker">https://github.com/sureshsoudararajan/Glypdl/issues</url>
+  <developer id="io.github.sureshsoudararajan">
     <name>Suresh Soundararajan</name>
   </developer>
   <provides>
