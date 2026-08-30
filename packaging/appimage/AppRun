@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 HERE="$(dirname "$(readlink -f "${0}")")"
 
+export GI_TYPELIB_PATH="${HERE}/usr/lib/girepository-1.0:${HERE}/usr/lib/x86_64-linux-gnu/girepository-1.0:${GI_TYPELIB_PATH}"
+export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}"
 export PYTHONPATH="${HERE}/usr/share/glypdl:${HERE}/usr/lib/python3/dist-packages:${PYTHONPATH}"
 export PATH="${HERE}/usr/share/glypdl/bin:${HERE}/usr/bin:${PATH}"
 export XDG_DATA_DIRS="${HERE}/usr/share:${XDG_DATA_DIRS}"

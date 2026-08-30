@@ -8,6 +8,8 @@ mkdir -p "$APP_DIR/usr/bin"
 mkdir -p "$APP_DIR/usr/share/glypdl/glypdl"
 mkdir -p "$APP_DIR/usr/share/glypdl/bin"
 mkdir -p "$APP_DIR/usr/lib/python3/dist-packages/glypdl"
+mkdir -p "$APP_DIR/usr/lib/girepository-1.0"
+mkdir -p "$APP_DIR/usr/lib/x86_64-linux-gnu"
 mkdir -p "$APP_DIR/usr/share/applications"
 mkdir -p "$APP_DIR/usr/share/metainfo"
 mkdir -p "$APP_DIR/usr/share/icons/hicolor/scalable/apps"
@@ -25,6 +27,22 @@ chmod +x "$APP_DIR/usr/bin/glypdl"
 echo "Downloading latest official yt-dlp binary into private bundle..."
 curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o "$APP_DIR/usr/share/glypdl/bin/yt-dlp"
 chmod +x "$APP_DIR/usr/share/glypdl/bin/yt-dlp"
+
+# Bundle GObject Introspection typelibs (Gtk-4.0, Adw-1, GLib, Gio, Gdk, Gsk, Graphene, Pango, Cairo, etc.)
+for tldir in /usr/lib/x86_64-linux-gnu/girepository-1.0 /usr/lib64/girepository-1.0 /usr/lib/girepository-1.0; do
+    if [ -d "$tldir" ]; then
+        cp -r "$tldir"/*.typelib "$APP_DIR/usr/lib/girepository-1.0/" 2>/dev/null || true
+    fi
+done
+
+# Bundle GTK4 & Libadwaita shared libraries
+for libdir in /usr/lib/x86_64-linux-gnu /usr/lib64 /usr/lib; do
+    if [ -d "$libdir" ]; then
+        cp -d "$libdir"/libgtk-4.so* "$APP_DIR/usr/lib/x86_64-linux-gnu/" 2>/dev/null || true
+        cp -d "$libdir"/libadwaita-1.so* "$APP_DIR/usr/lib/x86_64-linux-gnu/" 2>/dev/null || true
+        cp -d "$libdir"/libgraphene-1.0.so* "$APP_DIR/usr/lib/x86_64-linux-gnu/" 2>/dev/null || true
+    fi
+done
 
 # Copy AppRun & desktop integration
 cp packaging/appimage/AppRun "$APP_DIR/AppRun"
