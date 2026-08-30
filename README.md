@@ -4,204 +4,140 @@
   <img src="data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg" width="128" height="128" alt="Glypdl Logo" />
   <h3>A lightweight, native Linux desktop download manager for yt-dlp</h3>
   <p>Built with <b>GTK4</b> and <b>libadwaita</b> conforming to modern GNOME Human Interface Guidelines.</p>
+
+  <p>
+    <a href="https://github.com/sureshsoudararajan/Glypdl/releases"><img src="https://img.shields.io/github/v/release/sureshsoudararajan/Glypdl?style=flat-square&color=3584e4" alt="Latest Release" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3.0-blue.svg?style=flat-square" alt="License: GPL v3" /></a>
+    <img src="https://img.shields.io/badge/GTK-4.0-green.svg?style=flat-square&color=2ec27e" alt="GTK4" />
+    <img src="https://img.shields.io/badge/libadwaita-1.0+-blue.svg?style=flat-square&color=1c71d8" alt="libadwaita" />
+    <img src="https://img.shields.io/badge/Python-3.10+-yellow.svg?style=flat-square&color=f6d32d" alt="Python 3.10+" />
+  </p>
 </div>
 
 ---
 
-## Features
+## 🌟 Features
 
-* **Native GTK4 & Libadwaita Interface**:
-  * Ultra-fast startup and minimal RAM usage — zero Electron, Chromium, or web wrappers.
-  * Seamless theme integration supporting **System**, **Light**, and **Dark** color schemes.
-  * Cross-desktop compatibility: Runs natively on **GNOME**, **KDE Plasma**, **Cinnamon**, **XFCE**, **MATE**, **COSMIC**, and tiling window managers (**Hyprland**, **i3**, **sway**).
+* **⚡ Ultra-Lightweight & Native GTK4 / Libadwaita**:
+  * Pure native performance with near-instant launch times and minimal memory footprint &mdash; zero Electron or web wrappers.
+  * Adaptive layout following GNOME Human Interface Guidelines (HIG).
+  * Seamless theme integration supporting **System**, **Light**, and **Dark** modes.
+  * Cross-desktop compatibility across **GNOME**, **KDE Plasma**, **Cinnamon**, **XFCE**, **MATE**, **COSMIC**, and tiling window managers (**Hyprland**, **i3**, **Sway**).
 
-* **Flexible Download Modes**:
-  * **Video + Audio**: Automatically downloads and merges high-quality video and audio streams using `ffmpeg`.
+* **🎬 Flexible Download Modes & Quality Selection**:
+  * **Video + Audio**: Automatically downloads and merges high-definition video and audio streams using `ffmpeg`.
   * **Video Only**: Download video streams without audio across all standard resolutions (**4K 2160p**, **1440p**, **1080p**, **720p**, **480p**, **360p**, **240p**, **144p**).
   * **Audio Only**: Extract and convert audio directly to **MP3**, **M4A**, **Opus**, **FLAC**, or **WAV** with maximum audio quality.
 
-* **Interactive YouTube Playlist Support**:
+* **📑 Interactive YouTube Playlist Support**:
   * Automatically detects playlists and fetches video titles, thumbnails, durations, and channels in a scrollable preview card.
-  * Individual per-video selection checkboxes to download only chosen videos.
+  * Individual per-video selection checkboxes to download only the tracks you want.
   * One-click **Select All** / **Deselect All** toggle with a live selection counter (*e.g., 8 of 12 selected*).
-  * Batch format selector applying quality settings across all selected playlist items.
+  * Batch format selector applying quality settings across all selected playlist items simultaneously.
 
-* **Real-Time Network & Progress Metrics**:
-  * Accurate live download speed (*e.g., 9.7 MB/s*), estimated time remaining (ETA), downloaded bytes, and total file size.
-  * Visual progress bar with status badges: `Queued`, `Downloading`, `Processing`, `Merging`, `Completed`, `Failed`, and `Cancelled`.
+* **📊 Real-Time Network & Progress Metrics**:
+  * Live download speed (*e.g., 9.7 MB/s*), estimated time remaining (ETA), downloaded bytes, and total file size.
+  * Dynamic status badges: `Queued`, `Downloading`, `Processing`, `Merging`, `Completed`, `Failed`, and `Cancelled`.
   * Non-blocking multithreaded architecture keeping the GTK UI smooth and responsive at all times.
 
-* **Queue & Concurrency Management**:
-  * Configurable simultaneous downloads (1 to 10 concurrent items) with automatic queue processing.
-  * Individual item controls: **Pause**, **Resume**, **Cancel**, and **Retry on Failure**.
+* **⚙️ Built-In Zero-Click Engine Provisioning**:
+  * **Bundled `yt-dlp`**: Every package bundles the latest standalone official `yt-dlp` binary isolated in `/usr/share/glypdl/bin/` so you always have the latest engine without package conflicts.
+  * **Auto-Provisioning FFmpeg**: If `ffmpeg` is missing on your host OS, Glypdl automatically downloads a static standalone binary in the background to `~/.local/share/glypdl/bin/`.
 
-* **Persistent SQLite History & File Size Tracking**:
+* **🔒 Cookie Profiles & Authentication Handling**:
+  * **Saved Profiles**: Save and name multiple Netscape `cookies.txt` files (*e.g., YouTube, Patreon, Vimeo*) in Preferences with one-click **Use Profile** switching and active status badges.
+  * **Interactive Authentication Recovery**: If a private, age-restricted, or bot-protected link fails, Glypdl automatically displays an **Authentication / Cookies Required** dialog allowing immediate cookie profile selection and retry.
+
+* **📜 Persistent SQLite History**:
   * Local SQLite database recording every download, timestamp, media format, URL, cached thumbnail, and exact disk file size.
   * Instant search filtering by video title or URL.
   * Context actions: **Open File**, **Open Containing Folder**, **Download Again**, **Copy URL**, and **Delete**.
   * One-click **Clear All History** with confirmation.
 
-* **Cookie Profiles & Authentication Handling**:
-  * **Saved Cookie Profiles**: Save and name multiple Netscape `cookies.txt` files (*e.g., YouTube, Patreon, Vimeo*) in Preferences with one-click **Use Profile** switching and active status badges.
-  * **Interactive Authentication Recovery**: If a private, age-restricted, or bot-protected link fails, Glypdl automatically displays an **Authentication / Cookies Required** dialog allowing immediate cookie profile selection and retry.
-  * **Automatic Pre-Selection**: When media metadata is fetched using a cookie profile, that exact profile is automatically pre-selected in the format selector.
-
-* **Desktop Integration**:
-  * Desktop notifications on download completion or failure.
-  * Native file & directory selection via `xdg-desktop-portal` (opens native Dolphin on KDE, Nautilus on GNOME, Nemo on Cinnamon).
-  * Standard desktop menu launcher with scalable vector SVG and 512×512 application icons.
-
 ---
 
-## Dependencies & Requirements
+## 📥 Installation
 
-* **Python**: `>= 3.10`
-* **GTK**: `GTK4 (>= 4.0)` & `libadwaita (>= 1.0)`
-* **PyGObject**: `python3-gi / python-gobject`
-* **yt-dlp**: Required command-line media downloader
-* **ffmpeg**: Required for stream merging and audio extraction
+Choose the package format best suited for your Linux distribution:
 
-### Installing System Dependencies
+### 1. 🚀 Universal Standalone AppImage (Works on all Linux distros)
+Download the standalone AppImage, make it executable, and run:
 
-#### Arch Linux / Manjaro / EndeavourOS
 ```bash
-sudo pacman -S python python-gobject gtk4 libadwaita yt-dlp ffmpeg
-```
-
-#### Debian / Ubuntu / Linux Mint / Pop!_OS
-```bash
-sudo apt update
-sudo apt install python3 python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 yt-dlp ffmpeg
-```
-
-#### Fedora / RHEL / Rocky Linux / AlmaLinux
-```bash
-sudo dnf install python3 python3-gobject gtk4 libadwaita yt-dlp ffmpeg
+wget -O Glypdl-x86_64.AppImage https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.0.0/Glypdl-x86_64.AppImage
+chmod +x Glypdl-x86_64.AppImage
+./Glypdl-x86_64.AppImage
 ```
 
 ---
 
-## Installation & Packaging Guide
-
-### 1. Arch Linux / Manjaro (`pacman`)
-
-Build and install the native `.pkg.tar.zst` package:
+### 2. 📦 Debian / Ubuntu / Linux Mint / Pop!_OS (`.deb`)
+Install via `apt` to automatically resolve dependencies:
 
 ```bash
-cd Glypdl
-
-# Build the package
-makepkg -f --nodeps
-
-# Install the package locally
-sudo pacman -U ./glypdl-1.0.0-1-any.pkg.tar.zst
-```
-
-To run Glypdl:
-```bash
+wget -O glypdl.deb https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.0.0/glypdl_1.0.0-1_all.deb
+sudo apt install -y ./glypdl.deb
 glypdl
 ```
 
 ---
 
-### 2. Debian / Ubuntu / Linux Mint / Pop!_OS (`.deb`)
+### 3. 📦 Fedora / Rocky Linux / RHEL / AlmaLinux (`.rpm`)
+Install via `dnf`:
 
-#### Method A: Universal Python Builder (Works on any distro)
 ```bash
-cd Glypdl
-python3 packaging/deb/build_deb.py
-```
-> Generates `glypdl_1.0.0_all.deb` in the project root.
-
-#### Method B: Using `dpkg-deb` (On Debian/Ubuntu)
-```bash
-cd Glypdl
-bash packaging/deb/build_deb.sh
-```
-
-#### Install the `.deb` package:
-```bash
-sudo apt install ./glypdl_1.0.0_all.deb
+wget -O glypdl.rpm https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.0.0/glypdl-1.0.0-1.fc44.noarch.rpm
+sudo dnf install -y ./glypdl.rpm
+glypdl
 ```
 
 ---
 
-### 3. Fedora / RHEL / CentOS / openSUSE (`.rpm`)
+### 4. 📦 Arch Linux / Manjaro / EndeavourOS
 
-#### Prerequisites:
+#### Method A: Direct Pacman Package Installation (Pre-built)
 ```bash
-sudo dnf install rpm-build rpmdevtools python3-devel
+wget https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.0.0/glypdl-1.0.0-1-any.pkg.tar.zst
+sudo pacman -U ./glypdl-1.0.0-1-any.pkg.tar.zst
+glypdl
 ```
 
-#### Build Steps:
+#### Method B: Build from Git with `makepkg`
 ```bash
-# 1. Create rpmbuild directory tree
-mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-
-# 2. Create the source archive
-tar --exclude-vcs --exclude='*.deb' --exclude='*.pkg.tar.zst' \
-    -czvf ~/rpmbuild/SOURCES/glypdl-1.0.0.tar.gz \
-    --transform 's,^\.,glypdl-1.0.0,' .
-
-# 3. Build the RPM package
-cp packaging/rpm/glypdl.spec ~/rpmbuild/SPECS/
-rpmbuild -ba ~/rpmbuild/SPECS/glypdl.spec
-
-# 4. Install the built package
-sudo dnf install ~/rpmbuild/RPMS/noarch/glypdl-1.0.0-1.*.noarch.rpm
+git clone https://github.com/sureshsoudararajan/Glypdl.git
+cd Glypdl
+makepkg -si
 ```
 
 ---
 
-### 4. Flatpak (Cross-Distribution Sandboxed Container)
+### 5. 🛍️ Flatpak (Sandboxed Container)
 
-The Flatpak build bundles `yt-dlp` directly inside the container so it works out-of-the-box on any Linux distribution.
-
-#### Prerequisites:
+#### Build & Install Locally:
 ```bash
-# Install Flatpak & Flatpak Builder
-# Arch:   sudo pacman -S flatpak flatpak-builder
-# Fedora: sudo dnf install flatpak flatpak-builder
-# Ubuntu: sudo apt install flatpak flatpak-builder
-
-# Install GNOME 46 runtime
+cd Glypdl
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak install flathub org.gnome.Platform//46 org.gnome.Sdk//46
-```
+flatpak install -y flathub org.gnome.Platform//50 org.gnome.Sdk//50
 
-#### Build & Install:
-```bash
-cd Glypdl
 flatpak-builder --user --install --force-clean build-dir packaging/flatpak/io.github.sureshsoudararajan.Glypdl.yaml
-```
-
-#### Run Flatpak:
-```bash
 flatpak run io.github.sureshsoudararajan.Glypdl
 ```
 
-#### Export as Single `.flatpak` Bundle (Optional):
-```bash
-flatpak-builder --repo=repo --force-clean build-dir packaging/flatpak/io.github.sureshsoudararajan.Glypdl.yaml
-flatpak build-bundle repo glypdl.flatpak io.github.sureshsoudararajan.Glypdl
-```
-
 ---
 
-### 5. Running Directly from Source (No Installation)
-
-You can run Glypdl directly from the source directory without installing:
+### 6. 💻 Running Directly from Source (No Installation)
 
 ```bash
 git clone https://github.com/sureshsoudararajan/Glypdl.git
 cd Glypdl
 
+# Run directly
 PYTHONPATH=src python3 -m glypdl.app
 ```
 
 ---
 
-## Keyboard Shortcuts
+## ⌨️ Keyboard Shortcuts
 
 | Shortcut | Action |
 | :--- | :--- |
@@ -214,28 +150,29 @@ PYTHONPATH=src python3 -m glypdl.app
 
 ---
 
-## File & Configuration Paths
+## 📁 File & Configuration Paths
 
 Following the **XDG Base Directory Specification**:
 
 * **Configuration**: `~/.config/glypdl/config.ini`
 * **Cookie Profiles**: `~/.config/glypdl/profiles.json`
 * **History Database**: `~/.local/share/glypdl/history.db`
+* **Private Binaries (FFmpeg/yt-dlp)**: `~/.local/share/glypdl/bin/`
 * **Thumbnail Cache**: `~/.cache/glypdl/thumbnails/`
 * **Default Download Folder**: `~/Downloads`
 
 ---
 
-## Running Automated Tests
+## 🧪 Running Automated Tests
 
-Run the complete 24-test unit suite:
+Run the full 24-test automated suite:
 
 ```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
+PYTHONPATH=src python3 -m tests
 ```
 
 ---
 
-## License
+## 📄 License
 
-This project is licensed under the **GNU General Public License v3.0** — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **GNU General Public License v3.0** &mdash; see the [LICENSE](LICENSE) file for details.
