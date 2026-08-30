@@ -37,10 +37,10 @@
             </Grid>
 
             <!-- Loading Spinner -->
-            <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}" />
+            <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Visibility="{x:Bind BoolToVisibility(ViewModel.IsLoading), Mode=OneWay}" />
 
             <!-- Status Message -->
-            <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Foreground="{ThemeResource SystemAccentColor}" Visibility="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" />
+            <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Foreground="{ThemeResource SystemAccentColor}" Visibility="{x:Bind StringToVisibility(ViewModel.StatusMessage), Mode=OneWay}" />
 
             <!-- Metadata Preview Card -->
             <Border
@@ -49,7 +49,7 @@
                 BorderThickness="1"
                 CornerRadius="8"
                 Padding="16"
-                Visibility="{x:Bind ViewModel.PreviewMetadata, Mode=OneWay}">
+                Visibility="{x:Bind ObjectToVisibility(ViewModel.PreviewMetadata), Mode=OneWay}">
                 <StackPanel Spacing="16">
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
