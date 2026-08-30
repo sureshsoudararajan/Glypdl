@@ -11,6 +11,7 @@ mkdir -p "$PKG_DIR/usr/bin"
 mkdir -p "$PKG_DIR/usr/share/applications"
 mkdir -p "$PKG_DIR/usr/share/metainfo"
 mkdir -p "$PKG_DIR/usr/share/icons/hicolor/scalable/apps"
+mkdir -p "$PKG_DIR/usr/share/icons/hicolor/512x512/apps"
 
 # Copy python source code
 cp -r src/glypdl/* "$PKG_DIR/usr/lib/python3/dist-packages/glypdl/"

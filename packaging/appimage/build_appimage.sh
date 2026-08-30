@@ -9,6 +9,7 @@ mkdir -p "$APP_DIR/usr/lib/python3/dist-packages"
 mkdir -p "$APP_DIR/usr/share/applications"
 mkdir -p "$APP_DIR/usr/share/metainfo"
 mkdir -p "$APP_DIR/usr/share/icons/hicolor/scalable/apps"
+mkdir -p "$APP_DIR/usr/share/icons/hicolor/512x512/apps"
 
 # Copy application source
 cp -r src/glypdl "$APP_DIR/usr/lib/python3/dist-packages/"
