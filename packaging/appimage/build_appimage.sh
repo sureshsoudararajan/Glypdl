@@ -14,7 +14,7 @@ mkdir -p "$APP_DIR/usr/share/icons/hicolor/512x512/apps"
 # Copy application source
 cp -r src/glypdl "$APP_DIR/usr/lib/python3/dist-packages/"
 
-# Copy launcher binary
+# Copy launcher binary & bundle latest yt-dlp engine
 cat << 'EOF' > "$APP_DIR/usr/bin/glypdl"
 #!/usr/bin/env python3
 import sys
@@ -23,6 +23,10 @@ if __name__ == '__main__':
     sys.exit(main())
 EOF
 chmod +x "$APP_DIR/usr/bin/glypdl"
+
+echo "Downloading latest official yt-dlp binary..."
+curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o "$APP_DIR/usr/bin/yt-dlp"
+chmod +x "$APP_DIR/usr/bin/yt-dlp"
 
 # Copy AppRun & desktop integration
 cp packaging/appimage/AppRun "$APP_DIR/AppRun"

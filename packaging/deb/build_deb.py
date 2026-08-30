@@ -43,11 +43,21 @@ def create_deb():
             else:
                 shutil.copy2(item, target)
 
-        # 2. Copy launcher
+        # 2. Copy launcher & bundle latest yt-dlp binary
         launcher_src = root_dir / "bin" / "glypdl"
         launcher_dest = pkg_root / "usr/bin/glypdl"
         shutil.copy2(launcher_src, launcher_dest)
         launcher_dest.chmod(0o755)
+
+        import urllib.request
+        ytdlp_dest = pkg_root / "usr/bin/yt-dlp"
+        try:
+            print("Downloading latest official yt-dlp binary...")
+            urllib.request.urlretrieve("https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp", ytdlp_dest)
+            ytdlp_dest.chmod(0o755)
+            shutil.copy2(ytdlp_dest, pkg_root / "usr/share/glypdl/glypdl/yt-dlp")
+        except Exception as e:
+            print(f"Notice: could not download latest yt-dlp ({e})")
 
         # 3. Copy desktop, metainfo, icon, and docs
         shutil.copy2(root_dir / "data/desktop/io.github.sureshsoudararajan.Glypdl.desktop", pkg_root / "usr/share/applications/")

@@ -20,7 +20,23 @@ class YtDlpService:
             if custom_path and shutil.which(custom_path):
                 return custom_path
         
-        return shutil.which('yt-dlp')
+        found = shutil.which('yt-dlp')
+        if found:
+            return found
+
+        # Check bundled and platform locations
+        candidates = [
+            "/app/bin/yt-dlp",
+            "/usr/share/glypdl/bin/yt-dlp",
+            "/usr/local/bin/yt-dlp",
+            "/usr/bin/yt-dlp",
+            os.path.expanduser("~/.local/bin/yt-dlp"),
+        ]
+        for c in candidates:
+            if os.path.isfile(c) and os.access(c, os.X_OK):
+                return c
+
+        return None
 
     def get_version(self, path: Optional[str] = None) -> Optional[str]:
         """Get the yt-dlp version string."""
