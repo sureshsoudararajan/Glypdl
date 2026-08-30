@@ -12,6 +12,8 @@
     <img src="https://img.shields.io/badge/libadwaita-1.0+-blue.svg?style=flat-square&color=1c71d8" alt="libadwaita" />
     <img src="https://img.shields.io/badge/Python-3.10+-yellow.svg?style=flat-square&color=f6d32d" alt="Python 3.10+" />
   </p>
+</div>
+
 ---
 
 ## 📸 Screenshots
