@@ -7,6 +7,9 @@ License:        GPLv3+
 URL:            https://github.com/sureshsoudararajan/Glypdl
 Source0:        %{name}-%{version}.tar.gz
 
+# Exclude strict Python-version-locked dist generator requires for universal RPM compatibility (Fedora, RHEL, Rocky, Alma)
+%global __requires_exclude ^python3\\..*dist.*$
+
 BuildArch:      noarch
 BuildRequires:  python3-devel
 BuildRequires:  python3-pip
