@@ -94,14 +94,14 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Restore Dependencies
-        run: dotnet restore windows/Glypdl.Windows.sln
+        run: dotnet restore windows/Glypdl.Windows.sln -p:Platform=x64
 
       - name: Run Windows Tests
-        run: dotnet test windows/tests/Glypdl.Windows.Tests/Glypdl.Windows.Tests.csproj --configuration Release
+        run: dotnet test windows/tests/Glypdl.Windows.Tests/Glypdl.Windows.Tests.csproj --configuration Release -p:Platform=x64
 
       - name: Publish Windows App (win-x64)
         run: |
-          dotnet publish windows/src/Glypdl.Windows/Glypdl.Windows.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o windows/publish
+          dotnet publish windows/src/Glypdl.Windows/Glypdl.Windows.csproj -c Release -r win-x64 -p:Platform=x64 --self-contained true -p:PublishSingleFile=false -o windows/publish
 
       - name: Install Inno Setup
         run: choco install innosetup -y
