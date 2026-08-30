@@ -29,6 +29,12 @@
   <developer id="io.github.sureshsoudararajan">
     <name>Suresh Soundararajan</name>
   </developer>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Glypdl main window managing active and queued downloads</caption>
+      <image>https://raw.githubusercontent.com/sureshsoudararajan/Glypdl/main/data/screenshots/main-window.png</image>
+    </screenshot>
+  </screenshots>
   <provides>
     <binary>glypdl</binary>
   </provides>
