@@ -34,7 +34,7 @@ cp data/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg "$APP_DIR/io.git
 cp data/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg "$APP_DIR/usr/share/icons/hicolor/scalable/apps/"
 
 if command -v appimagetool >/dev/null 2>&1; then
-    ARCH=x86_64 appimagetool "$APP_DIR" Glypdl-x86_64.AppImage
+    ARCH=x86_64 appimagetool --appimage-extract-and-run "$APP_DIR" Glypdl-x86_64.AppImage || ARCH=x86_64 appimagetool "$APP_DIR" Glypdl-x86_64.AppImage
     echo "AppImage created successfully: Glypdl-x86_64.AppImage"
 else
     echo "AppDir structured at $APP_DIR. Install appimagetool to package into a single .AppImage binary."
