@@ -13,7 +13,7 @@
     <!-- Default platform to x64 for Self-Contained WinUI 3 -->
     <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</Platform>
     <Platforms>x64;ARM64</Platforms>
-    <!-- Enable RID graph compatibility for Windows App SDK -->
     <UseRidGraph>true</UseRidGraph>
+    <EnableMsixTooling>false</EnableMsixTooling>
   </PropertyGroup>
 </Project>
