@@ -9,7 +9,10 @@ Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      noarch
 BuildRequires:  python3-devel
+BuildRequires:  python3-pip
+BuildRequires:  python3-wheel
 BuildRequires:  python3-setuptools
+BuildRequires:  pyproject-rpm-macros
 
 Requires:       python3
 Requires:       python3-gobject
@@ -26,10 +29,10 @@ Built with GTK4 and libadwaita conforming to GNOME HIG.
 %autosetup
 
 %build
-%py3_build
+%pyproject_wheel
 
 %install
-%py3_install
+%pyproject_install
 install -Dm644 data/desktop/io.github.suresh.Glypdl.desktop %{buildroot}%{_datadir}/applications/io.github.suresh.Glypdl.desktop
 install -Dm644 data/metainfo/io.github.suresh.Glypdl.metainfo.xml %{buildroot}%{_datadir}/metainfo/io.github.suresh.Glypdl.metainfo.xml
 install -Dm644 data/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg

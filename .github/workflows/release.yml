@@ -70,7 +70,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build RPM Package
         run: |
-          dnf install -y rpm-build python3-devel python3-setuptools
+          dnf install -y rpm-build python3-devel python3-pip python3-wheel python3-setuptools pyproject-rpm-macros
           chmod +x packaging/rpm/build_rpm.sh
           ./packaging/rpm/build_rpm.sh
       - name: Upload RPM Package
