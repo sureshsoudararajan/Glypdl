@@ -82,9 +82,44 @@ jobs:
           name: glypdl-rpm
           path: "*.rpm"
 
+  build-windows:
+    name: Build Windows 11 App & Installer (.exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore Dependencies
+        run: dotnet restore windows/Glypdl.Windows.sln
+
+      - name: Run Windows Tests
+        run: dotnet test windows/tests/Glypdl.Windows.Tests/Glypdl.Windows.Tests.csproj --configuration Release
+
+      - name: Publish Windows App (win-x64)
+        run: |
+          dotnet publish windows/src/Glypdl.Windows/Glypdl.Windows.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o windows/publish
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build Windows Setup.exe
+        run: |
+          mkdir windows\dist
+          iscc windows/packaging/inno/setup.iss
+
+      - name: Upload Windows Setup
+        uses: actions/upload-artifact@v4
+        with:
+          name: glypdl-windows
+          path: windows/dist/*.exe
+
   release:
     name: Create GitHub Release
-    needs: [build-deb, build-appimage, build-arch, build-rpm]
+    needs: [build-deb, build-appimage, build-arch, build-rpm, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write

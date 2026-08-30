@@ -75,9 +75,17 @@
 
 ## 📥 Installation
 
-Choose the package format best suited for your Linux distribution:
+Choose the package format best suited for your operating system:
 
-### 1. 🚀 Universal Standalone AppImage (Works on all Linux distros)
+### 🪟 Windows 11 / 10 Installer (`.exe`)
+Download the official native Windows installer from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases):
+1. Download **`Glypdl-1.0.0-Setup-x64.exe`**.
+2. Run the installer to set up Start Menu and Desktop shortcuts.
+3. Launch **Glypdl** from your Start Menu!
+
+---
+
+### 1. 🚀 Universal Standalone AppImage (Linux)
 Download the standalone AppImage, make it executable, and run:
 
 ```bash
