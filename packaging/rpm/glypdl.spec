@@ -41,7 +41,6 @@ install -d %{buildroot}%{_datadir}/glypdl
 cp -r src/glypdl %{buildroot}%{_datadir}/glypdl/
 install -Dm755 bin/glypdl %{buildroot}%{_bindir}/glypdl
 install -Dm755 %{SOURCE1} %{buildroot}%{_datadir}/glypdl/bin/yt-dlp
-install -Dm755 %{SOURCE1} %{buildroot}%{_bindir}/yt-dlp
 install -Dm644 data/desktop/io.github.sureshsoudararajan.Glypdl.desktop %{buildroot}%{_datadir}/applications/io.github.sureshsoudararajan.Glypdl.desktop
 install -Dm644 data/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml %{buildroot}%{_datadir}/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml
 install -Dm644 data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg
@@ -51,7 +50,6 @@ install -Dm644 data/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glyp
 %license LICENSE
 %doc README.md
 %{_bindir}/glypdl
-%{_bindir}/yt-dlp
 %{_datadir}/glypdl
 %{python3_sitelib}/glypdl*
 %{_datadir}/applications/io.github.sureshsoudararajan.Glypdl.desktop

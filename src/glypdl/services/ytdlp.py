@@ -14,27 +14,27 @@ class YtDlpService:
         self.settings = settings
 
     def detect(self) -> Optional[str]:
-        """Find the yt-dlp executable path."""
+        """Find the yt-dlp executable path. Prioritizes bundled app binary."""
         if self.settings:
             custom_path = self.settings.get_custom_ytdlp_path() if hasattr(self.settings, 'get_custom_ytdlp_path') else self.settings.get('ytdlp_path', '')
             if custom_path and shutil.which(custom_path):
                 return custom_path
         
-        found = shutil.which('yt-dlp')
-        if found:
-            return found
-
-        # Check bundled and platform locations
+        # 1. First priority: Always check Glypdl's own bundled engines
         candidates = [
             "/app/bin/yt-dlp",
             "/usr/share/glypdl/bin/yt-dlp",
-            "/usr/local/bin/yt-dlp",
-            "/usr/bin/yt-dlp",
-            os.path.expanduser("~/.local/bin/yt-dlp"),
+            "/usr/local/share/glypdl/bin/yt-dlp",
+            os.path.expanduser("~/.local/share/glypdl/bin/yt-dlp"),
         ]
         for c in candidates:
             if os.path.isfile(c) and os.access(c, os.X_OK):
                 return c
+
+        # 2. System PATH
+        found = shutil.which('yt-dlp')
+        if found:
+            return found
 
         return None
 
@@ -67,29 +67,28 @@ class YtDlpService:
         return path
 
     def detect_ffmpeg(self) -> Optional[str]:
-        """Find the ffmpeg executable path."""
+        """Find the ffmpeg executable path. Prioritizes bundled / local app binary."""
         if self.settings:
             custom_path = self.settings.get_custom_ffmpeg_path() if hasattr(self.settings, 'get_custom_ffmpeg_path') else self.settings.get('ffmpeg_path', '')
             if custom_path and shutil.which(custom_path):
                 return custom_path
 
-        found = shutil.which('ffmpeg')
-        if found:
-            return found
-
-        # Check local data bin dir and platform/bundled locations
+        # 1. First priority: Glypdl private data / bundled paths
         from glypdl.utils.paths import get_bin_dir
         candidates = [
-            str(get_bin_dir() / "ffmpeg"),
             "/app/bin/ffmpeg",
             "/usr/share/glypdl/bin/ffmpeg",
-            "/usr/local/bin/ffmpeg",
-            "/usr/bin/ffmpeg",
-            os.path.expanduser("~/.local/bin/ffmpeg"),
+            str(get_bin_dir() / "ffmpeg"),
+            "/usr/local/share/glypdl/bin/ffmpeg",
         ]
         for c in candidates:
             if os.path.isfile(c) and os.access(c, os.X_OK):
                 return c
+
+        # 2. System PATH
+        found = shutil.which('ffmpeg')
+        if found:
+            return found
 
         return None
 

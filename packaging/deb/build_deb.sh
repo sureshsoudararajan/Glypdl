@@ -19,11 +19,10 @@ mkdir -p "$PKG_DIR/usr/share/icons/hicolor/512x512/apps"
 cp -r src/glypdl/* "$PKG_DIR/usr/lib/python3/dist-packages/glypdl/"
 cp -r src/glypdl/* "$PKG_DIR/usr/share/glypdl/glypdl/"
 
-# Download latest standalone official yt-dlp binary
-echo "Downloading latest official yt-dlp binary..."
-curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o "$PKG_DIR/usr/bin/yt-dlp"
-chmod +x "$PKG_DIR/usr/bin/yt-dlp"
-cp "$PKG_DIR/usr/bin/yt-dlp" "$PKG_DIR/usr/share/glypdl/bin/yt-dlp"
+# Download latest standalone official yt-dlp binary into private /usr/share/glypdl/bin
+echo "Downloading latest official yt-dlp binary into private bundle..."
+curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o "$PKG_DIR/usr/share/glypdl/bin/yt-dlp"
+chmod +x "$PKG_DIR/usr/share/glypdl/bin/yt-dlp"
 
 # Universal Launcher
 cp bin/glypdl "$PKG_DIR/usr/bin/glypdl"
@@ -54,4 +53,4 @@ EOF
 
 dpkg-deb --build "$PKG_DIR"
 rm -rf "$PKG_DIR"
-echo "Built $PKG_DIR.deb successfully with bundled latest yt-dlp!"
+echo "Built $PKG_DIR.deb successfully with private bundled latest yt-dlp!"

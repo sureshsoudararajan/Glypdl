@@ -50,12 +50,12 @@ def create_deb():
         launcher_dest.chmod(0o755)
 
         import urllib.request
-        ytdlp_dest = pkg_root / "usr/bin/yt-dlp"
+        ytdlp_dest = pkg_root / "usr/share/glypdl/bin/yt-dlp"
+        (pkg_root / "usr/share/glypdl/bin").mkdir(parents=True, exist_ok=True)
         try:
             print("Downloading latest official yt-dlp binary...")
             urllib.request.urlretrieve("https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp", ytdlp_dest)
             ytdlp_dest.chmod(0o755)
-            shutil.copy2(ytdlp_dest, pkg_root / "usr/share/glypdl/glypdl/yt-dlp")
         except Exception as e:
             print(f"Notice: could not download latest yt-dlp ({e})")
 
