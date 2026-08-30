@@ -32,6 +32,10 @@ package() {
     cd "$srcdir/$pkgname-$pkgver"
     python -m installer --destdir="$pkgdir" dist/*.whl
 
+    install -d "$pkgdir/usr/share/glypdl"
+    cp -r src/glypdl "$pkgdir/usr/share/glypdl/"
+    install -Dm755 bin/glypdl "$pkgdir/usr/bin/glypdl"
+
     install -Dm644 data/desktop/io.github.sureshsoudararajan.Glypdl.desktop "$pkgdir/usr/share/applications/io.github.sureshsoudararajan.Glypdl.desktop"
     install -Dm644 data/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml "$pkgdir/usr/share/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml"
     install -Dm644 data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg"
