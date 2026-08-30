@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=Glypdl
+GenericName=Video Downloader
+Comment=A lightweight native Linux graphical frontend for yt-dlp
+Exec=glypdl %U
+Icon=io.github.suresh.Glypdl
+Terminal=false
+Type=Application
+Categories=GNOME;GTK;AudioVideo;Video;Network;FileTransfer;
+Keywords=youtube;yt-dlp;download;video;audio;media;downloader;
+StartupNotify=true
+MimeType=x-scheme-handler/http;x-scheme-handler/https;
+X-Purism-FormFactor=Workstation;Mobile;

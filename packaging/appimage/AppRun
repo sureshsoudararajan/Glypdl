@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+HERE="$(dirname "$(readlink -f "${0}")")"
+export PYTHONPATH="${HERE}/usr/lib/python3/dist-packages:${PYTHONPATH}"
+export PATH="${HERE}/usr/bin:${PATH}"
+export XDG_DATA_DIRS="${HERE}/usr/share:${XDG_DATA_DIRS}"
+exec python3 "${HERE}/usr/bin/glypdl" "$@"

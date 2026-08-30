@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "glypdl"
+version = "1.0.0"
+description = "A lightweight native Linux graphical frontend for yt-dlp"
+authors = [
+    {name = "Suresh Soundararajan", email = "sureshsoundararajan18@gmail.com"}
+]
+license = {text = "GPL-3.0-or-later"}
+requires-python = ">=3.10"
+dependencies = [
+    "PyGObject>=3.42.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/sureshsoundararajan/Glypdl"
+Issues = "https://github.com/sureshsoundararajan/Glypdl/issues"
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+glypdl = "glypdl.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

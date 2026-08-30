@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+"""Glypdl launcher executable."""
+
+import sys
+import os
+from pathlib import Path
+
+# Dynamically resolve relative to binary location (handles /app in Flatpak, /usr, /usr/local, etc.)
+bin_dir = Path(__file__).resolve().parent
+prefix_share = bin_dir.parent / "share" / "glypdl"
+
+search_paths = [
+    str(prefix_share),
+    "/app/share/glypdl",
+    "/app/lib/python3.11/site-packages",
+    "/usr/share/glypdl",
+    "/usr/share/glypdl/src",
+    "/usr/lib/python3/dist-packages",
+    "/usr/local/share/glypdl",
+]
+
+for p in search_paths:
+    if os.path.isdir(p) and p not in sys.path:
+        sys.path.insert(0, p)
+
+from glypdl.app import main
+
+if __name__ == '__main__':
+    sys.exit(main())

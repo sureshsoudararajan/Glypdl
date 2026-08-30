@@ -1,0 +1,55 @@
+name: Build & Release Packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Debian Package
+        run: |
+          chmod +x packaging/deb/build_deb.sh
+          ./packaging/deb/build_deb.sh
+      - name: Upload .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: glypdl-deb
+          path: "*.deb"
+
+  build-appimage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install AppImageTool
+        run: |
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage -O /usr/local/bin/appimagetool
+          chmod +x /usr/local/bin/appimagetool
+      - name: Build AppImage
+        run: |
+          chmod +x packaging/appimage/build_appimage.sh
+          ./packaging/appimage/build_appimage.sh
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: glypdl-appimage
+          path: "*.AppImage"
+
+  release:
+    needs: [build-deb, build-appimage]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-release
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-release/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

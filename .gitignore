@@ -1,0 +1,57 @@
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / Packaging artifacts
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+pkg/
+srcdir/
+*.pkg.tar.zst
+*.pkg.tar.xz
+*.deb
+*.rpm
+glypdl_*/
+build-dir/
+.flatpak-builder/
+repo/
+*.flatpak
+
+# Local Databases, Logs, and Test Artifacts
+*.db
+*.sqlite
+*.sqlite3
+*.log
+history.db
+test_*.ini
+test_config.ini
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Local Cookies & Authentication Test Files (DO NOT COMMIT SECRETS)
+cookies.txt
+*.cookies
+*.cookies.txt
+zee.txt
+yt_cookies.txt
+vimeo_cookies.txt
+profiles.json
+
+# Planning and internal notes
+Implementation_plan.md
+*.plan
+
+# IDE / Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store

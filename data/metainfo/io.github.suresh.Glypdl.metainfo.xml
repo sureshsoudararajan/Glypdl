@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.suresh.Glypdl</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Glypdl</name>
+  <summary>A lightweight native Linux graphical frontend for yt-dlp</summary>
+  <description>
+    <p>
+      Glypdl is a fast, native GTK4/libadwaita download manager that interfaces seamlessly
+      with the system-installed yt-dlp tool. Designed for modern GNOME desktop environments,
+      it offers rich download controls, format selection, network throughput metrics,
+      download queuing, and complete download history tracking.
+    </p>
+    <p>Features include:</p>
+    <ul>
+      <li>Native GNOME/libadwaita look and feel with dark/light mode support</li>
+      <li>Audio-only, Video-only, and Video+Audio download modes</li>
+      <li>Smooth real-time network throughput and ETA calculations</li>
+      <li>Concurrent download queue management</li>
+      <li>History tracking powered by a local SQLite database</li>
+      <li>Cookie and profile authentication support</li>
+      <li>Zero web wrappers or heavy runtimes</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.suresh.Glypdl.desktop</launchable>
+  <url type="homepage">https://github.com/sureshsoundararajan/Glypdl</url>
+  <url type="bugtracker">https://github.com/sureshsoundararajan/Glypdl/issues</url>
+  <developer id="io.github.sureshsoundararajan">
+    <name>Suresh Soundararajan</name>
+  </developer>
+  <provides>
+    <binary>glypdl</binary>
+  </provides>
+  <releases>
+    <release version="1.0.0" date="2026-08-30">
+      <description>
+        <p>Initial release of Glypdl native download manager.</p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>
