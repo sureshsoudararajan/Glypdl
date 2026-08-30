@@ -193,7 +193,7 @@ flatpak build-bundle repo glypdl.flatpak io.github.suresh.Glypdl
 You can run Glypdl directly from the source directory without installing:
 
 ```bash
-git clone https://github.com/sureshsoundararajan/Glypdl.git
+git clone https://github.com/sureshsoudararajan/Glypdl.git
 cd Glypdl
 
 PYTHONPATH=src python3 -m glypdl.app

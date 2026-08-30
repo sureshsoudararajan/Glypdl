@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Suresh Soundararajan <sureshsoundararajan18@gmail.com>
 Build-Depends: debhelper-compat (= 13), python3-all, python3-setuptools, python3-gi
 Standards-Version: 4.6.2
-Homepage: https://github.com/sureshsoundararajan/Glypdl
+Homepage: https://github.com/sureshsoudararajan/Glypdl
 
 Package: glypdl
 Architecture: all

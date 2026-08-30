@@ -68,7 +68,7 @@ Priority: optional
 Architecture: all
 Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, yt-dlp, ffmpeg
 Maintainer: Suresh Soundararajan <sureshsoundararajan18@gmail.com>
-Homepage: https://github.com/sureshsoundararajan/Glypdl
+Homepage: https://github.com/sureshsoudararajan/Glypdl
 Description: Native Linux GTK4/libadwaita download manager frontend for yt-dlp
  Glypdl is a fast, lightweight GTK4/libadwaita download manager that uses
  the system-installed yt-dlp binary to download video and audio media with

@@ -16,8 +16,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/sureshsoundararajan/Glypdl"
-Issues = "https://github.com/sureshsoundararajan/Glypdl/issues"
+Homepage = "https://github.com/sureshsoudararajan/Glypdl"
+Issues = "https://github.com/sureshsoudararajan/Glypdl/issues"
 
 [project.optional-dependencies]
 dev = ["pytest"]

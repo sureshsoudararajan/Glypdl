@@ -4,7 +4,7 @@ Release:        1%{?dist}
 Summary:        A lightweight native Linux graphical frontend for yt-dlp
 
 License:        GPLv3+
-URL:            https://github.com/sureshsoundararajan/Glypdl
+URL:            https://github.com/sureshsoudararajan/Glypdl
 Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      noarch

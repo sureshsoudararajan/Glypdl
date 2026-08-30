@@ -183,8 +183,8 @@ class GlypdlApp(Adw.Application):
             developer_name="Suresh Soundararajan",
             version=__version__,
             comments="A lightweight native Linux graphical frontend for yt-dlp.",
-            website="https://github.com/sureshsoundararajan/Glypdl",
-            issue_url="https://github.com/sureshsoundararajan/Glypdl/issues",
+            website="https://github.com/sureshsoudararajan/Glypdl",
+            issue_url="https://github.com/sureshsoudararajan/Glypdl/issues",
             license_type=Gtk.License.GPL_3_0_ONLY,
             copyright="© 2026 Suresh Soundararajan"
         )

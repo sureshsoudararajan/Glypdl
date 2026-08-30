@@ -4,7 +4,7 @@ pkgver=1.0.0
 pkgrel=1
 pkgdesc="A lightweight native Linux graphical frontend for yt-dlp"
 arch=('any')
-url="https://github.com/sureshsoundararajan/Glypdl"
+url="https://github.com/sureshsoudararajan/Glypdl"
 license=('GPL-3.0-or-later')
 depends=(
     'python'
