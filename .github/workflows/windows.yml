@@ -27,7 +27,7 @@ jobs:
         run: dotnet restore windows/Glypdl.Windows.sln -p:Platform=x64
 
       - name: Build Windows Solution
-        run: dotnet build windows/Glypdl.Windows.sln -c Release -p:Platform=x64
+        run: dotnet build windows/Glypdl.Windows.sln -c Release -p:Platform=x64 --verbosity normal
 
       - name: Run Windows Tests
         run: dotnet test windows/tests/Glypdl.Windows.Tests/Glypdl.Windows.Tests.csproj --configuration Release -p:Platform=x64 --no-build
