@@ -9,6 +9,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Title = "Glypdl";
         ExtendsContentIntoTitleBar = true;
         NavView.SelectedItem = NavView.MenuItems[0];
         ContentFrame.Navigate(typeof(HomePage));
