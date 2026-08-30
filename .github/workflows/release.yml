@@ -7,6 +7,7 @@ on:
 
 jobs:
   build-deb:
+    name: Build Debian Package (.deb)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +22,7 @@ jobs:
           path: "*.deb"
 
   build-appimage:
+    name: Build AppImage (.AppImage)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,8 +42,46 @@ jobs:
           name: glypdl-appimage
           path: "*.AppImage"
 
+  build-arch:
+    name: Build Arch Package (.pkg.tar.zst)
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Arch Linux Package
+        run: |
+          pacman -Syu --noconfirm base-devel git
+          useradd -m builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          su builder -c "makepkg -f --nodeps"
+      - name: Upload Arch Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: glypdl-arch
+          path: "*.pkg.tar.zst"
+
+  build-rpm:
+    name: Build Fedora/RPM Package (.rpm)
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build RPM Package
+        run: |
+          dnf install -y rpm-build python3-devel python3-setuptools
+          chmod +x packaging/rpm/build_rpm.sh
+          ./packaging/rpm/build_rpm.sh
+      - name: Upload RPM Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: glypdl-rpm
+          path: "*.rpm"
+
   release:
-    needs: [build-deb, build-appimage]
+    name: Create GitHub Release
+    needs: [build-deb, build-appimage, build-arch, build-rpm]
     runs-on: ubuntu-latest
     permissions:
       contents: write

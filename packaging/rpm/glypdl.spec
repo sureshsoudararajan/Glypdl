@@ -39,8 +39,7 @@ install -Dm644 data/icons/hicolor/512x512/apps/io.github.suresh.Glypdl.png %{bui
 %license LICENSE
 %doc README.md
 %{_bindir}/glypdl
-%{python3_sitelib}/glypdl/
-%{python3_sitelib}/glypdl-*.egg-info/
+%{python3_sitelib}/glypdl*
 %{_datadir}/applications/io.github.suresh.Glypdl.desktop
 %{_datadir}/metainfo/io.github.suresh.Glypdl.metainfo.xml
 %{_datadir}/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg
