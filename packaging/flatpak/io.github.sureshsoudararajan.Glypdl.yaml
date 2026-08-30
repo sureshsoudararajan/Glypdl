@@ -42,4 +42,4 @@ modules:
       - type: git
         url: https://github.com/sureshsoudararajan/Glypdl.git
         tag: v1.0.0
-        commit: 0e0787050302b17351639d67ef611c034feeaec7
+        commit: d834be33260cb294ad7daa4542ce2f85e738a911
