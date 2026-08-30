@@ -28,5 +28,7 @@ jobs:
           xvfb
 
     - name: Run Test Suite
+      env:
+        PYTHONPATH: src
       run: |
         xvfb-run -a python3 -m unittest discover -s tests -v
