@@ -7,6 +7,7 @@ rm -rf "$PKG_DIR" "$PKG_DIR.deb"
 
 mkdir -p "$PKG_DIR/DEBIAN"
 mkdir -p "$PKG_DIR/usr/lib/python3/dist-packages/glypdl"
+mkdir -p "$PKG_DIR/usr/share/glypdl/glypdl"
 mkdir -p "$PKG_DIR/usr/bin"
 mkdir -p "$PKG_DIR/usr/share/glypdl/bin"
 mkdir -p "$PKG_DIR/usr/share/applications"
@@ -14,8 +15,9 @@ mkdir -p "$PKG_DIR/usr/share/metainfo"
 mkdir -p "$PKG_DIR/usr/share/icons/hicolor/scalable/apps"
 mkdir -p "$PKG_DIR/usr/share/icons/hicolor/512x512/apps"
 
-# Copy python source code
+# Copy python source code to both standard dist-packages and universal /usr/share/glypdl
 cp -r src/glypdl/* "$PKG_DIR/usr/lib/python3/dist-packages/glypdl/"
+cp -r src/glypdl/* "$PKG_DIR/usr/share/glypdl/glypdl/"
 
 # Download latest standalone official yt-dlp binary
 echo "Downloading latest official yt-dlp binary..."
@@ -23,14 +25,8 @@ curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o "$P
 chmod +x "$PKG_DIR/usr/bin/yt-dlp"
 cp "$PKG_DIR/usr/bin/yt-dlp" "$PKG_DIR/usr/share/glypdl/bin/yt-dlp"
 
-# Launcher wrapper
-cat << 'EOF' > "$PKG_DIR/usr/bin/glypdl"
-#!/usr/bin/env python3
-import sys
-from glypdl.app import main
-if __name__ == '__main__':
-    sys.exit(main())
-EOF
+# Universal Launcher
+cp bin/glypdl "$PKG_DIR/usr/bin/glypdl"
 chmod +x "$PKG_DIR/usr/bin/glypdl"
 
 # Desktop, Metainfo, Icons
