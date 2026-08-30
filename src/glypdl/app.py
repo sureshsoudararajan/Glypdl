@@ -179,7 +179,7 @@ class GlypdlApp(Adw.Application):
         # GNOME standard about dialog using the official app icon
         about = Adw.AboutDialog(
             application_name="Glypdl",
-            application_icon="io.github.suresh.Glypdl",
+            application_icon="io.github.sureshsoudararajan.Glypdl",
             developer_name="Suresh Soundararajan",
             version=__version__,
             comments="A lightweight native Linux graphical frontend for yt-dlp.",

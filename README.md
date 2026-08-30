@@ -1,7 +1,7 @@
 # Glypdl
 
 <div align="center">
-  <img src="data/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg" width="128" height="128" alt="Glypdl Logo" />
+  <img src="data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg" width="128" height="128" alt="Glypdl Logo" />
   <h3>A lightweight, native Linux desktop download manager for yt-dlp</h3>
   <p>Built with <b>GTK4</b> and <b>libadwaita</b> conforming to modern GNOME Human Interface Guidelines.</p>
 </div>
@@ -172,18 +172,18 @@ flatpak install flathub org.gnome.Platform//46 org.gnome.Sdk//46
 #### Build & Install:
 ```bash
 cd Glypdl
-flatpak-builder --user --install --force-clean build-dir packaging/flatpak/io.github.suresh.Glypdl.yaml
+flatpak-builder --user --install --force-clean build-dir packaging/flatpak/io.github.sureshsoudararajan.Glypdl.yaml
 ```
 
 #### Run Flatpak:
 ```bash
-flatpak run io.github.suresh.Glypdl
+flatpak run io.github.sureshsoudararajan.Glypdl
 ```
 
 #### Export as Single `.flatpak` Bundle (Optional):
 ```bash
-flatpak-builder --repo=repo --force-clean build-dir packaging/flatpak/io.github.suresh.Glypdl.yaml
-flatpak build-bundle repo glypdl.flatpak io.github.suresh.Glypdl
+flatpak-builder --repo=repo --force-clean build-dir packaging/flatpak/io.github.sureshsoudararajan.Glypdl.yaml
+flatpak build-bundle repo glypdl.flatpak io.github.sureshsoudararajan.Glypdl
 ```
 
 ---

@@ -33,20 +33,20 @@ Built with GTK4 and libadwaita conforming to GNOME HIG.
 
 %install
 %pyproject_install
-install -Dm644 data/desktop/io.github.suresh.Glypdl.desktop %{buildroot}%{_datadir}/applications/io.github.suresh.Glypdl.desktop
-install -Dm644 data/metainfo/io.github.suresh.Glypdl.metainfo.xml %{buildroot}%{_datadir}/metainfo/io.github.suresh.Glypdl.metainfo.xml
-install -Dm644 data/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg
-install -Dm644 data/icons/hicolor/512x512/apps/io.github.suresh.Glypdl.png %{buildroot}%{_datadir}/icons/hicolor/512x512/apps/io.github.suresh.Glypdl.png
+install -Dm644 data/desktop/io.github.sureshsoudararajan.Glypdl.desktop %{buildroot}%{_datadir}/applications/io.github.sureshsoudararajan.Glypdl.desktop
+install -Dm644 data/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml %{buildroot}%{_datadir}/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml
+install -Dm644 data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg
+install -Dm644 data/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glypdl.png %{buildroot}%{_datadir}/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glypdl.png
 
 %files
 %license LICENSE
 %doc README.md
 %{_bindir}/glypdl
 %{python3_sitelib}/glypdl*
-%{_datadir}/applications/io.github.suresh.Glypdl.desktop
-%{_datadir}/metainfo/io.github.suresh.Glypdl.metainfo.xml
-%{_datadir}/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg
-%{_datadir}/icons/hicolor/512x512/apps/io.github.suresh.Glypdl.png
+%{_datadir}/applications/io.github.sureshsoudararajan.Glypdl.desktop
+%{_datadir}/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml
+%{_datadir}/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg
+%{_datadir}/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glypdl.png
 
 %changelog
 * Sun Aug 30 2026 Suresh Soundararajan <sureshsoundararajan18@gmail.com> - 1.0.0-1

@@ -26,9 +26,10 @@ EOF
 chmod +x "$PKG_DIR/usr/bin/glypdl"
 
 # Desktop, Metainfo, Icons
-cp data/desktop/io.github.suresh.Glypdl.desktop "$PKG_DIR/usr/share/applications/"
-cp data/metainfo/io.github.suresh.Glypdl.metainfo.xml "$PKG_DIR/usr/share/metainfo/"
-cp data/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg "$PKG_DIR/usr/share/icons/hicolor/scalable/apps/"
+cp data/desktop/io.github.sureshsoudararajan.Glypdl.desktop "$PKG_DIR/usr/share/applications/"
+cp data/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml "$PKG_DIR/usr/share/metainfo/"
+cp data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg "$PKG_DIR/usr/share/icons/hicolor/scalable/apps/"
+cp data/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glypdl.png "$PKG_DIR/usr/share/icons/hicolor/512x512/apps/"
 
 # Control file
 cat << EOF > "$PKG_DIR/DEBIAN/control"

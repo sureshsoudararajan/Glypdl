@@ -33,9 +33,9 @@ package() {
     install -Dm755 bin/glypdl "$pkgdir/usr/bin/glypdl"
 
     # 4. Desktop entry, Metainfo, and Official App Icons
-    install -Dm644 data/desktop/io.github.suresh.Glypdl.desktop "$pkgdir/usr/share/applications/io.github.suresh.Glypdl.desktop"
-    install -Dm644 data/metainfo/io.github.suresh.Glypdl.metainfo.xml "$pkgdir/usr/share/metainfo/io.github.suresh.Glypdl.metainfo.xml"
-    install -Dm644 data/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg"
-    install -Dm644 data/icons/hicolor/512x512/apps/io.github.suresh.Glypdl.png "$pkgdir/usr/share/icons/hicolor/512x512/apps/io.github.suresh.Glypdl.png"
+    install -Dm644 data/desktop/io.github.sureshsoudararajan.Glypdl.desktop "$pkgdir/usr/share/applications/io.github.sureshsoudararajan.Glypdl.desktop"
+    install -Dm644 data/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml "$pkgdir/usr/share/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml"
+    install -Dm644 data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg"
+    install -Dm644 data/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glypdl.png "$pkgdir/usr/share/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glypdl.png"
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }

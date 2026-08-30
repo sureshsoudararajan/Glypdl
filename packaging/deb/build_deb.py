@@ -50,11 +50,11 @@ def create_deb():
         launcher_dest.chmod(0o755)
 
         # 3. Copy desktop, metainfo, icon, and docs
-        shutil.copy2(root_dir / "data/desktop/io.github.suresh.Glypdl.desktop", pkg_root / "usr/share/applications/")
-        shutil.copy2(root_dir / "data/metainfo/io.github.suresh.Glypdl.metainfo.xml", pkg_root / "usr/share/metainfo/")
-        shutil.copy2(root_dir / "data/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg", pkg_root / "usr/share/icons/hicolor/scalable/apps/")
-        if (root_dir / "data/icons/hicolor/512x512/apps/io.github.suresh.Glypdl.png").exists():
-            shutil.copy2(root_dir / "data/icons/hicolor/512x512/apps/io.github.suresh.Glypdl.png", pkg_root / "usr/share/icons/hicolor/512x512/apps/")
+        shutil.copy2(root_dir / "data/desktop/io.github.sureshsoudararajan.Glypdl.desktop", pkg_root / "usr/share/applications/")
+        shutil.copy2(root_dir / "data/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml", pkg_root / "usr/share/metainfo/")
+        shutil.copy2(root_dir / "data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg", pkg_root / "usr/share/icons/hicolor/scalable/apps/")
+        if (root_dir / "data/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glypdl.png").exists():
+            shutil.copy2(root_dir / "data/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glypdl.png", pkg_root / "usr/share/icons/hicolor/512x512/apps/")
         if (root_dir / "LICENSE").exists():
             shutil.copy2(root_dir / "LICENSE", pkg_root / "usr/share/doc/glypdl/copyright")
 

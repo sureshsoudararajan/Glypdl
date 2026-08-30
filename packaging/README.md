@@ -89,7 +89,7 @@ sudo dnf install ~/rpmbuild/RPMS/noarch/glypdl-1.0.0-1.*.noarch.rpm
 
 ## 4. Flatpak (Cross-Distribution)
 
-The Flatpak manifest is located at `packaging/flatpak/io.github.suresh.Glypdl.yaml`.
+The Flatpak manifest is located at `packaging/flatpak/io.github.sureshsoudararajan.Glypdl.yaml`.
 
 ### Prerequisites:
 ```bash
@@ -105,16 +105,16 @@ flatpak install flathub org.gnome.Platform//46 org.gnome.Sdk//46
 
 ### Build & Install Locally:
 ```bash
-flatpak-builder --user --install --force-clean build-dir packaging/flatpak/io.github.suresh.Glypdl.yaml
+flatpak-builder --user --install --force-clean build-dir packaging/flatpak/io.github.sureshsoudararajan.Glypdl.yaml
 ```
 
 ### Run the Flatpak:
 ```bash
-flatpak run io.github.suresh.Glypdl
+flatpak run io.github.sureshsoudararajan.Glypdl
 ```
 
 ### Export Flatpak Bundle (`.flatpak` single file):
 ```bash
-flatpak-builder --repo=repo --force-clean build-dir packaging/flatpak/io.github.suresh.Glypdl.yaml
-flatpak build-bundle repo glypdl.flatpak io.github.suresh.Glypdl
+flatpak-builder --repo=repo --force-clean build-dir packaging/flatpak/io.github.sureshsoudararajan.Glypdl.yaml
+flatpak build-bundle repo glypdl.flatpak io.github.sureshsoudararajan.Glypdl
 ```

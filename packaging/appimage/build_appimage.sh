@@ -27,11 +27,12 @@ chmod +x "$APP_DIR/usr/bin/glypdl"
 cp packaging/appimage/AppRun "$APP_DIR/AppRun"
 chmod +x "$APP_DIR/AppRun"
 
-cp data/desktop/io.github.suresh.Glypdl.desktop "$APP_DIR/io.github.suresh.Glypdl.desktop"
-cp data/desktop/io.github.suresh.Glypdl.desktop "$APP_DIR/usr/share/applications/io.github.suresh.Glypdl.desktop"
-cp data/metainfo/io.github.suresh.Glypdl.metainfo.xml "$APP_DIR/usr/share/metainfo/"
-cp data/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg "$APP_DIR/io.github.suresh.Glypdl.svg"
-cp data/icons/hicolor/scalable/apps/io.github.suresh.Glypdl.svg "$APP_DIR/usr/share/icons/hicolor/scalable/apps/"
+cp data/desktop/io.github.sureshsoudararajan.Glypdl.desktop "$APP_DIR/io.github.sureshsoudararajan.Glypdl.desktop"
+cp data/desktop/io.github.sureshsoudararajan.Glypdl.desktop "$APP_DIR/usr/share/applications/io.github.sureshsoudararajan.Glypdl.desktop"
+cp data/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml "$APP_DIR/usr/share/metainfo/"
+cp data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg "$APP_DIR/io.github.sureshsoudararajan.Glypdl.svg"
+cp data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg "$APP_DIR/usr/share/icons/hicolor/scalable/apps/"
+cp data/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glypdl.png "$APP_DIR/usr/share/icons/hicolor/512x512/apps/"
 
 if command -v appimagetool >/dev/null 2>&1; then
     ARCH=x86_64 appimagetool --appimage-extract-and-run "$APP_DIR" Glypdl-x86_64.AppImage || ARCH=x86_64 appimagetool "$APP_DIR" Glypdl-x86_64.AppImage
