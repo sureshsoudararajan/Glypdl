@@ -55,3 +55,15 @@ Implementation_plan.md
 *.swo
 *~
 .DS_Store
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# .NET / Windows Build Artifacts
+[Bb]in/
+[Oo]bj/
+[Pp]ublish/
+windows/publish/
+windows/dist/

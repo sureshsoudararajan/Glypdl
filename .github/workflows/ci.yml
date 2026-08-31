@@ -7,7 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  test:
+  test-linux:
+    name: Test Linux (GTK4 / Python)
     runs-on: ubuntu-latest
 
     steps:
@@ -36,3 +37,25 @@ jobs:
         LIBGL_ALWAYS_SOFTWARE: 1
       run: |
         xvfb-run -a python3 -m tests
+
+  test-windows:
+    name: Test Windows (WinUI 3 / .NET 8)
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore Dependencies
+      run: dotnet restore windows/Glypdl.Windows.sln -p:Platform=x64
+
+    - name: Build Windows Solution
+      run: dotnet build windows/Glypdl.Windows.sln -c Debug -p:Platform=x64 --verbosity normal
+
+    - name: Run Windows Tests
+      run: dotnet test windows/tests/Glypdl.Windows.Tests/Glypdl.Windows.Tests.csproj --configuration Debug -p:Platform=x64 --no-build

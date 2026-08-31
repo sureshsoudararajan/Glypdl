@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Glypdl.Windows.Models;
+using Glypdl.Windows.Utilities;
 
 namespace Glypdl.Windows.Services;
 
@@ -22,42 +23,54 @@ public class QueueService : IQueueService
 
     public void Enqueue(DownloadItem item)
     {
-        item.State = DownloadState.Queued;
-        item.StatusMessage = "Queued";
-        QueuedDownloads.Add(item);
+        DispatcherHelper.ExecuteOnUIThread(() =>
+        {
+            item.State = DownloadState.Queued;
+            item.StatusMessage = "Queued";
+            QueuedDownloads.Add(item);
+        });
         _ = ProcessQueueAsync(item);
     }
 
     public void Cancel(DownloadItem item)
     {
-        if (ActiveDownloads.Contains(item))
+        DispatcherHelper.ExecuteOnUIThread(() =>
         {
-            _downloadService.CancelDownload(item);
-            ActiveDownloads.Remove(item);
-        }
-        if (QueuedDownloads.Contains(item))
-        {
-            QueuedDownloads.Remove(item);
-        }
+            if (ActiveDownloads.Contains(item))
+            {
+                _downloadService.CancelDownload(item);
+                ActiveDownloads.Remove(item);
+            }
+            if (QueuedDownloads.Contains(item))
+            {
+                QueuedDownloads.Remove(item);
+            }
+        });
     }
 
     public void Retry(DownloadItem item)
     {
-        item.Progress = 0;
-        item.DownloadedBytes = 0;
-        item.TotalBytes = 0;
-        item.Speed = 0;
-        item.ErrorMessage = string.Empty;
+        DispatcherHelper.ExecuteOnUIThread(() =>
+        {
+            item.Progress = 0;
+            item.DownloadedBytes = 0;
+            item.TotalBytes = 0;
+            item.Speed = 0;
+            item.ErrorMessage = string.Empty;
+        });
         Enqueue(item);
     }
 
     public void ClearCompleted()
     {
-        var completed = ActiveDownloads.Where(d => d.State == DownloadState.Completed || d.State == DownloadState.Cancelled).ToList();
-        foreach (var item in completed)
+        DispatcherHelper.ExecuteOnUIThread(() =>
         {
-            ActiveDownloads.Remove(item);
-        }
+            var completed = ActiveDownloads.Where(d => d.State == DownloadState.Completed || d.State == DownloadState.Cancelled).ToList();
+            foreach (var item in completed)
+            {
+                ActiveDownloads.Remove(item);
+            }
+        });
     }
 
     private async Task ProcessQueueAsync(DownloadItem item)
@@ -65,16 +78,22 @@ public class QueueService : IQueueService
         await _semaphore.WaitAsync();
         try
         {
-            QueuedDownloads.Remove(item);
-            ActiveDownloads.Add(item);
+            DispatcherHelper.ExecuteOnUIThread(() =>
+            {
+                QueuedDownloads.Remove(item);
+                ActiveDownloads.Add(item);
+            });
 
             item.CancellationTokenSource = new CancellationTokenSource();
             await _downloadService.ExecuteDownloadAsync(item, item.CancellationTokenSource.Token);
         }
         catch (Exception ex)
         {
-            item.State = DownloadState.Failed;
-            item.ErrorMessage = ex.Message;
+            DispatcherHelper.ExecuteOnUIThread(() =>
+            {
+                item.State = DownloadState.Failed;
+                item.ErrorMessage = ex.Message;
+            });
         }
         finally
         {

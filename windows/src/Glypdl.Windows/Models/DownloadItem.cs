@@ -52,15 +52,19 @@ public partial class DownloadItem : ObservableObject
     private double _progress;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FormattedSize))]
     private long _downloadedBytes;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FormattedSize))]
     private long _totalBytes;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FormattedSpeed))]
     private double _speed;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FormattedEta))]
     private int _etaSeconds;
 
     [ObservableProperty]

@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Glypdl.Windows.Models;
 using Glypdl.Windows.Services;
+using Glypdl.Windows.Utilities;
 
 namespace Glypdl.Windows.ViewModels;
 
@@ -55,18 +56,58 @@ public partial class DownloadsViewModel : ObservableObject
     [RelayCommand]
     public void OpenFolder(DownloadItem item)
     {
+        if (!string.IsNullOrWhiteSpace(item.OutputPath) && File.Exists(item.OutputPath))
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"/select,\"{item.OutputPath}\"",
+                    UseShellExecute = true
+                });
+                return;
+            }
+            catch { }
+        }
+
+        var settings = (App.Services.GetService(typeof(ISettingsService)) as ISettingsService)?.GetSettings();
         string dir = !string.IsNullOrWhiteSpace(item.DownloadDirectory) && Directory.Exists(item.DownloadDirectory)
             ? item.DownloadDirectory
-            : Path.GetDirectoryName(item.OutputPath) ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            : (!string.IsNullOrWhiteSpace(settings?.DownloadDirectory) && Directory.Exists(settings.DownloadDirectory)
+                ? settings.DownloadDirectory
+                : PathUtils.GetDefaultDownloadDirectory());
 
         try
         {
-            Process.Start(new ProcessStartInfo
+            if (Directory.Exists(dir))
             {
-                FileName = "explorer.exe",
-                Arguments = $"\"{dir}\"",
-                UseShellExecute = true
-            });
+                var files = Directory.GetFiles(dir);
+                var cleanTitle = string.Concat(item.Title.Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
+                if (!string.IsNullOrWhiteSpace(cleanTitle))
+                {
+                    var matched = files.FirstOrDefault(f =>
+                        Path.GetFileNameWithoutExtension(f).Contains(cleanTitle, StringComparison.OrdinalIgnoreCase) ||
+                        cleanTitle.Contains(Path.GetFileNameWithoutExtension(f), StringComparison.OrdinalIgnoreCase));
+                    if (matched != null && File.Exists(matched))
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "explorer.exe",
+                            Arguments = $"/select,\"{matched}\"",
+                            UseShellExecute = true
+                        });
+                        return;
+                    }
+                }
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"\"{dir}\"",
+                    UseShellExecute = true
+                });
+            }
         }
         catch { }
     }

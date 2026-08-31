@@ -5,63 +5,70 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:vm="using:Glypdl.Windows.ViewModels"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
     mc:Ignorable="d">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24">
-        <StackPanel Spacing="20" MaxWidth="600" HorizontalAlignment="Center">
-            <!-- App Logo / Title -->
-            <StackPanel Spacing="8" HorizontalAlignment="Center">
-                <FontIcon Glyph="&#xE896;" FontSize="64" Foreground="{ThemeResource SystemAccentColor}" HorizontalAlignment="Center" />
-                <TextBlock Text="Glypdl" Style="{ThemeResource TitleLargeTextBlockStyle}" FontWeight="Bold" HorizontalAlignment="Center" />
-                <TextBlock Text="A lightweight native Windows 11 media downloader powered by yt-dlp" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
-                <TextBlock Text="Version 1.0.0" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+    <ScrollViewer
+        HorizontalScrollBarVisibility="Disabled"
+        VerticalScrollBarVisibility="Auto">
+        <Grid Padding="48,28,48,48" HorizontalAlignment="Stretch">
+            <StackPanel Spacing="24" MaxWidth="680" HorizontalAlignment="Center">
+                <!-- App Logo / Title -->
+                <StackPanel Spacing="10" HorizontalAlignment="Center">
+                    <Border CornerRadius="16" Width="84" Height="84" HorizontalAlignment="Center">
+                        <Image Source="ms-appx:///Assets/icon.png" Width="84" Height="84" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock Text="Glypdl" Style="{ThemeResource TitleLargeTextBlockStyle}" FontWeight="Bold" HorizontalAlignment="Center" />
+                    <TextBlock Text="A lightweight native Windows 11 media downloader powered by yt-dlp" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" TextAlignment="Center" />
+                    <TextBlock Text="Version 1.0.0" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+                </StackPanel>
+
+                <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
+                <!-- Author Info -->
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Author &amp; Project" FontWeight="SemiBold" />
+                        <Grid>
+                            <TextBlock Text="Developer" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="{x:Bind ViewModel.Author}" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                        </Grid>
+                        <Grid>
+                            <TextBlock Text="License" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="{x:Bind ViewModel.License}" HorizontalAlignment="Right" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Links & Updates -->
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Updates &amp; Support" FontWeight="SemiBold" />
+                        <Button
+                            Content="{x:Bind ViewModel.UpdateStatus, Mode=OneWay}"
+                            HorizontalAlignment="Stretch"
+                            Command="{x:Bind ViewModel.CheckForUpdatesCommand}" />
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button
+                                Grid.Column="0"
+                                Content="GitHub Repository"
+                                HorizontalAlignment="Stretch"
+                                Command="{x:Bind ViewModel.OpenUrlCommand}"
+                                CommandParameter="{x:Bind ViewModel.GitHubUrl}" />
+                            <Button
+                                Grid.Column="1"
+                                Content="Report an Issue"
+                                HorizontalAlignment="Stretch"
+                                Command="{x:Bind ViewModel.OpenUrlCommand}"
+                                CommandParameter="{x:Bind ViewModel.IssuesUrl}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
             </StackPanel>
-
-            <Separator />
-
-            <!-- Author Info -->
-            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Author &amp; Project" FontWeight="SemiBold" />
-                    <Grid>
-                        <TextBlock Text="Developer" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock Text="{x:Bind ViewModel.Author}" FontWeight="SemiBold" HorizontalAlignment="Right" />
-                    </Grid>
-                    <Grid>
-                        <TextBlock Text="License" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock Text="{x:Bind ViewModel.License}" HorizontalAlignment="Right" />
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <!-- Links & Updates -->
-            <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Updates &amp; Support" FontWeight="SemiBold" />
-                    <Button
-                        Content="{x:Bind ViewModel.UpdateStatus, Mode=OneWay}"
-                        HorizontalAlignment="Stretch"
-                        Command="{x:Bind ViewModel.CheckForUpdatesCommand}" />
-                    <Grid ColumnSpacing="8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Button
-                            Grid.Column="0"
-                            Content="GitHub Repository"
-                            HorizontalAlignment="Stretch"
-                            Command="{x:Bind ViewModel.OpenUrlCommand}"
-                            CommandParameter="{x:Bind ViewModel.GitHubUrl}" />
-                        <Button
-                            Grid.Column="1"
-                            Content="Report an Issue"
-                            HorizontalAlignment="Stretch"
-                            Command="{x:Bind ViewModel.OpenUrlCommand}"
-                            CommandParameter="{x:Bind ViewModel.IssuesUrl}" />
-                    </Grid>
-                </StackPanel>
-            </Border>
-        </StackPanel>
+        </Grid>
     </ScrollViewer>
 </Page>

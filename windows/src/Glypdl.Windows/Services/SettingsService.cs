@@ -38,6 +38,11 @@ public class SettingsService : ISettingsService
         try
         {
             string path = PathUtils.GetConfigFilePath();
+            var dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrWhiteSpace(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
             string json = JsonSerializer.Serialize(settings, JsonOptions);
             File.WriteAllText(path, json);
         }

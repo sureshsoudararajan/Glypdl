@@ -19,5 +19,6 @@ public interface IYtDlpService
         string? cookieFile = null,
         bool extractAudio = false,
         string? audioFormat = null,
+        string? audioQuality = null,
         string? extraArgs = null);
 }

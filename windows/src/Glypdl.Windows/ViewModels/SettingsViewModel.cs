@@ -24,6 +24,25 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private AppTheme _selectedTheme = AppTheme.System;
 
+    partial void OnSelectedThemeChanged(AppTheme value)
+    {
+        App.ApplyTheme(value);
+        OnPropertyChanged(nameof(ThemeIndex));
+        SaveSettings();
+    }
+
+    public int ThemeIndex
+    {
+        get => (int)SelectedTheme;
+        set
+        {
+            if ((int)SelectedTheme != value && value >= 0)
+            {
+                SelectedTheme = (AppTheme)value;
+            }
+        }
+    }
+
     [ObservableProperty]
     private string _filenameTemplate = "%(title)s.%(ext)s";
 
@@ -105,7 +124,6 @@ public partial class SettingsViewModel : ObservableObject
         _settingsService.SaveSettings(s);
     }
 
-    [RelayCommand]
     public void AddCookieProfile(string name, string filePath)
     {
         _cookieService.AddProfile(name, filePath);

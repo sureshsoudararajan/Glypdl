@@ -48,11 +48,15 @@ public class DownloadService : IDownloadService
             cookieFile: item.CookieFilePath,
             extractAudio: item.Mode == DownloadMode.AudioOnly,
             audioFormat: item.AudioFormat,
+            audioQuality: item.Quality,
             extraArgs: settings.ExtraArguments
         );
 
-        item.State = DownloadState.Downloading;
-        item.StatusMessage = "Starting download...";
+        DispatcherHelper.ExecuteOnUIThread(() =>
+        {
+            item.State = DownloadState.Downloading;
+            item.StatusMessage = "Starting download...";
+        });
 
         var tcs = new TaskCompletionSource<int>();
 
@@ -64,19 +68,31 @@ public class DownloadService : IDownloadService
                 var progress = FormattingUtils.ParseProgressLine(line);
                 if (progress != null)
                 {
-                    if (progress.Percent.HasValue) item.Progress = progress.Percent.Value;
-                    if (progress.DownloadedBytes.HasValue) item.DownloadedBytes = progress.DownloadedBytes.Value;
-                    if (progress.TotalBytes.HasValue) item.TotalBytes = progress.TotalBytes.Value;
-                    if (progress.SpeedBytesPerSec.HasValue) item.Speed = progress.SpeedBytesPerSec.Value;
-                    if (progress.EtaSeconds.HasValue) item.EtaSeconds = progress.EtaSeconds.Value;
-                    if (!string.IsNullOrWhiteSpace(progress.Status)) item.StatusMessage = progress.Status;
+                    DispatcherHelper.ExecuteOnUIThread(() =>
+                    {
+                        if (progress.Percent.HasValue)
+                            item.Progress = progress.Percent.Value;
+                        if (progress.DownloadedBytes.HasValue)
+                            item.DownloadedBytes = progress.DownloadedBytes.Value;
+                        if (progress.TotalBytes.HasValue)
+                            item.TotalBytes = progress.TotalBytes.Value;
+                        if (progress.SpeedBytesPerSec.HasValue)
+                            item.Speed = progress.SpeedBytesPerSec.Value;
+                        if (progress.EtaSeconds.HasValue)
+                            item.EtaSeconds = progress.EtaSeconds.Value;
+                        if (!string.IsNullOrWhiteSpace(progress.Status))
+                            item.StatusMessage = progress.Status;
+                    });
                 }
             },
             onError: errLine =>
             {
                 if (!string.IsNullOrWhiteSpace(errLine) && !errLine.Contains("WARNING:"))
                 {
-                    item.ErrorMessage = errLine;
+                    DispatcherHelper.ExecuteOnUIThread(() =>
+                    {
+                        item.ErrorMessage = errLine;
+                    });
                 }
             },
             workingDirectory: downloadDir
@@ -86,14 +102,7 @@ public class DownloadService : IDownloadService
 
         using (cancellationToken.Register(() =>
         {
-            try
-            {
-                if (!process.HasExited)
-                {
-                    process.Kill(true);
-                }
-            }
-            catch { }
+            try { process.Kill(); } catch { }
             tcs.TrySetCanceled();
         }))
         {
@@ -105,27 +114,104 @@ public class DownloadService : IDownloadService
 
         if (cancellationToken.IsCancellationRequested)
         {
-            item.State = DownloadState.Cancelled;
-            item.StatusMessage = "Cancelled";
+            DispatcherHelper.ExecuteOnUIThread(() =>
+            {
+                item.State = DownloadState.Cancelled;
+                item.StatusMessage = "Cancelled";
+            });
             return;
         }
 
         if (exitCode == 0)
         {
-            item.State = DownloadState.Completed;
-            item.StatusMessage = "Completed";
-            item.Progress = 100;
-            item.CompletedAt = DateTime.UtcNow;
+            long actualFileSize = item.TotalBytes > 0 ? item.TotalBytes : item.DownloadedBytes;
+            string destinationFile = downloadDir;
+
+            try
+            {
+                if (Directory.Exists(downloadDir))
+                {
+                    var files = Directory.GetFiles(downloadDir);
+                    var cleanTitle = string.Concat(item.Title.Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
+                    if (!string.IsNullOrWhiteSpace(cleanTitle))
+                    {
+                        var matched = files.FirstOrDefault(f =>
+                            Path.GetFileNameWithoutExtension(f).Contains(cleanTitle, StringComparison.OrdinalIgnoreCase) ||
+                            cleanTitle.Contains(Path.GetFileNameWithoutExtension(f), StringComparison.OrdinalIgnoreCase));
+                        if (matched != null && File.Exists(matched))
+                        {
+                            actualFileSize = new FileInfo(matched).Length;
+                            destinationFile = matched;
+                        }
+                    }
+
+                    if (actualFileSize <= 0 || destinationFile == downloadDir)
+                    {
+                        var mediaExts = new[] { ".mp4", ".mkv", ".webm", ".mp3", ".m4a", ".opus", ".flac", ".wav", ".aac" };
+                        var candidate = files.Where(f => mediaExts.Contains(Path.GetExtension(f).ToLowerInvariant()))
+                                             .OrderByDescending(f => File.GetLastWriteTimeUtc(f))
+                                             .FirstOrDefault();
+                        if (candidate != null && File.Exists(candidate))
+                        {
+                            actualFileSize = new FileInfo(candidate).Length;
+                            destinationFile = candidate;
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            DispatcherHelper.ExecuteOnUIThread(() =>
+            {
+                item.State = DownloadState.Completed;
+                item.StatusMessage = "Completed";
+                item.Progress = 100;
+                item.Speed = 0;
+                item.EtaSeconds = 0;
+                if (actualFileSize > 0)
+                {
+                    item.DownloadedBytes = actualFileSize;
+                    item.TotalBytes = actualFileSize;
+                }
+                if (File.Exists(destinationFile))
+                {
+                    item.OutputPath = destinationFile;
+                    item.DownloadDirectory = Path.GetDirectoryName(destinationFile) ?? downloadDir;
+                }
+                item.CompletedAt = DateTime.UtcNow;
+            });
+
+            string thumbPath = item.ThumbnailLocalPath;
+            if (string.IsNullOrWhiteSpace(thumbPath) && !string.IsNullOrWhiteSpace(item.ThumbnailUrl))
+            {
+                try
+                {
+                    var thumbDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Glypdl", "thumbnails");
+                    Directory.CreateDirectory(thumbDir);
+                    var cleanId = Guid.NewGuid().ToString("N");
+                    var filePath = Path.Combine(thumbDir, $"{cleanId}.jpg");
+                    using var http = new HttpClient();
+                    var bytes = await http.GetByteArrayAsync(item.ThumbnailUrl, cancellationToken);
+                    await File.WriteAllBytesAsync(filePath, bytes, cancellationToken);
+                    thumbPath = filePath;
+                    item.ThumbnailLocalPath = filePath;
+                }
+                catch { }
+            }
+            if (string.IsNullOrWhiteSpace(thumbPath))
+            {
+                thumbPath = item.ThumbnailUrl;
+            }
 
             await _historyService.AddEntryAsync(new HistoryEntry
             {
                 Url = item.Url,
                 Title = item.Title,
                 Uploader = item.Uploader,
-                ThumbnailPath = item.ThumbnailLocalPath,
-                DownloadPath = downloadDir,
+                ThumbnailPath = thumbPath,
+                DownloadPath = destinationFile,
                 Format = item.FormatId,
-                FileSize = item.TotalBytes > 0 ? item.TotalBytes : item.DownloadedBytes,
+                FileSize = actualFileSize,
                 Status = "Completed",
                 Timestamp = DateTime.UtcNow,
                 Duration = item.Duration,
@@ -137,12 +223,15 @@ public class DownloadService : IDownloadService
         }
         else
         {
-            item.State = DownloadState.Failed;
-            item.StatusMessage = "Failed";
-            if (string.IsNullOrWhiteSpace(item.ErrorMessage))
+            DispatcherHelper.ExecuteOnUIThread(() =>
             {
-                item.ErrorMessage = $"yt-dlp exited with code {exitCode}";
-            }
+                item.State = DownloadState.Failed;
+                item.StatusMessage = "Failed";
+                if (string.IsNullOrWhiteSpace(item.ErrorMessage))
+                {
+                    item.ErrorMessage = $"yt-dlp exited with code {exitCode}";
+                }
+            });
             _notificationService.ShowDownloadFailed(item);
         }
     }
@@ -160,8 +249,11 @@ public class DownloadService : IDownloadService
         catch { }
         finally
         {
-            item.State = DownloadState.Cancelled;
-            item.StatusMessage = "Cancelled";
+            DispatcherHelper.ExecuteOnUIThread(() =>
+            {
+                item.State = DownloadState.Cancelled;
+                item.StatusMessage = "Cancelled";
+            });
         }
     }
 }

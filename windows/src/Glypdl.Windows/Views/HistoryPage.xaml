@@ -4,87 +4,148 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:converters="using:Glypdl.Windows.Converters"
     xmlns:models="using:Glypdl.Windows.Models"
     xmlns:vm="using:Glypdl.Windows.ViewModels"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
     mc:Ignorable="d">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24">
-        <StackPanel Spacing="20" MaxWidth="900" HorizontalAlignment="Stretch">
-            <!-- Header & Search & Clear -->
-            <Grid ColumnSpacing="12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+    <Page.Resources>
+        <converters:StringToImageSourceConverter x:Key="ImageConverter" />
+        <converters:BoolToVisibilityConverter x:Key="BoolConverter" />
+    </Page.Resources>
 
-                <TextBlock Grid.Column="0" Text="Download History" Style="{ThemeResource TitleTextBlockStyle}" FontWeight="SemiBold" VerticalAlignment="Center" />
+    <ScrollViewer
+        HorizontalScrollBarVisibility="Disabled"
+        VerticalScrollBarVisibility="Auto">
+        <Grid Padding="48,28,48,48" HorizontalAlignment="Stretch">
+            <StackPanel Spacing="24" HorizontalAlignment="Stretch">
+                
+                <!-- Header & Search & Clear -->
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                <AutoSuggestBox
-                    Grid.Column="1"
-                    PlaceholderText="Search history..."
-                    Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay}"
-                    QuerySubmitted="AutoSuggestBox_QuerySubmitted"
-                    VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                        <TextBlock Text="History" Style="{ThemeResource TitleTextBlockStyle}" FontWeight="Bold" />
+                        <TextBlock Text="Past downloads records" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="13" />
+                    </StackPanel>
 
-                <Button
-                    Grid.Column="2"
-                    Content="Clear All"
-                    Command="{x:Bind ViewModel.ClearAllHistoryCommand}"
-                    VerticalAlignment="Center" />
-            </Grid>
+                    <AutoSuggestBox
+                        Grid.Column="1"
+                        PlaceholderText="Search title or uploader..."
+                        Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay}"
+                        QuerySubmitted="AutoSuggestBox_QuerySubmitted"
+                        TextChanged="AutoSuggestBox_TextChanged"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Right"
+                        Width="320" />
 
-            <!-- History List -->
-            <ListView
-                ItemsSource="{x:Bind ViewModel.HistoryEntries, Mode=OneWay}"
-                SelectionMode="None">
-                <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="models:HistoryEntry">
-                        <Border
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            Padding="12"
-                            Margin="0,0,0,8">
-                            <Grid ColumnSpacing="12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
+                    <Button
+                        Grid.Column="2"
+                        Content="Clear All"
+                        Command="{x:Bind ViewModel.ClearAllHistoryCommand}"
+                        VerticalAlignment="Center" />
+                </Grid>
 
-                                <!-- Title, Meta & Date -->
-                                <StackPanel Grid.Column="0" Spacing="4">
-                                    <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{x:Bind Uploader}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
-                                    <TextBlock Text="{x:Bind FormattedDate}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="11" />
-                                </StackPanel>
+                <!-- Empty State Card -->
+                <Border
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="48"
+                    Visibility="{x:Bind CountToEmptyVisibility(ViewModel.HistoryEntries.Count), Mode=OneWay}">
+                    <StackPanel Spacing="12" HorizontalAlignment="Center">
+                        <FontIcon Glyph="&#xE81C;" FontSize="48" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+                        <TextBlock Text="No Download History" FontWeight="SemiBold" FontSize="16" HorizontalAlignment="Center" />
+                        <TextBlock Text="Videos and audio files you download will appear here." Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Border>
 
-                                <!-- Size & Status -->
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="2" Margin="0,0,16,0">
-                                    <TextBlock Text="{x:Bind FormattedSize}" FontWeight="SemiBold" HorizontalAlignment="Right" />
-                                    <TextBlock Text="{x:Bind Status}" Foreground="{ThemeResource SystemAccentColor}" FontSize="12" HorizontalAlignment="Right" />
-                                </StackPanel>
+                <!-- History List -->
+                <ListView
+                    ItemsSource="{x:Bind ViewModel.HistoryEntries, Mode=OneWay}"
+                    SelectionMode="None"
+                    Visibility="{x:Bind CountToListVisibility(ViewModel.HistoryEntries.Count), Mode=OneWay}">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="models:HistoryEntry">
+                            <Border
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="16"
+                                Margin="0,0,0,10">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
 
-                                <!-- Context Actions -->
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
-                                    <Button
-                                        ToolTipService.ToolTip="Open Folder"
-                                        Click="OpenFolderButton_Click">
-                                        <FontIcon Glyph="&#xED25;" />
-                                    </Button>
-                                    <Button
-                                        ToolTipService.ToolTip="Download Again"
-                                        Click="DownloadAgainButton_Click">
-                                        <FontIcon Glyph="&#xE72C;" />
-                                    </Button>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-        </StackPanel>
+                                    <!-- Thumbnail -->
+                                    <Border Grid.Column="0" CornerRadius="6" Background="{ThemeResource LayerFillColorDefaultBrush}" Height="68" Width="120">
+                                        <Grid>
+                                            <FontIcon Glyph="&#xE8B9;" Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <Image
+                                                Source="{x:Bind ThumbnailPath, Converter={StaticResource ImageConverter}, Mode=OneWay}"
+                                                Stretch="UniformToFill"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Title, Meta & Date -->
+                                    <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1" FontSize="14" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{x:Bind Uploader}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                            <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="4" Padding="6,1">
+                                                <TextBlock Text="{x:Bind Quality}" FontSize="11" FontWeight="SemiBold" />
+                                            </Border>
+                                            <TextBlock Text="{x:Bind FormattedDate}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="11" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- Size & Status -->
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="2" Margin="0,0,16,0">
+                                        <TextBlock Text="{x:Bind FormattedSize}" FontWeight="SemiBold" HorizontalAlignment="Right" FontSize="13" />
+                                        <TextBlock Text="{x:Bind Status}" Foreground="{ThemeResource SystemAccentColor}" FontSize="11" HorizontalAlignment="Right" />
+                                    </StackPanel>
+
+                                    <!-- Context Actions -->
+                                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
+                                        <Button
+                                            ToolTipService.ToolTip="Play Media"
+                                            Click="PlayButton_Click"
+                                            Visibility="{x:Bind IsFileAvailable, Converter={StaticResource BoolConverter}, Mode=OneWay}"
+                                            Padding="10,8">
+                                            <FontIcon Glyph="&#xE768;" FontSize="13" />
+                                        </Button>
+                                        <Button
+                                            ToolTipService.ToolTip="Open Folder"
+                                            Click="OpenFolderButton_Click"
+                                            Padding="10,8">
+                                            <FontIcon Glyph="&#xED25;" FontSize="13" />
+                                        </Button>
+                                        <Button
+                                            ToolTipService.ToolTip="Re-download (Choose Format)"
+                                            Click="DownloadAgainButton_Click"
+                                            Padding="10,8">
+                                            <FontIcon Glyph="&#xE72C;" FontSize="13" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </StackPanel>
+        </Grid>
     </ScrollViewer>
 </Page>

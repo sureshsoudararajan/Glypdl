@@ -15,5 +15,7 @@
     <Platforms>x64;ARM64</Platforms>
     <UseRidGraph>true</UseRidGraph>
     <EnableMsixTooling>false</EnableMsixTooling>
+    <!-- Prevent MSVC folder probe on managed C# projects without C++ workloads -->
+    <VCToolsInstallDir Condition="'$(VCToolsInstallDir)' == ''">None</VCToolsInstallDir>
   </PropertyGroup>
 </Project>

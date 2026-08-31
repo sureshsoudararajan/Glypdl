@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.22621.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -23,9 +23,14 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.8" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Glypdl.Windows\Glypdl.Windows.csproj" />
+    <Compile Include="..\..\src\Glypdl.Windows\Models\*.cs" Link="Models\%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\Glypdl.Windows\Services\*.cs" Link="Services\%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\Glypdl.Windows\Utilities\*.cs" Link="Utilities\%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

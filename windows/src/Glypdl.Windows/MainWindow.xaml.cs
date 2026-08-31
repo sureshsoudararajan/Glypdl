@@ -1,5 +1,8 @@
+using System;
+using System.IO;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Glypdl.Windows.ViewModels;
 using Glypdl.Windows.Views;
 
 namespace Glypdl.Windows;
@@ -8,11 +11,54 @@ public partial class MainWindow : Window
 {
     public MainWindow()
     {
-        InitializeComponent();
-        Title = "Glypdl";
-        ExtendsContentIntoTitleBar = true;
-        NavView.SelectedItem = NavView.MenuItems[0];
-        ContentFrame.Navigate(typeof(HomePage));
+        try
+        {
+            InitializeComponent();
+            Title = "Glypdl";
+
+            try
+            {
+                var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "icon.ico");
+                if (File.Exists(iconPath))
+                {
+                    AppWindow.SetIcon(iconPath);
+                }
+                AppWindow.Resize(new global::Windows.Graphics.SizeInt32(1100, 750));
+            }
+            catch { }
+
+            ContentFrame.Navigated += (s, e) =>
+            {
+                ApplySavedTheme();
+            };
+
+            NavView.Loaded += (s, e) =>
+            {
+                try
+                {
+                    ApplySavedTheme();
+                    if (NavView.MenuItems.Count > 0)
+                    {
+                        NavView.SelectedItem = NavView.MenuItems[0];
+                    }
+                    ContentFrame.Navigate(typeof(HomePage));
+                    ApplySavedTheme();
+                }
+                catch (Exception ex)
+                {
+                    var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Glypdl");
+                    Directory.CreateDirectory(dir);
+                    File.WriteAllText(Path.Combine(dir, "nav_crash.log"), ex.ToString());
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Glypdl");
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "mainwindow_crash.log"), ex.ToString());
+            throw;
+        }
     }
 
     private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -23,7 +69,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (args.SelectedItemContainer is NavigationViewItem item)
+        var item = args.SelectedItemContainer as NavigationViewItem ?? args.SelectedItem as NavigationViewItem;
+        if (item != null)
         {
             string? tag = item.Tag?.ToString();
             switch (tag)
@@ -42,5 +89,57 @@ public partial class MainWindow : Window
                     break;
             }
         }
+    }
+
+    public void NavigateToHome(string? url = null)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            foreach (var item in NavView.MenuItems)
+            {
+                if (item is NavigationViewItem navItem && navItem.Tag?.ToString() == "Home")
+                {
+                    NavView.SelectedItem = navItem;
+                    break;
+                }
+            }
+            ContentFrame.Navigate(typeof(HomePage));
+
+            if (!string.IsNullOrWhiteSpace(url))
+            {
+                var homeVm = (HomeViewModel)App.Services.GetService(typeof(HomeViewModel))!;
+                homeVm.UrlInput = url;
+                _ = homeVm.FetchMetadataAsync();
+            }
+        });
+    }
+
+    public void NavigateToDownloads()
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            foreach (var item in NavView.MenuItems)
+            {
+                if (item is NavigationViewItem navItem && navItem.Tag?.ToString() == "Downloads")
+                {
+                    NavView.SelectedItem = navItem;
+                    break;
+                }
+            }
+            ContentFrame.Navigate(typeof(DownloadsPage));
+        });
+    }
+
+    public void ApplySavedTheme()
+    {
+        try
+        {
+            var settingsService = (Services.ISettingsService?)App.Services.GetService(typeof(Services.ISettingsService));
+            if (settingsService != null)
+            {
+                App.ApplyTheme(settingsService.GetSettings().Theme);
+            }
+        }
+        catch { }
     }
 }

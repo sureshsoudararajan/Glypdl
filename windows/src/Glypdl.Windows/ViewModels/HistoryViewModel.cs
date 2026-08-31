@@ -63,14 +63,15 @@ public partial class HistoryViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public void OpenFile(HistoryEntry entry)
+    public void PlayMedia(HistoryEntry entry)
     {
-        if (string.IsNullOrWhiteSpace(entry.DownloadPath)) return;
+        var file = entry.GetResolvedFilePath();
+        if (string.IsNullOrWhiteSpace(file) || !File.Exists(file)) return;
         try
         {
             Process.Start(new ProcessStartInfo
             {
-                FileName = entry.DownloadPath,
+                FileName = file,
                 UseShellExecute = true
             });
         }

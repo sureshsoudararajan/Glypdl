@@ -116,9 +116,10 @@ public class YtDlpService : IYtDlpService
         string? cookieFile = null,
         bool extractAudio = false,
         string? audioFormat = null,
+        string? audioQuality = null,
         string? extraArgs = null)
     {
-        var args = new List<string> { "--newline", "--progress", "--no-warnings" };
+        var args = new List<string> { "--newline", "--progress", "--no-warnings", "--no-overwrites" };
 
         string? ffmpeg = DetectFFmpeg();
         if (ffmpeg != null)
@@ -134,13 +135,23 @@ public class YtDlpService : IYtDlpService
         if (extractAudio)
         {
             args.Add("-x");
-            if (!string.IsNullOrWhiteSpace(audioFormat) && !audioFormat.Equals("best", StringComparison.OrdinalIgnoreCase))
+            string fmt = (!string.IsNullOrWhiteSpace(audioFormat) && !audioFormat.Equals("best", StringComparison.OrdinalIgnoreCase))
+                ? audioFormat.ToLowerInvariant()
+                : "mp3";
+            args.Add("--audio-format");
+            args.Add(fmt);
+
+            string qualityVal = "0"; // best (~320k)
+            if (!string.IsNullOrWhiteSpace(audioQuality))
             {
-                args.Add("--audio-format");
-                args.Add(audioFormat.ToLowerInvariant());
+                if (audioQuality.Contains("320")) qualityVal = "0";
+                else if (audioQuality.Contains("256")) qualityVal = "2";
+                else if (audioQuality.Contains("192")) qualityVal = "4";
+                else if (audioQuality.Contains("128")) qualityVal = "5";
+                else if (audioQuality.Contains("96")) qualityVal = "7";
             }
             args.Add("--audio-quality");
-            args.Add("0");
+            args.Add(qualityVal);
         }
 
         if (!string.IsNullOrWhiteSpace(formatSpec))

@@ -6,78 +6,111 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:models="using:Glypdl.Windows.Models"
     xmlns:vm="using:Glypdl.Windows.ViewModels"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
     mc:Ignorable="d">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24">
-        <StackPanel Spacing="24" MaxWidth="800" HorizontalAlignment="Stretch">
-            <TextBlock Text="Settings" Style="{ThemeResource TitleTextBlockStyle}" FontWeight="SemiBold" />
+    <ScrollViewer
+        HorizontalScrollBarVisibility="Disabled"
+        VerticalScrollBarVisibility="Auto">
+        <Grid Padding="48,28,48,48" HorizontalAlignment="Stretch">
+            <StackPanel Spacing="24" HorizontalAlignment="Stretch">
+                
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Settings" Style="{ThemeResource TitleTextBlockStyle}" FontWeight="Bold" />
+                    <TextBlock Text="Configure downloads, theme, and engine preferences" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="13" />
+                </StackPanel>
 
-            <!-- Downloads Section -->
-            <StackPanel Spacing="12">
-                <TextBlock Text="Downloads" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
+                <!-- Downloads Section -->
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Downloads" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" FontSize="15" />
 
-                <!-- Download Directory -->
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
-                    <Grid>
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="Download Directory" FontWeight="SemiBold" />
-                            <TextBlock Text="{x:Bind ViewModel.DownloadDirectory, Mode=OneWay}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        </StackPanel>
-                        <Button Content="Change" HorizontalAlignment="Right" VerticalAlignment="Center" Click="ChangeFolder_Click" />
-                    </Grid>
-                </Border>
+                    <!-- Download Directory Card -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                        <Grid>
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="Download Location" FontWeight="SemiBold" />
+                                <TextBlock Text="{x:Bind ViewModel.DownloadDirectory, Mode=OneWay}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                            </StackPanel>
+                            <Button Content="Change..." HorizontalAlignment="Right" VerticalAlignment="Center" Click="ChangeFolder_Click" Padding="16,6" />
+                        </Grid>
+                    </Border>
 
-                <!-- Max Concurrent -->
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
-                    <Grid>
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="Maximum Concurrent Downloads" FontWeight="SemiBold" />
-                            <TextBlock Text="Number of simultaneous downloads allowed" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        </StackPanel>
-                        <NumberBox Value="{x:Bind ViewModel.MaxConcurrentDownloads, Mode=TwoWay}" Minimum="1" Maximum="10" SpinButtonPlacementMode="Inline" HorizontalAlignment="Right" VerticalAlignment="Center" Width="120" />
-                    </Grid>
-                </Border>
+                    <!-- Max Concurrent -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                        <Grid>
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="Maximum Concurrent Downloads" FontWeight="SemiBold" />
+                                <TextBlock Text="How many media items can download at the same time" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                            </StackPanel>
+                            <NumberBox Value="{x:Bind ViewModel.MaxConcurrentDownloads, Mode=TwoWay}" Minimum="1" Maximum="10" SpinButtonPlacementMode="Inline" HorizontalAlignment="Right" VerticalAlignment="Center" Width="120" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Filename Template -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                        <Grid>
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="Output Filename Template" FontWeight="SemiBold" />
+                                <TextBlock Text="Default: %(title)s.%(ext)s" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                            </StackPanel>
+                            <TextBox Text="{x:Bind ViewModel.FilenameTemplate, Mode=TwoWay}" HorizontalAlignment="Right" VerticalAlignment="Center" Width="220" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- Appearance & Notifications Section -->
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Appearance &amp; System" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" FontSize="15" />
+
+                    <!-- Theme -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                        <Grid>
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="App Theme" FontWeight="SemiBold" />
+                                <TextBlock Text="Switch between System default, Light, and Dark" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                            </StackPanel>
+                            <ComboBox SelectedIndex="{x:Bind ViewModel.ThemeIndex, Mode=TwoWay}" HorizontalAlignment="Right" VerticalAlignment="Center" Width="140">
+                                <ComboBoxItem Content="System" />
+                                <ComboBoxItem Content="Light" />
+                                <ComboBoxItem Content="Dark" />
+                            </ComboBox>
+                        </Grid>
+                    </Border>
+
+                    <!-- Notifications -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                        <Grid>
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="Windows Toast Notifications" FontWeight="SemiBold" />
+                                <TextBlock Text="Show notification alerts when downloads complete" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                            </StackPanel>
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.EnableNotifications, Mode=TwoWay}" HorizontalAlignment="Right" VerticalAlignment="Center" OffContent="" OnContent="" />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- Engine Section -->
+                <StackPanel Spacing="10">
+                    <TextBlock Text="Engine &amp; CLI" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" FontSize="15" />
+
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                        <Grid>
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="yt-dlp Core Engine" FontWeight="SemiBold" />
+                                <TextBlock Text="{x:Bind ViewModel.DetectedYtDlpVersion, Mode=OneWay}" Foreground="{ThemeResource SystemAccentColor}" FontSize="12" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- Save Button -->
+                <Button
+                    Content="Save Preferences"
+                    Style="{ThemeResource AccentButtonStyle}"
+                    HorizontalAlignment="Right"
+                    Padding="24,10"
+                    Command="{x:Bind ViewModel.SaveSettingsCommand}" />
             </StackPanel>
-
-            <!-- Appearance Section -->
-            <StackPanel Spacing="12">
-                <TextBlock Text="Appearance" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
-
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
-                    <Grid>
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="App Theme" FontWeight="SemiBold" />
-                            <TextBlock Text="Select Light, Dark, or System default" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        </StackPanel>
-                        <ComboBox SelectedIndex="0" HorizontalAlignment="Right" VerticalAlignment="Center" Width="140">
-                            <ComboBoxItem Content="System" />
-                            <ComboBoxItem Content="Light" />
-                            <ComboBoxItem Content="Dark" />
-                        </ComboBox>
-                    </Grid>
-                </Border>
-            </StackPanel>
-
-            <!-- Engine Section -->
-            <StackPanel Spacing="12">
-                <TextBlock Text="yt-dlp Engine" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" />
-
-                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
-                    <Grid>
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="Detected yt-dlp Version" FontWeight="SemiBold" />
-                            <TextBlock Text="{x:Bind ViewModel.DetectedYtDlpVersion, Mode=OneWay}" Foreground="{ThemeResource SystemAccentColor}" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
-            </StackPanel>
-
-            <!-- Save Button -->
-            <Button
-                Content="Save Preferences"
-                Style="{ThemeResource AccentButtonStyle}"
-                HorizontalAlignment="Right"
-                Command="{x:Bind ViewModel.SaveSettingsCommand}" />
-        </StackPanel>
+        </Grid>
     </ScrollViewer>
 </Page>

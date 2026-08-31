@@ -5,14 +5,22 @@
     xmlns:local="using:Glypdl.Windows"
     xmlns:views="using:Glypdl.Windows.Views">
 
-    <Grid>
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="RootGrid" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <NavigationView
             x:Name="NavView"
+            x:FieldModifier="public"
             IsBackButtonVisible="Collapsed"
-            PaneDisplayMode="Auto"
+            PaneDisplayMode="LeftCompact"
+            OpenPaneLength="220"
+            CompactPaneLength="48"
+            IsSettingsVisible="True"
             SelectionChanged="NavView_SelectionChanged">
             <NavigationView.MenuItems>
-                <NavigationViewItem Content="Home" Tag="Home">
+                <NavigationViewItem Content="Add Download" Tag="Home">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE80F;" />
                     </NavigationViewItem.Icon>
@@ -37,7 +45,9 @@
                 </NavigationViewItem>
             </NavigationView.FooterMenuItems>
 
-            <Frame x:Name="ContentFrame" />
+            <NavigationView.Content>
+                <Frame x:Name="ContentFrame" x:FieldModifier="public" />
+            </NavigationView.Content>
         </NavigationView>
     </Grid>
 </Window>

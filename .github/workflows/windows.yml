@@ -2,11 +2,17 @@ name: Windows Build & Installer
 
 on:
   push:
+    branches: [ main ]
     paths:
       - 'windows/**'
       - '.github/workflows/windows.yml'
     tags:
       - 'v*'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'windows/**'
+      - '.github/workflows/windows.yml'
   workflow_dispatch:
 
 jobs:

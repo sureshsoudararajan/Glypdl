@@ -4,82 +4,143 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:converters="using:Glypdl.Windows.Converters"
     xmlns:models="using:Glypdl.Windows.Models"
     xmlns:vm="using:Glypdl.Windows.ViewModels"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
     mc:Ignorable="d">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24">
-        <StackPanel Spacing="20" MaxWidth="900" HorizontalAlignment="Stretch">
-            <!-- Header with Clear Button -->
-            <Grid>
-                <TextBlock Text="Active Downloads" Style="{ThemeResource TitleTextBlockStyle}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                <Button
-                    Content="Clear Completed"
-                    HorizontalAlignment="Right"
-                    Command="{x:Bind ViewModel.ClearCompletedCommand}" />
-            </Grid>
+    <Page.Resources>
+        <converters:StringToImageSourceConverter x:Key="ImageConverter" />
+        <converters:ActiveStateToVisibilityConverter x:Key="ActiveConverter" />
+        <converters:CompletedStateToVisibilityConverter x:Key="CompletedConverter" />
+    </Page.Resources>
 
-            <!-- Active Downloads List -->
-            <ListView
-                ItemsSource="{x:Bind ViewModel.ActiveDownloads, Mode=OneWay}"
-                SelectionMode="None">
-                <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="models:DownloadItem">
-                        <Border
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                            BorderThickness="1"
-                            CornerRadius="8"
-                            Padding="14"
-                            Margin="0,0,0,12">
-                            <Grid ColumnSpacing="14">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="140" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
+    <ScrollViewer
+        HorizontalScrollBarVisibility="Disabled"
+        VerticalScrollBarVisibility="Auto">
+        <Grid Padding="48,28,48,48" HorizontalAlignment="Stretch">
+            <StackPanel Spacing="24" HorizontalAlignment="Stretch">
+                
+                <!-- Header with Clear Button -->
+                <Grid>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Downloads Queue" Style="{ThemeResource TitleTextBlockStyle}" FontWeight="Bold" />
+                        <TextBlock Text="Monitor active and queued video/audio downloads" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="13" />
+                    </StackPanel>
 
-                                <!-- Thumbnail -->
-                                <Image
-                                    Grid.Column="0"
-                                    Source="{x:Bind ThumbnailUrl, Mode=OneWay}"
-                                    Stretch="UniformToFill"
-                                    Height="78"
-                                    CornerRadius="4" />
+                    <Button
+                        Content="Clear Completed"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Command="{x:Bind ViewModel.ClearCompletedCommand}" />
+                </Grid>
 
-                                <!-- Info & Progress -->
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
-                                    <TextBlock Text="{x:Bind Title, Mode=OneWay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{x:Bind Uploader, Mode=OneWay}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                <!-- Empty State Card -->
+                <Border
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="48"
+                    Visibility="{x:Bind CountToEmptyVisibility(ViewModel.ActiveDownloads.Count), Mode=OneWay}">
+                    <StackPanel Spacing="12" HorizontalAlignment="Center">
+                        <FontIcon Glyph="&#xE896;" FontSize="48" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" />
+                        <TextBlock Text="No Active Downloads" FontWeight="SemiBold" FontSize="16" HorizontalAlignment="Center" />
+                        <TextBlock Text="Paste a link on the Add Download tab to start downloading media." Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Border>
 
-                                    <!-- Progress Bar -->
-                                    <ProgressBar Value="{x:Bind Progress, Mode=OneWay}" Maximum="100" />
+                <!-- Active Downloads List -->
+                <ListView
+                    ItemsSource="{x:Bind ViewModel.ActiveDownloads, Mode=OneWay}"
+                    SelectionMode="None"
+                    Visibility="{x:Bind CountToListVisibility(ViewModel.ActiveDownloads.Count), Mode=OneWay}">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="models:DownloadItem">
+                            <Border
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="16"
+                                Margin="0,0,0,12">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
 
-                                    <!-- Stats Grid -->
-                                    <Grid>
-                                        <TextBlock Text="{x:Bind StatusMessage, Mode=OneWay}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                        <TextBlock Text="{x:Bind FormattedSize, Mode=OneWay}" FontSize="12" HorizontalAlignment="Right" />
-                                    </Grid>
-                                </StackPanel>
+                                    <!-- Thumbnail with Placeholder Fallback -->
+                                    <Border Grid.Column="0" CornerRadius="8" Background="{ThemeResource LayerFillColorDefaultBrush}" Height="84" Width="150">
+                                        <Grid>
+                                            <FontIcon Glyph="&#xE8B9;" Foreground="{ThemeResource TextFillColorTertiaryBrush}" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <Image
+                                                Source="{x:Bind ThumbnailUrl, Converter={StaticResource ImageConverter}, Mode=OneWay}"
+                                                Stretch="UniformToFill"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
 
-                                <!-- Action Buttons -->
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
-                                    <Button
-                                        ToolTipService.ToolTip="Cancel"
-                                        Click="CancelButton_Click">
-                                        <FontIcon Glyph="&#xE711;" />
-                                    </Button>
-                                    <Button
-                                        ToolTipService.ToolTip="Open Folder"
-                                        Click="OpenFolderButton_Click">
-                                        <FontIcon Glyph="&#xED25;" />
-                                    </Button>
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
-        </StackPanel>
+                                    <!-- Info & Progress Column -->
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+                                        <TextBlock Text="{x:Bind Title, Mode=OneWay}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1" FontSize="14" />
+                                        
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{x:Bind Uploader, Mode=OneWay}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                            <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="4" Padding="6,1">
+                                                <TextBlock Text="{x:Bind Quality, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" />
+                                            </Border>
+                                        </StackPanel>
+
+                                        <!-- Progress Bar -->
+                                        <ProgressBar Value="{x:Bind Progress, Mode=OneWay}" Maximum="100" Height="4" Margin="0,2,0,0" />
+
+                                        <!-- Stats Grid -->
+                                        <Grid Margin="0,2,0,0">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="4" Padding="6,2">
+                                                    <TextBlock Text="{x:Bind StatusMessage, Mode=OneWay}" FontSize="11" FontWeight="SemiBold" />
+                                                </Border>
+                                                <TextBlock Text="{x:Bind FormattedSpeed, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" Visibility="{x:Bind State, Converter={StaticResource ActiveConverter}, Mode=OneWay}" />
+                                                <TextBlock Text="{x:Bind FormattedEta, Mode=OneWay}" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" Visibility="{x:Bind State, Converter={StaticResource ActiveConverter}, Mode=OneWay}" />
+                                            </StackPanel>
+                                            <TextBlock Text="{x:Bind FormattedSize, Mode=OneWay}" FontSize="11" HorizontalAlignment="Right" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <!-- Action Buttons -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
+                                        <Button
+                                            ToolTipService.ToolTip="Cancel"
+                                            Click="CancelButton_Click"
+                                            Visibility="{x:Bind State, Converter={StaticResource ActiveConverter}, Mode=OneWay}"
+                                            Padding="10,8">
+                                            <FontIcon Glyph="&#xE711;" FontSize="13" />
+                                        </Button>
+                                        <Button
+                                            ToolTipService.ToolTip="Play Media"
+                                            Click="PlayButton_Click"
+                                            Visibility="{x:Bind State, Converter={StaticResource CompletedConverter}, Mode=OneWay}"
+                                            Padding="10,8">
+                                            <FontIcon Glyph="&#xE768;" FontSize="13" />
+                                        </Button>
+                                        <Button
+                                            ToolTipService.ToolTip="Open Folder"
+                                            Click="OpenFolderButton_Click"
+                                            Visibility="{x:Bind State, Converter={StaticResource CompletedConverter}, Mode=OneWay}"
+                                            Padding="10,8">
+                                            <FontIcon Glyph="&#xED25;" FontSize="13" />
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </StackPanel>
+        </Grid>
     </ScrollViewer>
 </Page>

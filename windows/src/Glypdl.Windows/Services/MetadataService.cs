@@ -16,7 +16,21 @@ public class MetadataService : IMetadataService
     public async Task<MediaMetadata?> FetchMetadataAsync(string url, string? cookieFile = null, CancellationToken cancellationToken = default)
     {
         string? binary = _ytdlpService.DetectYtDlp();
-        if (binary == null) throw new InvalidOperationException("yt-dlp executable was not found.");
+        if (binary == null)
+        {
+            try
+            {
+                string localBin = Path.Combine(PathUtils.GetBinDir(), "yt-dlp.exe");
+                using var client = new HttpClient();
+                var bytes = await client.GetByteArrayAsync("https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe", cancellationToken);
+                await File.WriteAllBytesAsync(localBin, bytes, cancellationToken);
+                binary = localBin;
+            }
+            catch
+            {
+                throw new InvalidOperationException("yt-dlp executable was not found and could not be downloaded automatically.");
+            }
+        }
 
         var args = _ytdlpService.BuildMetadataArguments(url, cookieFile);
         var result = await ProcessRunner.RunAsync(binary, args, cancellationToken);
@@ -37,35 +51,75 @@ public class MetadataService : IMetadataService
             using var doc = JsonDocument.Parse(result.StandardOutput);
             var root = doc.RootElement;
 
-            bool isPlaylist = root.TryGetProperty("_type", out var typeEl) && typeEl.GetString() == "playlist";
+            bool isPlaylist = GetStringSafe(root, "_type") == "playlist";
+
+            string thumb = GetStringSafe(root, "thumbnail");
+            if (string.IsNullOrWhiteSpace(thumb) && root.TryGetProperty("thumbnails", out var thumbsEl) && thumbsEl.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var t in thumbsEl.EnumerateArray())
+                {
+                    var u = GetStringSafe(t, "url");
+                    if (!string.IsNullOrWhiteSpace(u))
+                    {
+                        thumb = u;
+                    }
+                }
+            }
 
             var meta = new MediaMetadata
             {
                 Url = url,
-                Id = root.TryGetProperty("id", out var idEl) ? idEl.GetString() ?? "" : "",
-                Title = root.TryGetProperty("title", out var titleEl) ? titleEl.GetString() ?? "" : "Untitled",
-                Uploader = root.TryGetProperty("uploader", out var upEl) ? upEl.GetString() ?? "" : (root.TryGetProperty("channel", out var chEl) ? chEl.GetString() ?? "" : ""),
-                Duration = root.TryGetProperty("duration", out var durEl) && durEl.TryGetInt32(out int d) ? d : 0,
-                ThumbnailUrl = root.TryGetProperty("thumbnail", out var thumbEl) ? thumbEl.GetString() ?? "" : "",
-                Extractor = root.TryGetProperty("extractor", out var extEl) ? extEl.GetString() ?? "" : "",
-                Description = root.TryGetProperty("description", out var descEl) ? descEl.GetString() ?? "" : "",
+                Id = GetStringSafe(root, "id"),
+                Title = GetStringSafe(root, "title", "Untitled"),
+                Uploader = GetStringSafe(root, "uploader", GetStringSafe(root, "channel")),
+                Duration = GetIntSafe(root, "duration") ?? 0,
+                ThumbnailUrl = thumb,
+                Extractor = GetStringSafe(root, "extractor"),
+                Description = GetStringSafe(root, "description"),
                 IsPlaylist = isPlaylist
             };
 
             if (isPlaylist && root.TryGetProperty("entries", out var entriesEl) && entriesEl.ValueKind == JsonValueKind.Array)
             {
                 meta.PlaylistCount = entriesEl.GetArrayLength();
+                int idx = 1;
                 foreach (var entry in entriesEl.EnumerateArray())
                 {
-                    meta.PlaylistEntries.Add(new MediaMetadata
+                    string entryThumb = GetStringSafe(entry, "thumbnail");
+                    if (string.IsNullOrWhiteSpace(entryThumb) && entry.TryGetProperty("thumbnails", out var entryThumbs) && entryThumbs.ValueKind == JsonValueKind.Array)
                     {
-                        Url = entry.TryGetProperty("url", out var u) ? u.GetString() ?? "" : (entry.TryGetProperty("webpage_url", out var w) ? w.GetString() ?? "" : ""),
-                        Id = entry.TryGetProperty("id", out var i) ? i.GetString() ?? "" : "",
-                        Title = entry.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "Track",
-                        Uploader = entry.TryGetProperty("uploader", out var eUp) ? eUp.GetString() ?? "" : meta.Uploader,
-                        Duration = entry.TryGetProperty("duration", out var eDur) && eDur.TryGetInt32(out int ed) ? ed : 0,
-                        ThumbnailUrl = entry.TryGetProperty("thumbnail", out var eTh) ? eTh.GetString() ?? "" : "",
-                        IsSelectedInPlaylist = true
+                        foreach (var et in entryThumbs.EnumerateArray())
+                        {
+                            var u = GetStringSafe(et, "url");
+                            if (!string.IsNullOrWhiteSpace(u))
+                            {
+                                entryThumb = u;
+                            }
+                        }
+                    }
+
+                    string entryId = GetStringSafe(entry, "id");
+                    if (string.IsNullOrWhiteSpace(entryThumb) && !string.IsNullOrWhiteSpace(entryId) && entryId.Length == 11)
+                    {
+                        entryThumb = $"https://i.ytimg.com/vi/{entryId}/mqdefault.jpg";
+                    }
+
+                    string entryUrl = GetStringSafe(entry, "url", GetStringSafe(entry, "webpage_url"));
+                    if (!string.IsNullOrWhiteSpace(entryId) && (string.IsNullOrWhiteSpace(entryUrl) || !entryUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        entryUrl = $"https://www.youtube.com/watch?v={entryId}";
+                    }
+
+                    meta.PlaylistEntries.Add(new PlaylistItem
+                    {
+                        Index = idx++,
+                        Url = entryUrl,
+                        Id = entryId,
+                        Title = GetStringSafe(entry, "title", $"Track {idx - 1}"),
+                        Uploader = GetStringSafe(entry, "uploader", meta.Uploader),
+                        Duration = GetIntSafe(entry, "duration") ?? 0,
+                        ThumbnailUrl = entryThumb,
+                        IsSelected = true
                     });
                 }
             }
@@ -73,26 +127,26 @@ public class MetadataService : IMetadataService
             {
                 foreach (var f in formatsEl.EnumerateArray())
                 {
-                    string vcodec = f.TryGetProperty("vcodec", out var vc) ? vc.GetString() ?? "none" : "none";
-                    string acodec = f.TryGetProperty("acodec", out var ac) ? ac.GetString() ?? "none" : "none";
+                    string vcodec = GetStringSafe(f, "vcodec", "none");
+                    string acodec = GetStringSafe(f, "acodec", "none");
                     bool hasVideo = vcodec != "none" && !string.IsNullOrWhiteSpace(vcodec);
                     bool hasAudio = acodec != "none" && !string.IsNullOrWhiteSpace(acodec);
 
-                    int? height = f.TryGetProperty("height", out var h) && h.TryGetInt32(out int hval) ? hval : null;
-                    string res = height.HasValue ? $"{height.Value}p" : (f.TryGetProperty("resolution", out var r) ? r.GetString() ?? "" : "");
+                    int? height = GetIntSafe(f, "height");
+                    string res = height.HasValue ? $"{height.Value}p" : GetStringSafe(f, "resolution");
 
                     meta.Formats.Add(new MediaFormat
                     {
-                        FormatId = f.TryGetProperty("format_id", out var fid) ? fid.GetString() ?? "" : "",
-                        Extension = f.TryGetProperty("ext", out var ext) ? ext.GetString() ?? "" : "",
+                        FormatId = GetStringSafe(f, "format_id"),
+                        Extension = GetStringSafe(f, "ext"),
                         Resolution = res,
-                        Fps = f.TryGetProperty("fps", out var fps) && fps.TryGetInt32(out int fpsval) ? fpsval : null,
+                        Fps = GetIntSafe(f, "fps"),
                         VideoCodec = vcodec,
                         AudioCodec = acodec,
-                        FileSize = f.TryGetProperty("filesize", out var fs) && fs.TryGetInt64(out long fsval) ? fsval : (f.TryGetProperty("filesize_approx", out var fsa) && fsa.TryGetInt64(out long fsaval) ? fsaval : null),
-                        TotalBitrate = f.TryGetProperty("tbr", out var tbr) && tbr.TryGetDouble(out double tbrval) ? tbrval : null,
-                        AudioBitrate = f.TryGetProperty("abr", out var abr) && abr.TryGetDouble(out double abrval) ? abrval : null,
-                        FormatNote = f.TryGetProperty("format_note", out var fn) ? fn.GetString() ?? "" : "",
+                        FileSize = GetLongSafe(f, "filesize") ?? GetLongSafe(f, "filesize_approx"),
+                        TotalBitrate = GetDoubleSafe(f, "tbr"),
+                        AudioBitrate = GetDoubleSafe(f, "abr"),
+                        FormatNote = GetStringSafe(f, "format_note"),
                         HasVideo = hasVideo,
                         HasAudio = hasAudio
                     });
@@ -105,6 +159,58 @@ public class MetadataService : IMetadataService
         {
             throw new Exception($"Failed to parse metadata JSON: {ex.Message}");
         }
+    }
+
+    private static int? GetIntSafe(JsonElement el, string prop)
+    {
+        if (!el.TryGetProperty(prop, out var val)) return null;
+        if (val.ValueKind == JsonValueKind.Number)
+        {
+            if (val.TryGetInt32(out int i)) return i;
+            if (val.TryGetDouble(out double d)) return (int)Math.Round(d);
+        }
+        if (val.ValueKind == JsonValueKind.String && int.TryParse(val.GetString(), out int parsed))
+        {
+            return parsed;
+        }
+        return null;
+    }
+
+    private static long? GetLongSafe(JsonElement el, string prop)
+    {
+        if (!el.TryGetProperty(prop, out var val)) return null;
+        if (val.ValueKind == JsonValueKind.Number)
+        {
+            if (val.TryGetInt64(out long l)) return l;
+            if (val.TryGetDouble(out double d)) return (long)Math.Round(d);
+        }
+        if (val.ValueKind == JsonValueKind.String && long.TryParse(val.GetString(), out long parsed))
+        {
+            return parsed;
+        }
+        return null;
+    }
+
+    private static double? GetDoubleSafe(JsonElement el, string prop)
+    {
+        if (!el.TryGetProperty(prop, out var val)) return null;
+        if (val.ValueKind == JsonValueKind.Number && val.TryGetDouble(out double d))
+        {
+            return d;
+        }
+        if (val.ValueKind == JsonValueKind.String && double.TryParse(val.GetString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double parsed))
+        {
+            return parsed;
+        }
+        return null;
+    }
+
+    private static string GetStringSafe(JsonElement el, string prop, string fallback = "")
+    {
+        if (!el.TryGetProperty(prop, out var val)) return fallback;
+        if (val.ValueKind == JsonValueKind.String) return val.GetString() ?? fallback;
+        if (val.ValueKind == JsonValueKind.Number) return val.GetRawText();
+        return fallback;
     }
 
     public string GetFormatSpec(MediaMetadata metadata, string quality, DownloadMode mode)
