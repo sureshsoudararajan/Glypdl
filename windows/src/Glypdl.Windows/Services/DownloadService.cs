@@ -28,9 +28,14 @@ public class DownloadService : IDownloadService
         string? binary = _ytdlpService.DetectYtDlp();
         if (binary == null)
         {
-            item.State = DownloadState.Failed;
-            item.ErrorMessage = "yt-dlp executable not found.";
-            return;
+            await _ytdlpService.EnsureBinariesAsync();
+            binary = _ytdlpService.DetectYtDlp();
+            if (binary == null)
+            {
+                item.State = DownloadState.Failed;
+                item.ErrorMessage = "yt-dlp executable not found and could not be downloaded.";
+                return;
+            }
         }
 
         var settings = _settingsService.GetSettings();

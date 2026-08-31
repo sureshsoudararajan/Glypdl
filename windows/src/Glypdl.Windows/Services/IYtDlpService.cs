@@ -9,6 +9,8 @@ public interface IYtDlpService
     bool IsYtDlpAvailable();
     bool IsFFmpegAvailable();
     Task<string?> GetVersionAsync();
+    Task<bool> EnsureBinariesAsync(IProgress<string>? progress = null);
+    Task<string> UpdateYtDlpAsync();
     List<string> BuildMetadataArguments(string url, string? cookieFile = null);
     List<string> BuildPlaylistArguments(string url, string? cookieFile = null);
     List<string> BuildDownloadArguments(

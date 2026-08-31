@@ -15,18 +15,12 @@ public class MetadataService : IMetadataService
 
     public async Task<MediaMetadata?> FetchMetadataAsync(string url, string? cookieFile = null, CancellationToken cancellationToken = default)
     {
-        string? binary = _ytdlpService.DetectYtDlp();
+        var binary = _ytdlpService.DetectYtDlp();
         if (binary == null)
         {
-            try
-            {
-                string localBin = Path.Combine(PathUtils.GetBinDir(), "yt-dlp.exe");
-                using var client = new HttpClient();
-                var bytes = await client.GetByteArrayAsync("https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe", cancellationToken);
-                await File.WriteAllBytesAsync(localBin, bytes, cancellationToken);
-                binary = localBin;
-            }
-            catch
+            await _ytdlpService.EnsureBinariesAsync();
+            binary = _ytdlpService.DetectYtDlp();
+            if (binary == null)
             {
                 throw new InvalidOperationException("yt-dlp executable was not found and could not be downloaded automatically.");
             }

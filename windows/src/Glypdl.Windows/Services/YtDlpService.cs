@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using Glypdl.Windows.Utilities;
 
 namespace Glypdl.Windows.Services;
@@ -71,6 +72,11 @@ public class YtDlpService : IYtDlpService
     public async Task<string?> GetVersionAsync()
     {
         string? binary = DetectYtDlp();
+        if (binary == null)
+        {
+            await EnsureBinariesAsync();
+            binary = DetectYtDlp();
+        }
         if (binary == null) return null;
 
         try
@@ -81,6 +87,88 @@ public class YtDlpService : IYtDlpService
         catch
         {
             return null;
+        }
+    }
+
+    public async Task<bool> EnsureBinariesAsync(IProgress<string>? progress = null)
+    {
+        string binDir = PathUtils.GetBinDir();
+        string ytDlpPath = Path.Combine(binDir, "yt-dlp.exe");
+
+        // 1. Ensure yt-dlp.exe
+        if (!File.Exists(ytDlpPath) && DetectYtDlp() == null)
+        {
+            try
+            {
+                progress?.Report("Downloading yt-dlp engine...");
+                using var http = new HttpClient();
+                http.Timeout = TimeSpan.FromMinutes(2);
+                var ytDlpBytes = await http.GetByteArrayAsync("https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe");
+                await File.WriteAllBytesAsync(ytDlpPath, ytDlpBytes);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to auto-download yt-dlp: {ex.Message}");
+            }
+        }
+
+        // 2. Ensure ffmpeg.exe & ffprobe.exe
+        string ffmpegPath = Path.Combine(binDir, "ffmpeg.exe");
+        if (!File.Exists(ffmpegPath) && DetectFFmpeg() == null)
+        {
+            try
+            {
+                progress?.Report("Downloading FFmpeg converter...");
+                using var http = new HttpClient();
+                http.Timeout = TimeSpan.FromMinutes(5);
+                var zipBytes = await http.GetByteArrayAsync("https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip");
+                var tempZip = Path.Combine(PathUtils.GetAppDataDir(), "ffmpeg_temp.zip");
+                await File.WriteAllBytesAsync(tempZip, zipBytes);
+                
+                using (var archive = System.IO.Compression.ZipFile.OpenRead(tempZip))
+                {
+                    foreach (var entry in archive.Entries)
+                    {
+                        if (entry.Name.Equals("ffmpeg.exe", StringComparison.OrdinalIgnoreCase))
+                        {
+                            entry.ExtractToFile(Path.Combine(binDir, "ffmpeg.exe"), overwrite: true);
+                        }
+                        else if (entry.Name.Equals("ffprobe.exe", StringComparison.OrdinalIgnoreCase))
+                        {
+                            entry.ExtractToFile(Path.Combine(binDir, "ffprobe.exe"), overwrite: true);
+                        }
+                    }
+                }
+                
+                try { File.Delete(tempZip); } catch { }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to auto-download ffmpeg: {ex.Message}");
+            }
+        }
+
+        return IsYtDlpAvailable();
+    }
+
+    public async Task<string> UpdateYtDlpAsync()
+    {
+        string? binary = DetectYtDlp();
+        if (binary == null)
+        {
+            await EnsureBinariesAsync();
+            binary = DetectYtDlp();
+        }
+        if (binary == null) return "yt-dlp binary not found.";
+
+        try
+        {
+            var res = await ProcessRunner.RunAsync(binary, new[] { "-U" });
+            return res.Success ? (res.StandardOutput.Trim() + "\n" + res.StandardError.Trim()).Trim() : "Update failed: " + res.StandardError;
+        }
+        catch (Exception ex)
+        {
+            return "Update failed: " + ex.Message;
         }
     }
 
