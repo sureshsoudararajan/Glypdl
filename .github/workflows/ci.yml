@@ -51,11 +51,14 @@ jobs:
       with:
         dotnet-version: '8.0.x'
 
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
     - name: Restore Dependencies
-      run: dotnet restore windows/Glypdl.Windows.sln -p:Platform=x64
+      run: msbuild windows/Glypdl.Windows.sln -t:Restore -p:Configuration=Debug -p:Platform=x64
 
     - name: Build Windows Solution
-      run: dotnet build windows/Glypdl.Windows.sln -c Debug -p:Platform=x64 --verbosity normal
+      run: msbuild windows/Glypdl.Windows.sln -p:Configuration=Debug -p:Platform=x64
 
     - name: Run Windows Tests
-      run: dotnet test windows/tests/Glypdl.Windows.Tests/Glypdl.Windows.Tests.csproj --configuration Debug -p:Platform=x64 --no-build
+      run: dotnet test windows/tests/Glypdl.Windows.Tests/Glypdl.Windows.Tests.csproj -c Debug -p:Platform=x64 --no-build
