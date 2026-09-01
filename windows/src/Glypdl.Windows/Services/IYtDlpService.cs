@@ -2,15 +2,19 @@ using Glypdl.Windows.Models;
 
 namespace Glypdl.Windows.Services;
 
+public record EngineSetupProgress(string Stage, string Details, double Percent, bool IsIndeterminate);
+
 public interface IYtDlpService
 {
     string? DetectYtDlp();
     string? DetectFFmpeg();
     bool IsYtDlpAvailable();
     bool IsFFmpegAvailable();
+    bool NeedsBinariesSetup();
     Task<string?> GetVersionAsync();
     Task<string?> GetFFmpegVersionAsync();
     Task<bool> EnsureBinariesAsync(IProgress<string>? progress = null);
+    Task<bool> EnsureBinariesWithProgressAsync(IProgress<EngineSetupProgress>? progress = null);
     Task<string> UpdateYtDlpAsync();
     List<string> BuildMetadataArguments(string url, string? cookieFile = null);
     List<string> BuildPlaylistArguments(string url, string? cookieFile = null);

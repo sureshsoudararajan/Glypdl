@@ -37,7 +37,7 @@ public partial class MainWindow : Window
                 };
             }
 
-            NavView.Loaded += (s, e) =>
+            NavView.Loaded += async (s, e) =>
             {
                 try
                 {
@@ -53,6 +53,8 @@ public partial class MainWindow : Window
                     Directory.CreateDirectory(dir);
                     File.WriteAllText(Path.Combine(dir, "nav_crash.log"), ex.ToString());
                 }
+
+                await CheckAndProvisionEnginesAsync();
             };
         }
         catch (Exception ex)
@@ -61,6 +63,55 @@ public partial class MainWindow : Window
             Directory.CreateDirectory(dir);
             File.WriteAllText(Path.Combine(dir, "mainwindow_crash.log"), ex.ToString());
             throw;
+        }
+    }
+
+    private async Task CheckAndProvisionEnginesAsync()
+    {
+        var ytdlpService = App.Services.GetService(typeof(Services.IYtDlpService)) as Services.IYtDlpService;
+        if (ytdlpService == null) return;
+
+        if (ytdlpService.NeedsBinariesSetup())
+        {
+            EngineSetupOverlay.Visibility = Visibility.Visible;
+            EngineProgressBar.IsIndeterminate = false;
+            EngineProgressBar.Value = 0;
+            EngineStageText.Text = "Preparing download...";
+            EnginePercentText.Text = "0%";
+            EngineDetailText.Text = "Connecting to server...";
+
+            var progress = new Progress<Services.EngineSetupProgress>(p =>
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    EngineStageText.Text = p.Stage;
+                    EngineDetailText.Text = p.Details;
+                    EngineProgressBar.IsIndeterminate = p.IsIndeterminate;
+                    if (!p.IsIndeterminate)
+                    {
+                        EngineProgressBar.Value = Math.Clamp(p.Percent, 0, 100);
+                        EnginePercentText.Text = $"{Math.Round(p.Percent)}%";
+                    }
+                });
+            });
+
+            try
+            {
+                await Task.Run(async () =>
+                {
+                    await ytdlpService.EnsureBinariesWithProgressAsync(progress);
+                });
+
+                await Task.Delay(600);
+            }
+            catch { }
+            finally
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    EngineSetupOverlay.Visibility = Visibility.Collapsed;
+                });
+            }
         }
     }
 

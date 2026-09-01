@@ -131,41 +131,68 @@ public class YtDlpService : IYtDlpService
         }
     }
 
+    public bool NeedsBinariesSetup()
+    {
+        return !IsYtDlpAvailable() || !IsFFmpegAvailable();
+    }
+
     public async Task<bool> EnsureBinariesAsync(IProgress<string>? progress = null)
     {
+        var wrapper = progress != null 
+            ? new Progress<EngineSetupProgress>(p => progress.Report($"{p.Stage}: {p.Details}"))
+            : null;
+        return await EnsureBinariesWithProgressAsync(wrapper);
+    }
+
+    public async Task<bool> EnsureBinariesWithProgressAsync(IProgress<EngineSetupProgress>? progress = null)
+    {
         string binDir = PathUtils.GetBinDir();
-        string ytDlpPath = Path.Combine(binDir, "yt-dlp.exe");
+        Directory.CreateDirectory(binDir);
+
+        bool needYtDlp = !File.Exists(Path.Combine(binDir, "yt-dlp.exe")) && DetectYtDlp() == null;
+        bool needFFmpeg = !File.Exists(Path.Combine(binDir, "ffmpeg.exe")) && DetectFFmpeg() == null;
+
+        if (!needYtDlp && !needFFmpeg)
+        {
+            return true;
+        }
+
+        using var http = new HttpClient();
+        http.Timeout = TimeSpan.FromMinutes(10);
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("Glypdl/1.0.0 (Windows; Native Client)");
 
         // 1. Ensure yt-dlp.exe
-        if (!File.Exists(ytDlpPath) && DetectYtDlp() == null)
+        if (needYtDlp)
         {
+            string ytDlpPath = Path.Combine(binDir, "yt-dlp.exe");
+            string ytDlpTemp = Path.Combine(binDir, "yt-dlp.exe.tmp");
             try
             {
-                progress?.Report("Downloading yt-dlp engine...");
-                using var http = new HttpClient();
-                http.Timeout = TimeSpan.FromMinutes(2);
-                var ytDlpBytes = await http.GetByteArrayAsync("https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe");
-                await File.WriteAllBytesAsync(ytDlpPath, ytDlpBytes);
+                progress?.Report(new EngineSetupProgress("Downloading yt-dlp engine (1/2)...", "Connecting to GitHub...", 0, true));
+                double maxPercent = needFFmpeg ? 25.0 : 100.0;
+                await DownloadFileWithProgressAsync(http, "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe", ytDlpTemp, progress, "Downloading yt-dlp engine (1/2)...", 0, maxPercent);
+                if (File.Exists(ytDlpPath)) File.Delete(ytDlpPath);
+                File.Move(ytDlpTemp, ytDlpPath);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to auto-download yt-dlp: {ex.Message}");
+                try { if (File.Exists(ytDlpTemp)) File.Delete(ytDlpTemp); } catch { }
             }
         }
 
         // 2. Ensure ffmpeg.exe & ffprobe.exe
-        string ffmpegPath = Path.Combine(binDir, "ffmpeg.exe");
-        if (!File.Exists(ffmpegPath) && DetectFFmpeg() == null)
+        if (needFFmpeg)
         {
+            string tempZip = Path.Combine(PathUtils.GetAppDataDir(), "ffmpeg_temp.zip");
             try
             {
-                progress?.Report("Downloading FFmpeg converter...");
-                using var http = new HttpClient();
-                http.Timeout = TimeSpan.FromMinutes(5);
-                var zipBytes = await http.GetByteArrayAsync("https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip");
-                var tempZip = Path.Combine(PathUtils.GetAppDataDir(), "ffmpeg_temp.zip");
-                await File.WriteAllBytesAsync(tempZip, zipBytes);
-                
+                double startPercent = needYtDlp ? 25.0 : 0.0;
+                double endPercent = 90.0;
+                progress?.Report(new EngineSetupProgress("Downloading FFmpeg & FFprobe (2/2)...", "Connecting to GitHub...", startPercent, true));
+                await DownloadFileWithProgressAsync(http, "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip", tempZip, progress, "Downloading FFmpeg & FFprobe (2/2)...", startPercent, endPercent);
+
+                progress?.Report(new EngineSetupProgress("Extracting FFmpeg & FFprobe...", "Unpacking converter binaries...", 92, true));
                 using (var archive = System.IO.Compression.ZipFile.OpenRead(tempZip))
                 {
                     foreach (var entry in archive.Entries)
@@ -180,16 +207,59 @@ public class YtDlpService : IYtDlpService
                         }
                     }
                 }
-                
-                try { File.Delete(tempZip); } catch { }
+                progress?.Report(new EngineSetupProgress("Setup Complete!", "Media engines are ready.", 100, false));
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Failed to auto-download ffmpeg: {ex.Message}");
             }
+            finally
+            {
+                try { if (File.Exists(tempZip)) File.Delete(tempZip); } catch { }
+            }
         }
 
         return IsYtDlpAvailable();
+    }
+
+    private static async Task DownloadFileWithProgressAsync(
+        HttpClient client,
+        string url,
+        string destinationPath,
+        IProgress<EngineSetupProgress>? progress,
+        string stageTitle,
+        double startPercent,
+        double endPercent)
+    {
+        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+
+        long? totalBytes = response.Content.Headers.ContentLength;
+        using var contentStream = await response.Content.ReadAsStreamAsync();
+        using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 81920, true);
+
+        var buffer = new byte[81920];
+        long totalRead = 0;
+        int bytesRead;
+
+        while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        {
+            await fileStream.WriteAsync(buffer, 0, bytesRead);
+            totalRead += bytesRead;
+
+            if (totalBytes.HasValue && totalBytes.Value > 0)
+            {
+                double fileFraction = (double)totalRead / totalBytes.Value;
+                double overallPercent = startPercent + (fileFraction * (endPercent - startPercent));
+                string details = $"{totalRead / 1048576.0:F1} MB / {totalBytes.Value / 1048576.0:F1} MB ({Math.Round(fileFraction * 100)}%)";
+                progress?.Report(new EngineSetupProgress(stageTitle, details, overallPercent, false));
+            }
+            else
+            {
+                string details = $"{totalRead / 1048576.0:F1} MB downloaded";
+                progress?.Report(new EngineSetupProgress(stageTitle, details, startPercent, true));
+            }
+        }
     }
 
     public async Task<string> UpdateYtDlpAsync()

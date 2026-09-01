@@ -63,5 +63,57 @@
                 <Frame x:Name="ContentFrame" x:FieldModifier="public" />
             </NavigationView.Content>
         </NavigationView>
+
+        <!-- Engine Setup Overlay (Displayed automatically if yt-dlp or FFmpeg are missing) -->
+        <Grid
+            x:Name="EngineSetupOverlay"
+            Grid.Row="0"
+            Grid.RowSpan="2"
+            Background="{ThemeResource LayerFillColorDefaultBrush}"
+            Visibility="Collapsed">
+            <Border
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="32,28"
+                MaxWidth="480"
+                Width="440">
+                <StackPanel Spacing="16">
+                    <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <Image Source="Assets/icon.png" Width="32" Height="32" />
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Setting Up Media Engines" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="Bold" />
+                            <TextBlock Text="Downloading required engine components..." Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock
+                        Text="Glypdl requires the latest yt-dlp engine and FFmpeg converter to download and extract media. This automatic setup runs only once."
+                        TextWrapping="Wrap"
+                        FontSize="13"
+                        Opacity="0.85" />
+
+                    <StackPanel Spacing="8" Margin="0,8,0,0">
+                        <Grid>
+                            <TextBlock x:Name="EngineStageText" Text="Preparing download..." FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Left" />
+                            <TextBlock x:Name="EnginePercentText" Text="0%" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Right" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        </Grid>
+
+                        <ProgressBar
+                            x:Name="EngineProgressBar"
+                            Value="0"
+                            Maximum="100"
+                            IsIndeterminate="False"
+                            Height="6"
+                            CornerRadius="3" />
+
+                        <TextBlock x:Name="EngineDetailText" Text="Connecting to server..." Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
