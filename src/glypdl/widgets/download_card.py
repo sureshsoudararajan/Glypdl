@@ -30,6 +30,8 @@ class DownloadCard(Gtk.Box):
         super().__init__(**kwargs)
         self.set_orientation(Gtk.Orientation.VERTICAL)
         self.add_css_class('card')
+        self.set_hexpand(True)
+        self.set_halign(Gtk.Align.FILL)
         self.set_margin_top(4)
         self.set_margin_bottom(4)
         self.set_margin_start(4)
@@ -41,6 +43,8 @@ class DownloadCard(Gtk.Box):
 
         # Main horizontal container
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        hbox.set_hexpand(True)
+        hbox.set_halign(Gtk.Align.FILL)
         hbox.set_margin_top(10)
         hbox.set_margin_bottom(10)
         hbox.set_margin_start(10)
@@ -66,6 +70,7 @@ class DownloadCard(Gtk.Box):
         # Central details vbox with hexpand to lock outer dimensions
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         vbox.set_hexpand(True)
+        vbox.set_halign(Gtk.Align.FILL)
         vbox.set_valign(Gtk.Align.CENTER)
         hbox.append(vbox)
 
@@ -73,44 +78,63 @@ class DownloadCard(Gtk.Box):
         self.title_label.add_css_class('heading')
         self.title_label.set_ellipsize(Pango.EllipsizeMode.END)
         self.title_label.set_hexpand(True)
+        self.title_label.set_halign(Gtk.Align.FILL)
+        self.title_label.set_max_width_chars(1)
         vbox.append(self.title_label)
 
         self.info_sublabel = Gtk.Label(halign=Gtk.Align.START, xalign=0.0)
         self.info_sublabel.add_css_class('dim-label')
         self.info_sublabel.set_ellipsize(Pango.EllipsizeMode.END)
         self.info_sublabel.set_hexpand(True)
+        self.info_sublabel.set_halign(Gtk.Align.FILL)
+        self.info_sublabel.set_max_width_chars(1)
         vbox.append(self.info_sublabel)
 
-        # Progress bar
+        # Progress bar: Always occupies full available width of container
         self.progress_bar = Gtk.ProgressBar()
-        self.progress_bar.set_margin_top(2)
-        self.progress_bar.set_margin_bottom(2)
+        self.progress_bar.set_hexpand(True)
+        self.progress_bar.set_halign(Gtk.Align.FILL)
+        self.progress_bar.set_valign(Gtk.Align.CENTER)
+        self.progress_bar.set_margin_top(3)
+        self.progress_bar.set_margin_bottom(3)
         vbox.append(self.progress_bar)
 
-        # Stats row with fixed sizing on labels to prevent container jitter
+        # Progress Information Row below progress bar
         self.stats_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.stats_box.set_hexpand(True)
+        self.stats_box.set_halign(Gtk.Align.FILL)
         vbox.append(self.stats_box)
 
         self.progress_text = Gtk.Label(halign=Gtk.Align.START, xalign=0.0)
         self.progress_text.add_css_class('dim-label')
         self.progress_text.add_css_class('numeric')
-        self.progress_text.set_size_request(210, -1)
+        self.progress_text.set_hexpand(False)
+        self.progress_text.set_ellipsize(Pango.EllipsizeMode.END)
+        self.progress_text.set_max_width_chars(1)
         self.stats_box.append(self.progress_text)
 
         self.speed_eta_text = Gtk.Label(halign=Gtk.Align.END, xalign=1.0)
         self.speed_eta_text.add_css_class('dim-label')
         self.speed_eta_text.add_css_class('numeric')
         self.speed_eta_text.set_hexpand(True)
+        self.speed_eta_text.set_halign(Gtk.Align.END)
+        self.speed_eta_text.set_ellipsize(Pango.EllipsizeMode.END)
+        self.speed_eta_text.set_max_width_chars(1)
         self.stats_box.append(self.speed_eta_text)
 
         # Status label (for queued, merging, failed, etc.)
         self.status_label = Gtk.Label(halign=Gtk.Align.START, xalign=0.0)
         self.status_label.add_css_class('dim-label')
         self.status_label.set_ellipsize(Pango.EllipsizeMode.END)
+        self.status_label.set_hexpand(True)
+        self.status_label.set_halign(Gtk.Align.FILL)
+        self.status_label.set_max_width_chars(1)
         vbox.append(self.status_label)
 
         # Right Action Buttons
         self.btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.btn_box.set_hexpand(False)
+        self.btn_box.set_halign(Gtk.Align.END)
         self.btn_box.set_valign(Gtk.Align.CENTER)
         hbox.append(self.btn_box)
 

@@ -99,6 +99,7 @@ class GlypdlWindow(Adw.ApplicationWindow):
         scrolled.set_child(clamp)
 
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        content_box.set_hexpand(True)
         clamp.set_child(content_box)
 
         # Top URL Input Bar
@@ -108,6 +109,7 @@ class GlypdlWindow(Adw.ApplicationWindow):
 
         # Metadata Preview Container
         self.preview_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.preview_container.set_hexpand(True)
         content_box.append(self.preview_container)
 
         # Fetching Spinner & Status
@@ -131,6 +133,7 @@ class GlypdlWindow(Adw.ApplicationWindow):
 
         self.downloads_list = Gtk.ListBox()
         self.downloads_list.add_css_class("boxed-list")
+        self.downloads_list.set_hexpand(True)
         self.downloads_list.set_selection_mode(Gtk.SelectionMode.NONE)
         content_box.append(self.downloads_list)
 
@@ -142,6 +145,7 @@ class GlypdlWindow(Adw.ApplicationWindow):
 
         self.queued_list = Gtk.ListBox()
         self.queued_list.add_css_class("boxed-list")
+        self.queued_list.set_hexpand(True)
         self.queued_list.set_selection_mode(Gtk.SelectionMode.NONE)
         content_box.append(self.queued_list)
 
@@ -164,10 +168,12 @@ class GlypdlWindow(Adw.ApplicationWindow):
         self.completed_scrolled.set_propagate_natural_height(True)
         self.completed_scrolled.set_max_content_height(280)
         self.completed_scrolled.set_min_content_height(75)
+        self.completed_scrolled.set_hexpand(True)
         self.completed_scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
 
         self.completed_list = Gtk.ListBox()
         self.completed_list.add_css_class("boxed-list")
+        self.completed_list.set_hexpand(True)
         self.completed_list.set_selection_mode(Gtk.SelectionMode.NONE)
         self.completed_scrolled.set_child(self.completed_list)
         content_box.append(self.completed_scrolled)
