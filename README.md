@@ -147,9 +147,36 @@ cd Glypdl
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak install -y flathub org.gnome.Platform//50 org.gnome.Sdk//50
 
-flatpak-builder --user --install --force-clean build-dir packaging/flatpak/io.github.sureshsoudararajan.Glypdl.yaml
+# Build from local source
+flatpak-builder --user --install --force-clean build-dir packaging/flatpak/io.github.sureshsoudararajan.Glypdl.local.yaml
+
+# Run application
 flatpak run io.github.sureshsoudararajan.Glypdl
 ```
+
+#### 🍪 Accessing Host Browser Cookies in Flatpak:
+Flatpak applications run in an isolated sandbox. While Netscape `cookies.txt` uploads work out-of-the-box, direct browser cookie extraction (`--cookies-from-browser`) requires read-only permission to the host browser's directory.
+
+Grant scoped permissions for your browser(s) using `flatpak override`:
+
+```bash
+# LibreWolf
+flatpak override --user --filesystem=~/.config/librewolf:ro io.github.sureshsoudararajan.Glypdl
+
+# Google Chrome
+flatpak override --user --filesystem=~/.config/google-chrome:ro io.github.sureshsoudararajan.Glypdl
+
+# Chromium / Brave Browser
+flatpak override --user --filesystem=~/.config/chromium:ro --filesystem=~/.config/BraveSoftware:ro io.github.sureshsoudararajan.Glypdl
+
+# Mozilla Firefox
+flatpak override --user --filesystem=~/.mozilla:ro io.github.sureshsoudararajan.Glypdl
+
+# Microsoft Edge
+flatpak override --user --filesystem=~/.config/microsoft-edge:ro io.github.sureshsoudararajan.Glypdl
+```
+
+> 💡 **Tip**: You can also use the graphical **[Flatseal](https://flathub.org/apps/com.github.tchx84.Flatseal)** application to toggle these filesystem permissions visually.
 
 ---
 
@@ -193,7 +220,7 @@ Following the **XDG Base Directory Specification**:
 
 ## 🧪 Running Automated Tests
 
-Run the full 24-test automated suite:
+Run the full 34-test automated suite:
 
 ```bash
 PYTHONPATH=src python3 -m tests
