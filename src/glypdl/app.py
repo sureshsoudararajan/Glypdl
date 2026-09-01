@@ -196,7 +196,7 @@ class GlypdlApp(Adw.Application):
         about.present(self.win)
 
     def _show_preferences(self, action, param):
-        dialog = PreferencesDialog(self.settings, self.cookie_service)
+        dialog = PreferencesDialog(self.settings, self.cookie_service, ytdlp_service=self.ytdlp_service)
         dialog.present(self.win)
 
 

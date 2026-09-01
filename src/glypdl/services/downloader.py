@@ -96,6 +96,7 @@ class DownloadManager:
             'download_dir', ''
         )
         cookie_file = download_item.cookie_file or ''
+        cookies_from_browser = download_item.cookies_from_browser or ''
 
         # For audio downloads, isolate the entire download + conversion in a dedicated subfolder
         # so yt-dlp NEVER inspects, reuses, overwrites or deletes existing video files in download_dir
@@ -118,6 +119,7 @@ class DownloadManager:
             output_template=output_template,
             download_dir=active_download_dir,
             cookie_file=cookie_file if cookie_file else None,
+            cookies_from_browser=cookies_from_browser if cookies_from_browser else None,
             extract_audio=is_audio,
             audio_format=audio_fmt if is_audio else None,
             extra_args=extra_args if extra_args else None
@@ -140,11 +142,13 @@ class DownloadManager:
 
             # Speed smoothing buffer
             speed_samples = []
+            output_lines = []
 
             for line in proc.stdout:
                 line = line.strip()
                 if not line:
                     continue
+                output_lines.append(line)
 
                 # Detect post-processing states
                 new_state = self._detect_state_from_line(line)
@@ -238,7 +242,17 @@ class DownloadManager:
                     final_file_path
                 )
             else:
-                stderr_output = f"Download failed with exit code {proc.returncode}"
+                combined_err = " ".join(output_lines[-6:]).lower() if output_lines else ""
+                if "database is locked" in combined_err or "sqlite3.operationalerror" in combined_err:
+                    stderr_output = "Browser cookie database is locked. Try closing your browser completely and retry, or switch to cookies.txt."
+                elif "could not find" in combined_err and "cookie" in combined_err:
+                    stderr_output = "Browser profile not found. Verify your browser profile in Settings or switch to cookies.txt."
+                elif "keyring" in combined_err or "decrypt" in combined_err or "secret" in combined_err:
+                    stderr_output = "Cookie decryption failed. Check desktop keyring permissions or switch to cookies.txt."
+                elif output_lines:
+                    stderr_output = output_lines[-1]
+                else:
+                    stderr_output = f"Download failed with exit code {proc.returncode}"
                 GLib.idle_add(self._mark_failed, download_item, stderr_output)
 
         except Exception as e:

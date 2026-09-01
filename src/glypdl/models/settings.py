@@ -28,8 +28,12 @@ class Settings:
         'ffmpeg_path': '',
         'extra_args': '',
         'verbose_logging': False,
-        'use_cookies': False,
-        'cookie_file': ''
+        'cookie_method': 'none',  # 'none', 'browser', 'file'
+        'use_cookies': False,      # Legacy backward-compatibility
+        'cookie_file': '',
+        'browser_name': 'auto',
+        'browser_profile': '',
+        'browser_keyring': 'auto'
     }
 
     def __init__(self, config_path=None):
@@ -118,3 +122,27 @@ class Settings:
     def get_custom_ffmpeg_path(self) -> str:
         """Get custom ffmpeg binary path."""
         return self.get('ffmpeg_path', '')
+
+    def get_cookie_method(self) -> str:
+        """Get active cookie authentication method ('none', 'browser', 'file')."""
+        method = self.get('cookie_method', 'none')
+        # Migrate legacy use_cookies boolean if cookie_method not explicitly set
+        if method == 'none' and self.get('use_cookies', False):
+            if self.get('cookie_file'):
+                return 'file'
+        return method
+
+    def set_cookie_method(self, method: str):
+        """Set active cookie authentication method."""
+        self.set('cookie_method', method)
+        self.set('use_cookies', method != 'none')
+
+    def get_browser_name(self) -> str:
+        return self.get('browser_name', 'auto')
+
+    def get_browser_profile(self) -> str:
+        return self.get('browser_profile', '')
+
+    def get_browser_keyring(self) -> str:
+        return self.get('browser_keyring', 'auto')
+

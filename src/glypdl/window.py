@@ -287,15 +287,23 @@ class GlypdlWindow(Adw.ApplicationWindow):
         self.fetch_spinner.start()
 
         cookie_file = cookie_override
+        cookies_from_browser = None
         if cookie_file is None:
-            if self.app.settings.get('use_cookies', False):
+            method = self.app.settings.get_cookie_method()
+            if method == 'browser':
+                b_name = self.app.settings.get_browser_name()
+                b_prof = self.app.settings.get_browser_profile()
+                b_key = self.app.settings.get_browser_keyring()
+                cookies_from_browser = self.app.cookie_service.build_browser_spec(b_name, profile=b_prof, keyring=b_key)
+            elif method == 'file':
                 cookie_file = self.app.settings.get('cookie_file', '')
 
         self.app.metadata_service.fetch_async(
             url,
             callback=self._on_metadata_fetched,
             error_callback=lambda err, target_url=url: self._on_metadata_error(err, target_url),
-            cookie_file=cookie_file
+            cookie_file=cookie_file,
+            cookies_from_browser=cookies_from_browser
         )
 
     def _on_metadata_fetched(self, metadata: dict):
@@ -491,13 +499,22 @@ class GlypdlWindow(Adw.ApplicationWindow):
         self._dismiss_preview()
 
         cookie_file = None
+        cookies_from_browser = None
+
+        method = self.app.settings.get_cookie_method()
+        if method == 'browser':
+            b_name = self.app.settings.get_browser_name()
+            b_prof = self.app.settings.get_browser_profile()
+            b_key = self.app.settings.get_browser_keyring()
+            cookies_from_browser = self.app.cookie_service.build_browser_spec(b_name, profile=b_prof, keyring=b_key)
+        elif method == 'file':
+            cookie_file = self.app.settings.get('cookie_file', '')
+
         if hasattr(widget, 'format_selector'):
             sel_cookie = widget.format_selector.get_selected_cookie_file()
             if sel_cookie and os.path.isfile(sel_cookie):
                 cookie_file = sel_cookie
-
-        if not cookie_file and self.app.settings.get('use_cookies', False):
-            cookie_file = self.app.settings.get('cookie_file', '')
+                cookies_from_browser = None
 
         dl_dir = self.app.settings.get('download_dir') or str(get_default_download_dir())
 
@@ -514,7 +531,8 @@ class GlypdlWindow(Adw.ApplicationWindow):
                 audio_format=audio_format,
                 download_dir=dl_dir,
                 filename_template=self.app.settings.get('filename_template', '%(title)s.%(ext)s'),
-                cookie_file=cookie_file or ''
+                cookie_file=cookie_file or '',
+                cookies_from_browser=cookies_from_browser or ''
             )
 
             self.downloads.append(item)
@@ -547,13 +565,22 @@ class GlypdlWindow(Adw.ApplicationWindow):
         self._dismiss_preview()
 
         cookie_file = None
+        cookies_from_browser = None
+
+        method = self.app.settings.get_cookie_method()
+        if method == 'browser':
+            b_name = self.app.settings.get_browser_name()
+            b_prof = self.app.settings.get_browser_profile()
+            b_key = self.app.settings.get_browser_keyring()
+            cookies_from_browser = self.app.cookie_service.build_browser_spec(b_name, profile=b_prof, keyring=b_key)
+        elif method == 'file':
+            cookie_file = self.app.settings.get('cookie_file', '')
+
         if hasattr(widget, 'format_selector'):
             sel_cookie = widget.format_selector.get_selected_cookie_file()
             if sel_cookie and os.path.isfile(sel_cookie):
                 cookie_file = sel_cookie
-
-        if not cookie_file and self.app.settings.get('use_cookies', False):
-            cookie_file = self.app.settings.get('cookie_file', '')
+                cookies_from_browser = None
 
         dl_dir = self.app.settings.get('download_dir') or str(get_default_download_dir())
 
@@ -569,7 +596,8 @@ class GlypdlWindow(Adw.ApplicationWindow):
             audio_format=audio_format,
             download_dir=dl_dir,
             filename_template=self.app.settings.get('filename_template', '%(title)s.%(ext)s'),
-            cookie_file=cookie_file or ''
+            cookie_file=cookie_file or '',
+            cookies_from_browser=cookies_from_browser or ''
         )
 
         self.downloads.append(item)

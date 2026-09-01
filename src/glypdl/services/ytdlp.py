@@ -157,6 +157,7 @@ class YtDlpService:
                             download_dir: Optional[str] = None, 
                             temp_dir: Optional[str] = None,
                             cookie_file: Optional[str] = None, 
+                            cookies_from_browser: Optional[str] = None,
                             extract_audio: bool = False,
                             audio_format: Optional[str] = None,
                             extra_args: Optional[List[str]] = None) -> List[str]:
@@ -191,7 +192,9 @@ class YtDlpService:
             os.makedirs(effective_temp, exist_ok=True)
             args.extend(['-P', f'temp:{effective_temp}'])
             
-        if cookie_file and os.path.isfile(cookie_file):
+        if cookies_from_browser:
+            args.extend(['--cookies-from-browser', cookies_from_browser])
+        elif cookie_file and os.path.isfile(cookie_file):
             args.extend(['--cookies', cookie_file])
             
         if extra_args:
@@ -200,20 +203,24 @@ class YtDlpService:
         args.append(url)
         return args
 
-    def build_metadata_args(self, url: str, cookie_file: Optional[str] = None) -> List[str]:
+    def build_metadata_args(self, url: str, cookie_file: Optional[str] = None, cookies_from_browser: Optional[str] = None) -> List[str]:
         """Build argument list for extracting video metadata."""
         path = self.get_path()
         args = [path, '-J', '--no-warnings', '--no-playlist']
-        if cookie_file and os.path.isfile(cookie_file):
+        if cookies_from_browser:
+            args.extend(['--cookies-from-browser', cookies_from_browser])
+        elif cookie_file and os.path.isfile(cookie_file):
             args.extend(['--cookies', cookie_file])
         args.append(url)
         return args
 
-    def build_playlist_args(self, url: str, cookie_file: Optional[str] = None) -> List[str]:
+    def build_playlist_args(self, url: str, cookie_file: Optional[str] = None, cookies_from_browser: Optional[str] = None) -> List[str]:
         """Build argument list for extracting playlist metadata."""
         path = self.get_path()
         args = [path, '-J', '--flat-playlist', '--no-warnings']
-        if cookie_file and os.path.isfile(cookie_file):
+        if cookies_from_browser:
+            args.extend(['--cookies-from-browser', cookies_from_browser])
+        elif cookie_file and os.path.isfile(cookie_file):
             args.extend(['--cookies', cookie_file])
         args.append(url)
         return args

@@ -15,14 +15,14 @@ class MetadataService:
     def __init__(self, ytdlp_service):
         self.ytdlp_service = ytdlp_service
 
-    def fetch_async(self, url: str, callback, error_callback=None, cookie_file: Optional[str] = None):
+    def fetch_async(self, url: str, callback, error_callback=None, cookie_file: Optional[str] = None, cookies_from_browser: Optional[str] = None):
         """Fetch metadata asynchronously (single video or playlist) and invoke callback(metadata_dict) on GTK main thread."""
         def _fetch():
             try:
                 is_likely_playlist = 'playlist' in url or 'list=' in url
 
                 if is_likely_playlist:
-                    playlist_args = self.ytdlp_service.build_playlist_args(url, cookie_file=cookie_file)
+                    playlist_args = self.ytdlp_service.build_playlist_args(url, cookie_file=cookie_file, cookies_from_browser=cookies_from_browser)
                     p_res = subprocess.run(
                         playlist_args,
                         capture_output=True,
@@ -64,13 +64,14 @@ class MetadataService:
                             'uploader': data.get('uploader') or data.get('channel') or '',
                             'playlist_count': len(normalized_entries),
                             'entries': normalized_entries,
-                            'used_cookie_file': cookie_file or ''
+                            'used_cookie_file': cookie_file or '',
+                            'used_cookies_from_browser': cookies_from_browser or ''
                         }
                         GLib.idle_add(callback, playlist_dict)
                         return
 
                 # Fetch single video metadata
-                args = self.ytdlp_service.build_metadata_args(url, cookie_file=cookie_file)
+                args = self.ytdlp_service.build_metadata_args(url, cookie_file=cookie_file, cookies_from_browser=cookies_from_browser)
                 result = subprocess.run(
                     args,
                     capture_output=True,
@@ -81,6 +82,7 @@ class MetadataService:
                 metadata_dict = json.loads(result.stdout)
                 metadata_dict['original_url'] = url
                 metadata_dict['used_cookie_file'] = cookie_file or ''
+                metadata_dict['used_cookies_from_browser'] = cookies_from_browser or ''
                 
                 # Fetch and cache thumbnail in background if available
                 thumb_url = metadata_dict.get('thumbnail')

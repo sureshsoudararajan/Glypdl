@@ -46,6 +46,7 @@ class DownloadItem(GObject.Object):
     download_dir = GObject.Property(type=str)
     filename_template = GObject.Property(type=str)
     cookie_file = GObject.Property(type=str)
+    cookies_from_browser = GObject.Property(type=str)
     
     progress = GObject.Property(type=float, default=0.0)
     downloaded_bytes = GObject.Property(type=int, default=0)

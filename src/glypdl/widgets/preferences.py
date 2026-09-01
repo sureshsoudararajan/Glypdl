@@ -1,27 +1,30 @@
-"""Preferences window for configuring Glypdl."""
+"""Preferences window for configuring Glypdl with browser cookie and cookies.txt support."""
 
 import os
 import gi
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
-from gi.repository import Gtk, Adw, Gio, GLib
+from gi.repository import Gtk, Adw, Gio, GLib, Pango
 
 from glypdl.models.settings import Settings
-from glypdl.services.cookies import CookieService
+from glypdl.services.cookies import CookieService, is_flatpak_environment
+from glypdl.services.ytdlp import YtDlpService
 from glypdl.utils.paths import get_default_download_dir
 
 
 class PreferencesDialog(Adw.PreferencesDialog):
-    """Preferences dialog conforming to GNOME HIG."""
+    """Preferences dialog conforming to GNOME Human Interface Guidelines."""
     __gtype_name__ = 'GlypdlPreferencesDialog'
 
-    def __init__(self, settings: Settings, cookie_service: CookieService, **kwargs):
+    def __init__(self, settings: Settings, cookie_service: CookieService, ytdlp_service: YtDlpService = None, **kwargs):
         super().__init__(**kwargs)
         self.set_title("Preferences")
         self.settings = settings
         self.cookie_service = cookie_service
+        self.ytdlp_service = ytdlp_service or YtDlpService(settings=settings)
         self._profile_rows = []
+        self._discovered_browsers = []
 
         # ----------------------------------------------------
         # Page 1: General
@@ -82,7 +85,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
         self.theme_dd = Gtk.DropDown(model=self.theme_model, valign=Gtk.Align.CENTER)
         self.theme_row = Adw.ActionRow(title="Application Theme")
         self.theme_row.add_suffix(self.theme_dd)
-        
+
         current_theme = self.settings.get_color_scheme()
         if current_theme == "light":
             self.theme_dd.set_selected(1)
@@ -126,7 +129,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
         overwrite_group.add(self.overwrite_row)
 
         # ----------------------------------------------------
-        # Page 4: Cookies
+        # Page 4: Cookies (Direct Browser + cookies.txt)
         # ----------------------------------------------------
         cookies_page = Adw.PreferencesPage(
             title="Cookies",
@@ -134,16 +137,102 @@ class PreferencesDialog(Adw.PreferencesDialog):
         )
         self.add(cookies_page)
 
-        cookie_group = Adw.PreferencesGroup(
-            title="Authentication Cookies",
-            description="Use a Netscape cookies.txt file for sites requiring login"
+        # 1. Authentication Method Selector
+        method_group = Adw.PreferencesGroup(
+            title="Authentication Method",
+            description="Select how Glypdl should authenticate for media requiring user login"
         )
-        cookies_page.add(cookie_group)
+        cookies_page.add(method_group)
 
-        self.use_cookies_row = Adw.SwitchRow(title="Enable Cookies")
-        self.use_cookies_row.set_active(self.settings.get('use_cookies', False))
-        self.use_cookies_row.connect('notify::active', self._on_use_cookies_toggled)
-        cookie_group.add(self.use_cookies_row)
+        self.method_model = Gtk.StringList.new([
+            "None (Disabled)",
+            "Browser Cookies (Direct from Installed Browser)",
+            "Cookie File (Netscape cookies.txt)"
+        ])
+        self.method_dd = Gtk.DropDown(model=self.method_model, valign=Gtk.Align.CENTER)
+        self.method_row = Adw.ActionRow(title="Active Method")
+        self.method_row.add_suffix(self.method_dd)
+        method_group.add(self.method_row)
+
+        # 2. Browser Cookies Group (visible when method == 'browser')
+        self.browser_group = Adw.PreferencesGroup(
+            title="Browser Configuration",
+            description="yt-dlp will extract session cookies directly from your web browser"
+        )
+        cookies_page.add(self.browser_group)
+
+        # Flatpak Sandbox Warning (if applicable)
+        if is_flatpak_environment():
+            self.flatpak_notice = Adw.ActionRow(
+                title="Flatpak Sandbox Limitation",
+                subtitle="Direct host browser cookies may be restricted by the Flatpak sandbox. If extraction fails, use a cookies.txt file."
+            )
+            use_txt_btn = Gtk.Button(label="Switch to Cookie File", valign=Gtk.Align.CENTER)
+            use_txt_btn.connect('clicked', lambda _: self._select_cookie_method(2))
+            self.flatpak_notice.add_suffix(use_txt_btn)
+            self.browser_group.add(self.flatpak_notice)
+
+        # Browser Dropdown Row
+        self.browser_model = Gtk.StringList()
+        self.browser_dd = Gtk.DropDown(model=self.browser_model, valign=Gtk.Align.CENTER)
+        self.browser_row = Adw.ActionRow(title="Web Browser")
+        self.browser_row.add_suffix(self.browser_dd)
+        self.browser_group.add(self.browser_row)
+
+        # Profile Dropdown Row
+        self.profile_model = Gtk.StringList()
+        self.profile_dd = Gtk.DropDown(model=self.profile_model, valign=Gtk.Align.CENTER)
+        self.profile_row = Adw.ActionRow(title="Browser Profile")
+        self.profile_row.add_suffix(self.profile_dd)
+        self.browser_group.add(self.profile_row)
+
+        # Decryption Keyring Row (Advanced)
+        self.keyring_model = Gtk.StringList.new([k["name"] for k in self.cookie_service.get_supported_keyrings()])
+        self.keyring_dd = Gtk.DropDown(model=self.keyring_model, valign=Gtk.Align.CENTER)
+        self.keyring_row = Adw.ActionRow(
+            title="Decryption Keyring",
+            subtitle="Keyring used by Chromium-based browsers on Linux"
+        )
+        self.keyring_row.add_suffix(self.keyring_dd)
+        self.browser_group.add(self.keyring_row)
+
+        # Action Buttons Row (Test & Refresh)
+        self.test_row = Adw.ActionRow(
+            title="Test Connection",
+            subtitle="Verify that yt-dlp can access cookies from this browser"
+        )
+        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8, valign=Gtk.Align.CENTER)
+        self.test_row.add_suffix(btn_box)
+
+        self.refresh_btn = Gtk.Button(icon_name="view-refresh-symbolic", tooltip_text="Scan for newly installed browsers & profiles")
+        self.refresh_btn.connect('clicked', lambda _: self._refresh_browsers(force=True))
+        btn_box.append(self.refresh_btn)
+
+        self.test_btn = Gtk.Button(label="Test Browser Cookies")
+        self.test_btn.add_css_class("suggested-action")
+        self.test_btn.connect('clicked', self._on_test_browser_cookies)
+        btn_box.append(self.test_btn)
+
+        self.browser_group.add(self.test_row)
+
+        # Live Test Result Banner Row
+        self.test_result_row = Adw.ActionRow(title="Ready to test")
+        self.test_result_row.set_visible(False)
+        self.browser_group.add(self.test_result_row)
+
+        # Security Note Row
+        security_note = Adw.ActionRow(
+            title="🔒 Local Privacy Guarantee",
+            subtitle="Glypdl never reads, stores, or transmits your cookies. Extraction and decryption are handled entirely by yt-dlp on your local system."
+        )
+        self.browser_group.add(security_note)
+
+        # 3. Cookie File Group (visible when method == 'file')
+        self.file_group = Adw.PreferencesGroup(
+            title="Cookie File (cookies.txt)",
+            description="Use a Netscape cookies.txt file exported from a browser extension"
+        )
+        cookies_page.add(self.file_group)
 
         self.cookie_file_row = Adw.ActionRow(
             title="Active Cookie File",
@@ -156,7 +245,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
         clear_cookie_btn = Gtk.Button(icon_name="edit-clear-symbolic", tooltip_text="Clear Active Cookie File", valign=Gtk.Align.CENTER)
         clear_cookie_btn.connect('clicked', self._on_clear_cookie_file)
         self.cookie_file_row.add_suffix(clear_cookie_btn)
-        cookie_group.add(self.cookie_file_row)
+        self.file_group.add(self.cookie_file_row)
 
         # Saved Profiles list
         self.profiles_group = Adw.PreferencesGroup(
@@ -165,6 +254,9 @@ class PreferencesDialog(Adw.PreferencesDialog):
         )
         cookies_page.add(self.profiles_group)
         self._populate_profiles()
+
+        # Connect Cookie Method & Browser Signals
+        self._init_cookie_ui_state()
 
         # ----------------------------------------------------
         # Page 5: Advanced
@@ -199,9 +291,149 @@ class PreferencesDialog(Adw.PreferencesDialog):
         self.extra_args_row.connect('notify::text', lambda row, pspec: self.settings.set('extra_args', row.get_text()))
         extra_group.add(self.extra_args_row)
 
-    def _on_use_cookies_toggled(self, row, pspec):
-        self.settings.set('use_cookies', row.get_active())
-        self._populate_profiles()
+    # =========================================================================
+    # Cookie UI Logic & Signal Handlers
+    # =========================================================================
+
+    def _init_cookie_ui_state(self):
+        """Initialize dropdown selections and visibility from settings."""
+        # 1. Method
+        method = self.settings.get_cookie_method()
+        if method == "browser":
+            self.method_dd.set_selected(1)
+        elif method == "file":
+            self.method_dd.set_selected(2)
+        else:
+            self.method_dd.set_selected(0)
+
+        self._update_cookie_sections_visibility(self.method_dd.get_selected())
+        self.method_dd.connect('notify::selected', self._on_method_changed)
+
+        # 2. Keyring
+        keyring = self.settings.get_browser_keyring()
+        keyrings = self.cookie_service.get_supported_keyrings()
+        for idx, k in enumerate(keyrings):
+            if k["id"] == keyring:
+                self.keyring_dd.set_selected(idx)
+                break
+        self.keyring_dd.connect('notify::selected', self._on_keyring_changed)
+
+        # 3. Discovered Browsers & Profiles
+        self._refresh_browsers(force=False)
+        self.browser_dd.connect('notify::selected', self._on_browser_changed)
+        self.profile_dd.connect('notify::selected', self._on_profile_changed)
+
+    def _select_cookie_method(self, index: int):
+        self.method_dd.set_selected(index)
+
+    def _on_method_changed(self, dropdown, pspec):
+        idx = dropdown.get_selected()
+        self._update_cookie_sections_visibility(idx)
+        if idx == 1:
+            self.settings.set_cookie_method('browser')
+        elif idx == 2:
+            self.settings.set_cookie_method('file')
+        else:
+            self.settings.set_cookie_method('none')
+
+    def _update_cookie_sections_visibility(self, method_idx: int):
+        self.browser_group.set_visible(method_idx == 1)
+        self.file_group.set_visible(method_idx == 2)
+        self.profiles_group.set_visible(method_idx == 2)
+
+    def _refresh_browsers(self, force: bool = False):
+        """Populate browser and profile dropdowns based on discovery."""
+        self._discovered_browsers = self.cookie_service.discover_installed_browsers(force_refresh=force)
+        
+        # Rebuild browser StringList model
+        while self.browser_model.get_n_items() > 0:
+            self.browser_model.remove(0)
+
+        selected_browser_id = self.settings.get_browser_name()
+        selected_browser_idx = 0
+
+        for idx, b in enumerate(self._discovered_browsers):
+            status_suffix = " (Installed)" if b.get("is_installed") else ""
+            self.browser_model.append(f"{b['name']}{status_suffix}")
+            if b["id"] == selected_browser_id:
+                selected_browser_idx = idx
+
+        self.browser_dd.set_selected(selected_browser_idx)
+        self._update_profile_dropdown(selected_browser_idx)
+
+    def _on_browser_changed(self, dropdown, pspec):
+        idx = dropdown.get_selected()
+        if 0 <= idx < len(self._discovered_browsers):
+            b_info = self._discovered_browsers[idx]
+            self.settings.set('browser_name', b_info["id"])
+            self._update_profile_dropdown(idx)
+
+    def _update_profile_dropdown(self, browser_idx: int):
+        if not (0 <= browser_idx < len(self._discovered_browsers)):
+            return
+
+        b_info = self._discovered_browsers[browser_idx]
+        profiles = b_info.get("profiles", ["Default"])
+
+        while self.profile_model.get_n_items() > 0:
+            self.profile_model.remove(0)
+
+        saved_profile = self.settings.get_browser_profile()
+        selected_prof_idx = 0
+
+        for idx, p in enumerate(profiles):
+            self.profile_model.append(p)
+            if p == saved_profile:
+                selected_prof_idx = idx
+
+        self.profile_dd.set_selected(selected_prof_idx)
+
+    def _on_profile_changed(self, dropdown, pspec):
+        idx = dropdown.get_selected()
+        b_idx = self.browser_dd.get_selected()
+        if 0 <= b_idx < len(self._discovered_browsers):
+            profiles = self._discovered_browsers[b_idx].get("profiles", ["Default"])
+            if 0 <= idx < len(profiles):
+                self.settings.set('browser_profile', profiles[idx])
+
+    def _on_keyring_changed(self, dropdown, pspec):
+        idx = dropdown.get_selected()
+        keyrings = self.cookie_service.get_supported_keyrings()
+        if 0 <= idx < len(keyrings):
+            self.settings.set('browser_keyring', keyrings[idx]["id"])
+
+    def _on_test_browser_cookies(self, btn):
+        """Run an asynchronous verification check using yt-dlp."""
+        b_name = self.settings.get_browser_name()
+        profile = self.settings.get_browser_profile()
+        keyring = self.settings.get_browser_keyring()
+        spec = self.cookie_service.build_browser_spec(b_name, profile=profile, keyring=keyring)
+
+        if not spec:
+            self.test_result_row.set_visible(True)
+            self.test_result_row.set_title("⚠ Invalid Configuration")
+            self.test_result_row.set_subtitle("Please select a valid web browser.")
+            return
+
+        self.test_btn.set_sensitive(False)
+        self.test_result_row.set_visible(True)
+        self.test_result_row.set_title("Testing cookie extraction…")
+        self.test_result_row.set_subtitle(f"Running check for '{spec}'…")
+
+        def _on_test_done(success: bool, msg: str, details: str):
+            self.test_btn.set_sensitive(True)
+            if success:
+                self.test_result_row.set_title("✓ Cookies Accessible")
+                self.test_result_row.set_subtitle(msg)
+            else:
+                self.test_result_row.set_title("⚠ Cookie Extraction Issue")
+                self.test_result_row.set_subtitle(msg)
+
+        self.cookie_service.test_browser_cookies_async(self.ytdlp_service, spec, _on_test_done)
+
+    # =========================================================================
+    # General Preferences & Cookie File Profiles
+    # =========================================================================
 
     def _on_theme_changed(self, dropdown, pspec):
         selected = dropdown.get_selected()
@@ -242,6 +474,8 @@ class PreferencesDialog(Adw.PreferencesDialog):
             if gfile:
                 path_str = gfile.get_path()
                 self.settings.set('cookie_file', path_str)
+                self.settings.set_cookie_method('file')
+                self.method_dd.set_selected(2)
                 self.cookie_file_row.set_subtitle(path_str)
                 self._populate_profiles()
         except Exception:
@@ -259,8 +493,8 @@ class PreferencesDialog(Adw.PreferencesDialog):
 
         profiles = self.cookie_service.get_profiles() if self.cookie_service else []
         active_cookie = self.settings.get('cookie_file', '')
-        use_cookies = self.settings.get('use_cookies', False)
-        
+        method = self.settings.get_cookie_method()
+
         if not profiles:
             empty_row = Adw.ActionRow(
                 title="No Saved Profiles",
@@ -275,10 +509,10 @@ class PreferencesDialog(Adw.PreferencesDialog):
             for p in profiles:
                 p_name = p.get('name', 'Profile')
                 p_path = p.get('path', '')
-                is_active = (p_path == active_cookie and use_cookies)
+                is_active = (p_path == active_cookie and method == 'file')
 
                 row = Adw.ActionRow(title=p_name, subtitle=p_path)
-                
+
                 btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6, valign=Gtk.Align.CENTER)
                 row.add_suffix(btn_box)
 
@@ -295,7 +529,7 @@ class PreferencesDialog(Adw.PreferencesDialog):
                 del_btn.add_css_class("destructive-action")
                 del_btn.connect('clicked', lambda btn, name=p_name, r=row: self._delete_profile(name, r))
                 btn_box.append(del_btn)
-                
+
                 self.profiles_group.add(row)
                 self._profile_rows.append(row)
 
@@ -309,8 +543,8 @@ class PreferencesDialog(Adw.PreferencesDialog):
 
     def _set_active_cookie_profile(self, path: str):
         self.settings.set('cookie_file', path)
-        self.settings.set('use_cookies', True)
-        self.use_cookies_row.set_active(True)
+        self.settings.set_cookie_method('file')
+        self.method_dd.set_selected(2)
         self.cookie_file_row.set_subtitle(path)
         self._populate_profiles()
 
@@ -325,11 +559,11 @@ class PreferencesDialog(Adw.PreferencesDialog):
             if gfile:
                 path_str = gfile.get_path()
                 default_name = os.path.splitext(os.path.basename(path_str))[0].capitalize()
-                
+
                 entry = Gtk.Entry(text=default_name)
                 entry.set_margin_top(8)
                 entry.set_margin_bottom(8)
-                
+
                 msg_dialog = Adw.MessageDialog(
                     transient_for=self.get_root(),
                     heading="Name Cookie Profile",
@@ -339,14 +573,14 @@ class PreferencesDialog(Adw.PreferencesDialog):
                 msg_dialog.add_response("cancel", "Cancel")
                 msg_dialog.add_response("add", "Add Profile")
                 msg_dialog.set_response_appearance("add", Adw.ResponseAppearance.SUGGESTED)
-                
+
                 def _on_name_response(dlg, resp):
                     if resp == "add":
                         p_name = entry.get_text().strip() or default_name
                         if self.cookie_service:
                             self.cookie_service.add_profile(p_name, path_str)
                             self._populate_profiles()
-                
+
                 msg_dialog.connect("response", _on_name_response)
                 msg_dialog.present()
         except Exception:

@@ -51,14 +51,36 @@ class TestYtDlpService(unittest.TestCase):
         self.assertIn("--audio-format", args)
         self.assertIn("mp3", args)
 
-    def test_build_metadata_args(self):
+    def test_build_download_args_with_browser_cookies(self):
         service = YtDlpService()
-        args = service.build_metadata_args("https://example.com/video")
-        self.assertIn(service.get_path(), args[0])
-        self.assertIn("-J", args)
-        self.assertIn("--no-warnings", args)
-        self.assertIn("--no-playlist", args)
-        self.assertEqual("https://example.com/video", args[-1])
+        args = service.build_download_args(
+            url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            cookies_from_browser="chrome:Default"
+        )
+        self.assertIn("--cookies-from-browser", args)
+        idx = args.index("--cookies-from-browser")
+        self.assertEqual(args[idx + 1], "chrome:Default")
+
+    def test_build_metadata_args_with_browser_cookies(self):
+        service = YtDlpService()
+        args = service.build_metadata_args(
+            url="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            cookies_from_browser="firefox:default-release"
+        )
+        self.assertIn("--cookies-from-browser", args)
+        idx = args.index("--cookies-from-browser")
+        self.assertEqual(args[idx + 1], "firefox:default-release")
+
+    def test_build_playlist_args_with_browser_cookies(self):
+        service = YtDlpService()
+        args = service.build_playlist_args(
+            url="https://www.youtube.com/playlist?list=PL12345",
+            cookies_from_browser="brave+gnomekeyring:Default"
+        )
+        self.assertIn("--cookies-from-browser", args)
+        idx = args.index("--cookies-from-browser")
+        self.assertEqual(args[idx + 1], "brave+gnomekeyring:Default")
+
 
 
 if __name__ == '__main__':

@@ -12,11 +12,13 @@ class TestDownloadModel(unittest.TestCase):
             uploader="Test Uploader",
             duration=180,
             mode=DownloadMode.VIDEO_AUDIO,
-            quality="1080p"
+            quality="1080p",
+            cookies_from_browser="firefox:default-release"
         )
 
         self.assertEqual(item.url, "https://example.com/test")
         self.assertEqual(item.title, "Test Title")
+        self.assertEqual(item.cookies_from_browser, "firefox:default-release")
         self.assertEqual(item.state, DownloadState.FETCHING_INFO)
         self.assertEqual(item.progress, 0.0)
 
