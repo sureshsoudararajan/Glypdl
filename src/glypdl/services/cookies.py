@@ -105,9 +105,11 @@ class CookieService:
             "librewolf": {
                 "binaries": ["librewolf", "io.gitlab.librewolf-community.LibreWolf"],
                 "paths": [
-                    home / ".librewolf",
+                    home / ".config" / "librewolf" / "librewolf",
                     home / ".config" / "librewolf",
+                    home / ".librewolf",
                     home / ".var" / "app" / "io.gitlab.librewolf-community" / ".librewolf",
+                    home / ".var" / "app" / "io.gitlab.librewolf-community" / "config" / "librewolf" / "librewolf",
                     home / ".var" / "app" / "io.gitlab.LibreWolf" / ".librewolf",
                     home / "snap" / "librewolf" / "common" / ".librewolf",
                 ],
@@ -225,10 +227,18 @@ class CookieService:
         return profiles if profiles else ["Default"]
 
     def _discover_firefox_profiles(self, config_dir: Path) -> List[str]:
-        """Discover profile names from Firefox profiles.ini or folder names."""
+        """Discover profile names from Firefox / LibreWolf profiles.ini or folder names."""
         profiles = []
         try:
-            ini_path = config_dir / "profiles.ini"
+            # Handle nested directory structure if profiles.ini is inside a subfolder (e.g. ~/.config/librewolf/librewolf)
+            target_dir = config_dir
+            if not (target_dir / "profiles.ini").exists():
+                for sub in ("librewolf", "firefox", ".librewolf", ".mozilla"):
+                    if (target_dir / sub / "profiles.ini").exists():
+                        target_dir = target_dir / sub
+                        break
+
+            ini_path = target_dir / "profiles.ini"
             if ini_path.exists() and ini_path.is_file():
                 cp = configparser.ConfigParser()
                 cp.read(str(ini_path))
@@ -244,9 +254,14 @@ class CookieService:
                             if base and base not in profiles and not name:
                                 profiles.append(base)
 
-            # Fallback scan directories
+            # Fallback scan directories for profile folders containing cookies.sqlite
+            for item in sorted(target_dir.iterdir()):
+                if item.is_dir() and (item / "cookies.sqlite").exists():
+                    if item.name not in profiles:
+                        profiles.append(item.name)
+
             if not profiles:
-                for item in config_dir.iterdir():
+                for item in target_dir.iterdir():
                     if item.is_dir() and ("default" in item.name or ".release" in item.name):
                         profiles.append(item.name)
         except Exception:
@@ -258,19 +273,26 @@ class CookieService:
         """Resolve a physical directory path for a LibreWolf profile."""
         home = Path.home()
         librewolf_dirs = [
-            home / ".librewolf",
+            home / ".config" / "librewolf" / "librewolf",
             home / ".config" / "librewolf",
+            home / ".librewolf",
+            home / ".var" / "app" / "io.gitlab.librewolf-community" / "config" / "librewolf" / "librewolf",
             home / ".var" / "app" / "io.gitlab.librewolf-community" / ".librewolf",
             home / ".var" / "app" / "io.gitlab.LibreWolf" / ".librewolf",
+            home / "snap" / "librewolf" / "common" / ".config" / "librewolf" / "librewolf",
             home / "snap" / "librewolf" / "common" / ".librewolf",
         ]
 
+        # 1. First search for exact profile name or path match in profiles.ini
         for base in librewolf_dirs:
             if not base.exists() or not base.is_dir():
                 continue
 
-            # Check profiles.ini
-            ini_path = base / "profiles.ini"
+            target_base = base
+            if not (target_base / "profiles.ini").exists() and (target_base / "librewolf" / "profiles.ini").exists():
+                target_base = target_base / "librewolf"
+
+            ini_path = target_base / "profiles.ini"
             if ini_path.exists() and ini_path.is_file():
                 try:
                     cp = configparser.ConfigParser()
@@ -281,19 +303,26 @@ class CookieService:
                             path_val = cp.get(sec, "Path", fallback=None)
                             is_relative = cp.get(sec, "IsRelative", fallback="1") == "1"
                             if path_val:
-                                full_p = (base / path_val).resolve() if is_relative else Path(path_val)
+                                full_p = (target_base / path_val).resolve() if is_relative else Path(path_val)
                                 if profile and (profile == name or profile == path_val or profile == full_p.name):
                                     if full_p.exists():
                                         return str(full_p)
                 except Exception:
                     pass
 
-            # Check subdirectories directly
-            for item in sorted(base.iterdir()):
-                if item.is_dir():
-                    if (item / "cookies.sqlite").exists():
-                        if not profile or profile == "Default" or profile in item.name:
-                            return str(item.resolve())
+        # 2. Match directory with cookies.sqlite directly
+        for base in librewolf_dirs:
+            if not base.exists() or not base.is_dir():
+                continue
+
+            target_base = base
+            if not any((item / "cookies.sqlite").exists() for item in target_base.iterdir() if item.is_dir()) and (target_base / "librewolf").is_dir():
+                target_base = target_base / "librewolf"
+
+            for item in sorted(target_base.iterdir()):
+                if item.is_dir() and (item / "cookies.sqlite").exists():
+                    if not profile or profile == "Default" or profile in item.name:
+                        return str(item.resolve())
 
         return None
 
