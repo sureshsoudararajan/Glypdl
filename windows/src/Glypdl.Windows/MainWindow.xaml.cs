@@ -14,6 +14,8 @@ public partial class MainWindow : Window
         try
         {
             InitializeComponent();
+            ExtendsContentIntoTitleBar = true;
+            SetTitleBar(AppTitleBar);
             Title = "Glypdl";
 
             try
@@ -27,22 +29,23 @@ public partial class MainWindow : Window
             }
             catch { }
 
-            ContentFrame.Navigated += (s, e) =>
+            if (Content is FrameworkElement root)
             {
-                ApplySavedTheme();
-            };
+                root.ActualThemeChanged += (s, e) =>
+                {
+                    App.UpdateTitleBar();
+                };
+            }
 
             NavView.Loaded += (s, e) =>
             {
                 try
                 {
-                    ApplySavedTheme();
                     if (NavView.MenuItems.Count > 0)
                     {
                         NavView.SelectedItem = NavView.MenuItems[0];
                     }
                     ContentFrame.Navigate(typeof(HomePage));
-                    ApplySavedTheme();
                 }
                 catch (Exception ex)
                 {
@@ -130,16 +133,12 @@ public partial class MainWindow : Window
         });
     }
 
-    public void ApplySavedTheme()
+    public void NavigateToSettings()
     {
-        try
+        DispatcherQueue.TryEnqueue(() =>
         {
-            var settingsService = (Services.ISettingsService?)App.Services.GetService(typeof(Services.ISettingsService));
-            if (settingsService != null)
-            {
-                App.ApplyTheme(settingsService.GetSettings().Theme);
-            }
-        }
-        catch { }
+            NavView.SelectedItem = NavView.SettingsItem;
+            ContentFrame.Navigate(typeof(SettingsPage));
+        });
     }
 }

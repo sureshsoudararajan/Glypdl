@@ -7,7 +7,7 @@
     xmlns:converters="using:Glypdl.Windows.Converters"
     xmlns:models="using:Glypdl.Windows.Models"
     xmlns:vm="using:Glypdl.Windows.ViewModels"
-    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+    Background="Transparent"
     KeyDown="Page_KeyDown"
     mc:Ignorable="d">
 
@@ -68,6 +68,21 @@
                     <ProgressRing IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" Width="36" Height="36" />
                     <TextBlock Text="{x:Bind ViewModel.StatusMessage, Mode=OneWay}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
                 </StackPanel>
+
+                <!-- Auth / Cookies Required Warning InfoBar -->
+                <InfoBar
+                    IsOpen="{x:Bind ViewModel.IsAuthWarningVisible, Mode=OneWay}"
+                    Severity="Warning"
+                    Title="{x:Bind ViewModel.AuthWarningTitle, Mode=OneWay}"
+                    Message="{x:Bind ViewModel.AuthWarningMessage, Mode=OneWay}"
+                    IsClosable="True">
+                    <InfoBar.ActionButton>
+                        <Button Content="Go to Settings" Command="{x:Bind ViewModel.GoToSettingsCommand}" Style="{ThemeResource AccentButtonStyle}" Padding="14,6" />
+                    </InfoBar.ActionButton>
+                    <InfoBar.Content>
+                        <HyperlinkButton Content="Or choose / import a cookies.txt file directly to retry..." Click="ImportCookieAndRetry_Click" Margin="0,2,0,4" />
+                    </InfoBar.Content>
+                </InfoBar>
 
                 <!-- Status / Error Banner -->
                 <InfoBar
@@ -319,13 +334,18 @@
                         <StackPanel Spacing="14">
                             <TextBlock Text="Download Options" FontWeight="SemiBold" FontSize="14" />
                             
-                            <Grid ColumnSpacing="14">
+                            <Grid ColumnSpacing="14" RowSpacing="12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
                                 <ComboBox
+                                    Grid.Row="0"
                                     Grid.Column="0"
                                     Header="Download Mode"
                                     HorizontalAlignment="Stretch"
@@ -337,6 +357,7 @@
 
                                 <!-- Video Quality (Shown for Video + Audio and Video Only) -->
                                 <ComboBox
+                                    Grid.Row="0"
                                     Grid.Column="1"
                                     Header="Video Quality"
                                     HorizontalAlignment="Stretch"
@@ -345,7 +366,7 @@
                                     SelectedItem="{x:Bind ViewModel.SelectedQuality, Mode=TwoWay}" />
 
                                 <!-- Audio Format & Bitrate (Shown for Audio Only) -->
-                                <Grid Grid.Column="1" ColumnSpacing="10" Visibility="{x:Bind ViewModel.IsAudioOnly, Converter={StaticResource BoolConverter}, Mode=OneWay}">
+                                <Grid Grid.Row="0" Grid.Column="1" ColumnSpacing="10" Visibility="{x:Bind ViewModel.IsAudioOnly, Converter={StaticResource BoolConverter}, Mode=OneWay}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
@@ -363,6 +384,26 @@
                                         ItemsSource="{x:Bind ViewModel.AudioBitrates, Mode=OneWay}"
                                         SelectedItem="{x:Bind ViewModel.SelectedAudioBitrate, Mode=TwoWay}" />
                                 </Grid>
+
+                                <!-- Cookie Profile Selector -->
+                                <ComboBox
+                                    Grid.Row="1"
+                                    Grid.Column="0"
+                                    Grid.ColumnSpan="2"
+                                    Header="Cookie Profile (Site Authentication)"
+                                    HorizontalAlignment="Stretch"
+                                    ItemsSource="{x:Bind ViewModel.CookieOptions, Mode=OneWay}"
+                                    SelectedItem="{x:Bind ViewModel.SelectedCookieOption, Mode=TwoWay}"
+                                    Visibility="{x:Bind ViewModel.HasCookieOptions, Converter={StaticResource BoolConverter}, Mode=OneWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="models:CookieOptionItem">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon Glyph="&#xE72D;" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="{x:Bind DisplayName}" FontSize="13" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
                             </Grid>
                         </StackPanel>
 

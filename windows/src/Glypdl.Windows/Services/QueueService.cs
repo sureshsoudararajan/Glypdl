@@ -65,7 +65,7 @@ public class QueueService : IQueueService
     {
         DispatcherHelper.ExecuteOnUIThread(() =>
         {
-            var completed = ActiveDownloads.Where(d => d.State == DownloadState.Completed || d.State == DownloadState.Cancelled).ToList();
+            var completed = ActiveDownloads.Where(d => d.State == DownloadState.Completed || d.State == DownloadState.Failed || d.State == DownloadState.Cancelled).ToList();
             foreach (var item in completed)
             {
                 ActiveDownloads.Remove(item);

@@ -16,24 +16,8 @@ public partial class HistoryPage : Page
         DataContext = ViewModel;
         Loaded += (_, _) =>
         {
-            ApplyCurrentTheme();
             _ = ViewModel.LoadHistoryAsync();
         };
-    }
-
-    private void ApplyCurrentTheme()
-    {
-        var settingsService = (Services.ISettingsService?)App.Services.GetService(typeof(Services.ISettingsService));
-        if (settingsService != null)
-        {
-            var theme = settingsService.GetSettings().Theme;
-            RequestedTheme = theme switch
-            {
-                Models.AppTheme.Light => ElementTheme.Light,
-                Models.AppTheme.Dark => ElementTheme.Dark,
-                _ => ElementTheme.Default
-            };
-        }
     }
 
     public Visibility CountToEmptyVisibility(int count) => count == 0 ? Visibility.Visible : Visibility.Collapsed;

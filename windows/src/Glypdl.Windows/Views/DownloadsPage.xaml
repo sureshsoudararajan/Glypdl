@@ -7,13 +7,14 @@
     xmlns:converters="using:Glypdl.Windows.Converters"
     xmlns:models="using:Glypdl.Windows.Models"
     xmlns:vm="using:Glypdl.Windows.ViewModels"
-    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+    Background="Transparent"
     mc:Ignorable="d">
 
     <Page.Resources>
         <converters:StringToImageSourceConverter x:Key="ImageConverter" />
         <converters:ActiveStateToVisibilityConverter x:Key="ActiveConverter" />
         <converters:CompletedStateToVisibilityConverter x:Key="CompletedConverter" />
+        <converters:FailedStateToVisibilityConverter x:Key="FailedConverter" />
     </Page.Resources>
 
     <ScrollViewer
@@ -113,6 +114,13 @@
 
                                     <!-- Action Buttons -->
                                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
+                                        <Button
+                                            ToolTipService.ToolTip="Redownload / Retry"
+                                            Click="RetryButton_Click"
+                                            Visibility="{x:Bind State, Converter={StaticResource FailedConverter}, Mode=OneWay}"
+                                            Padding="10,8">
+                                            <FontIcon Glyph="&#xE72C;" FontSize="13" />
+                                        </Button>
                                         <Button
                                             ToolTipService.ToolTip="Cancel"
                                             Click="CancelButton_Click"

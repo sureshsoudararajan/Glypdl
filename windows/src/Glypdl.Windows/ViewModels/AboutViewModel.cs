@@ -8,6 +8,7 @@ namespace Glypdl.Windows.ViewModels;
 public partial class AboutViewModel : ObservableObject
 {
     private readonly IUpdateService _updateService;
+    private readonly IYtDlpService _ytdlpService;
 
     public string AppName => "Glypdl for Windows 11";
     public string Version => "1.0.0";
@@ -15,6 +16,22 @@ public partial class AboutViewModel : ObservableObject
     public string License => "GPL-3.0-or-later";
     public string GitHubUrl => "https://github.com/sureshsoudararajan/Glypdl";
     public string IssuesUrl => "https://github.com/sureshsoudararajan/Glypdl/issues";
+
+    private string _ytDlpVersion = "Detecting...";
+    public string YtDlpVersion
+    {
+        get => _ytDlpVersion;
+        set => SetProperty(ref _ytDlpVersion, value);
+    }
+
+    private string _ffmpegVersion = "Detecting...";
+    public string FFmpegVersion
+    {
+        get => _ffmpegVersion;
+        set => SetProperty(ref _ffmpegVersion, value);
+    }
+
+    public string FFprobeVersion => "FFmpeg Suite";
 
     [ObservableProperty]
     private string _updateStatus = "Check for Updates";
@@ -25,9 +42,46 @@ public partial class AboutViewModel : ObservableObject
     [ObservableProperty]
     private UpdateCheckResult? _updateResult;
 
-    public AboutViewModel(IUpdateService updateService)
+    public AboutViewModel(IUpdateService updateService, IYtDlpService ytdlpService)
     {
         _updateService = updateService;
+        _ytdlpService = ytdlpService;
+        _ = LoadVersionsAsync();
+    }
+
+    public async Task LoadVersionsAsync()
+    {
+        try
+        {
+            var yVer = await _ytdlpService.GetVersionAsync();
+            Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
+            {
+                YtDlpVersion = !string.IsNullOrWhiteSpace(yVer) ? yVer : "Bundled (Latest)";
+            });
+        }
+        catch
+        {
+            Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
+            {
+                YtDlpVersion = "Bundled";
+            });
+        }
+
+        try
+        {
+            var fVer = await _ytdlpService.GetFFmpegVersionAsync();
+            Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
+            {
+                FFmpegVersion = !string.IsNullOrWhiteSpace(fVer) ? fVer : "Bundled (Latest)";
+            });
+        }
+        catch
+        {
+            Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
+            {
+                FFmpegVersion = "Bundled";
+            });
+        }
     }
 
     [RelayCommand]

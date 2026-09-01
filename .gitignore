@@ -61,9 +61,32 @@ Implementation_plan.md
 *.userosscache
 *.sln.docstates
 
-# .NET / Windows Build Artifacts
+# .NET / Windows Build Artifacts & Binaries
 [Bb]in/
 [Oo]bj/
 [Pp]ublish/
+bin_bundle/
 windows/publish/
 windows/dist/
+windows/src/Glypdl.Windows/bin_bundle/
+AppPackages/
+BundleArtifacts/
+Generated Files/
+
+# Binary Files & Binaries (yt-dlp, ffmpeg, compiled outputs)
+*.exe
+*.dll
+*.pdb
+*.pri
+*.xbf
+*.msi
+*.appx
+*.msix
+*.appxbundle
+*.msixbundle
+yt-dlp
+yt-dlp.exe
+ffmpeg
+ffmpeg.exe
+ffprobe
+ffprobe.exe

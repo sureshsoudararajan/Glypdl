@@ -10,6 +10,9 @@
     <UseWinUI>true</UseWinUI>
     <WindowsPackageType>None</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <PublishSelfContained>true</PublishSelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
   </PropertyGroup>
@@ -35,7 +38,20 @@
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 
-  <Target Name="CopyPriToResourcesPri" AfterTargets="_GenerateProjectPriFileCore;Build;Publish">
+  <Target Name="CopyPriToResourcesPri" AfterTargets="_GenerateProjectPriFileCore;Build">
     <Copy SourceFiles="$(TargetDir)$(TargetName).pri" DestinationFiles="$(TargetDir)resources.pri" Condition="Exists('$(TargetDir)$(TargetName).pri')" ContinueOnError="true" />
+  </Target>
+
+  <Target Name="CopyPriAndXbfToPublish" AfterTargets="Publish">
+    <Copy SourceFiles="$(TargetDir)resources.pri" DestinationFolder="$(PublishDir)" Condition="Exists('$(TargetDir)resources.pri')" ContinueOnError="true" />
+    <Copy SourceFiles="$(TargetDir)$(TargetName).pri" DestinationFolder="$(PublishDir)" Condition="Exists('$(TargetDir)$(TargetName).pri')" ContinueOnError="true" />
+    <Copy SourceFiles="$(TargetDir)App.xbf" DestinationFolder="$(PublishDir)" Condition="Exists('$(TargetDir)App.xbf')" ContinueOnError="true" />
+    <Copy SourceFiles="$(TargetDir)MainWindow.xbf" DestinationFolder="$(PublishDir)" Condition="Exists('$(TargetDir)MainWindow.xbf')" ContinueOnError="true" />
+    <ItemGroup>
+      <_ViewsXbfFiles Include="$(TargetDir)Views\*.xbf" />
+      <_BinBundleFiles Include="bin_bundle\*.exe" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_ViewsXbfFiles)" DestinationFolder="$(PublishDir)Views\" Condition="'@(_ViewsXbfFiles)' != ''" ContinueOnError="true" />
+    <Copy SourceFiles="@(_BinBundleFiles)" DestinationFolder="$(PublishDir)" Condition="'@(_BinBundleFiles)' != ''" ContinueOnError="true" />
   </Target>
 </Project>

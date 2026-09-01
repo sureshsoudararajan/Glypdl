@@ -22,28 +22,6 @@ public partial class SettingsViewModel : ObservableObject
     private bool _enableNotifications = true;
 
     [ObservableProperty]
-    private AppTheme _selectedTheme = AppTheme.System;
-
-    partial void OnSelectedThemeChanged(AppTheme value)
-    {
-        App.ApplyTheme(value);
-        OnPropertyChanged(nameof(ThemeIndex));
-        SaveSettings();
-    }
-
-    public int ThemeIndex
-    {
-        get => (int)SelectedTheme;
-        set
-        {
-            if ((int)SelectedTheme != value && value >= 0)
-            {
-                SelectedTheme = (AppTheme)value;
-            }
-        }
-    }
-
-    [ObservableProperty]
     private string _filenameTemplate = "%(title)s.%(ext)s";
 
     [ObservableProperty]
@@ -58,8 +36,23 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _useCookies;
 
+    partial void OnUseCookiesChanged(bool value)
+    {
+        UpdateProfileActiveStates();
+        SaveSettings();
+    }
+
+    [ObservableProperty]
+    private string _activeCookieFile = string.Empty;
+
     [ObservableProperty]
     private CookieProfile? _selectedCookieProfile;
+
+    [ObservableProperty]
+    private bool _hasCookieProfiles;
+
+    [ObservableProperty]
+    private bool _hasNoCookieProfiles = true;
 
     [ObservableProperty]
     private string _detectedYtDlpVersion = "Checking...";
@@ -77,34 +70,52 @@ public partial class SettingsViewModel : ObservableObject
         LoadSettings();
     }
 
-    private void LoadSettings()
+    public void LoadSettings()
     {
         var s = _settingsService.GetSettings();
         DownloadDirectory = s.DownloadDirectory;
         MaxConcurrentDownloads = s.MaxConcurrentDownloads;
         EnableNotifications = s.EnableNotifications;
-        SelectedTheme = s.Theme;
         FilenameTemplate = s.FilenameTemplate;
         CustomYtDlpPath = s.CustomYtDlpPath;
         CustomFFmpegPath = s.CustomFFmpegPath;
         ExtraArguments = s.ExtraArguments;
         UseCookies = s.UseCookies;
+        ActiveCookieFile = s.ActiveCookieFile;
 
-        CookieProfiles.Clear();
-        foreach (var p in _cookieService.GetProfiles())
-        {
-            CookieProfiles.Add(p);
-        }
+        RefreshProfiles();
 
         if (!string.IsNullOrWhiteSpace(s.ActiveCookieProfileId))
         {
             SelectedCookieProfile = CookieProfiles.FirstOrDefault(p => p.Id == s.ActiveCookieProfileId);
         }
+        if (SelectedCookieProfile != null && string.IsNullOrWhiteSpace(ActiveCookieFile))
+        {
+            ActiveCookieFile = SelectedCookieProfile.FilePath;
+        }
 
+        UpdateProfileActiveStates();
         _ = RefreshVersionAsync();
     }
 
+    [ObservableProperty]
+    private string _saveStatusMessage = string.Empty;
+
     [RelayCommand]
+    public async Task SaveSettingsAsync()
+    {
+        SaveSettings();
+        Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
+        {
+            SaveStatusMessage = "Preferences saved successfully! ✅";
+        });
+        await Task.Delay(3500);
+        Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
+        {
+            SaveStatusMessage = string.Empty;
+        });
+    }
+
     public void SaveSettings()
     {
         var s = new AppSettings
@@ -112,33 +123,93 @@ public partial class SettingsViewModel : ObservableObject
             DownloadDirectory = DownloadDirectory,
             MaxConcurrentDownloads = (int)MaxConcurrentDownloads,
             EnableNotifications = EnableNotifications,
-            Theme = SelectedTheme,
+            Theme = AppTheme.System,
             FilenameTemplate = FilenameTemplate,
             CustomYtDlpPath = CustomYtDlpPath,
             CustomFFmpegPath = CustomFFmpegPath,
             ExtraArguments = ExtraArguments,
             UseCookies = UseCookies,
-            ActiveCookieProfileId = SelectedCookieProfile?.Id ?? string.Empty
+            ActiveCookieProfileId = SelectedCookieProfile?.Id ?? string.Empty,
+            ActiveCookieFile = ActiveCookieFile
         };
 
         _settingsService.SaveSettings(s);
     }
 
+    [RelayCommand]
+    public void UseProfile(CookieProfile profile)
+    {
+        if (profile == null) return;
+        SelectedCookieProfile = profile;
+        ActiveCookieFile = profile.FilePath;
+        UseCookies = true;
+        UpdateProfileActiveStates();
+        SaveSettings();
+    }
+
+    [RelayCommand]
+    public void ClearActiveCookie()
+    {
+        ActiveCookieFile = string.Empty;
+        SelectedCookieProfile = null;
+        UpdateProfileActiveStates();
+        SaveSettings();
+    }
+
+    public void SetActiveCookieFile(string path)
+    {
+        ActiveCookieFile = path;
+        var matchingProfile = CookieProfiles.FirstOrDefault(p => p.FilePath == path);
+        SelectedCookieProfile = matchingProfile;
+        UseCookies = true;
+        UpdateProfileActiveStates();
+        SaveSettings();
+    }
+
     public void AddCookieProfile(string name, string filePath)
     {
         _cookieService.AddProfile(name, filePath);
-        CookieProfiles.Clear();
-        foreach (var p in _cookieService.GetProfiles())
-        {
-            CookieProfiles.Add(p);
-        }
+        RefreshProfiles();
+        SaveSettings();
     }
 
     [RelayCommand]
     public void RemoveCookieProfile(CookieProfile profile)
     {
+        if (profile == null) return;
+        if (SelectedCookieProfile?.Id == profile.Id || ActiveCookieFile == profile.FilePath)
+        {
+            SelectedCookieProfile = null;
+            ActiveCookieFile = string.Empty;
+        }
         _cookieService.RemoveProfile(profile.Id);
         CookieProfiles.Remove(profile);
+        UpdateProfileActiveStates();
+        SaveSettings();
+    }
+
+    public void RefreshProfiles()
+    {
+        CookieProfiles.Clear();
+        foreach (var p in _cookieService.GetProfiles())
+        {
+            CookieProfiles.Add(p);
+        }
+        UpdateProfileActiveStates();
+    }
+
+    private void UpdateProfileActiveStates()
+    {
+        HasCookieProfiles = CookieProfiles.Count > 0;
+        HasNoCookieProfiles = CookieProfiles.Count == 0;
+
+        foreach (var p in CookieProfiles)
+        {
+            p.IsActive = UseCookies && (
+                (!string.IsNullOrWhiteSpace(ActiveCookieFile) && p.FilePath == ActiveCookieFile) ||
+                (SelectedCookieProfile != null && p.Id == SelectedCookieProfile.Id)
+            );
+        }
     }
 
     private async Task RefreshVersionAsync()

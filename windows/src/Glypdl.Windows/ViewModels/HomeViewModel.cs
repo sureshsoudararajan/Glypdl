@@ -71,7 +71,7 @@ public partial class HomeViewModel : ObservableObject
     private string _selectedQuality = "Best";
 
     [ObservableProperty]
-    private string _selectedAudioFormat = "mp3";
+    private string _selectedAudioFormat = "webm";
 
     [ObservableProperty]
     private string _selectedAudioBitrate = "320 kbps (Best)";
@@ -79,8 +79,42 @@ public partial class HomeViewModel : ObservableObject
     [ObservableProperty]
     private List<string> _availableQualities = new() { "Best" };
 
-    public List<string> AudioFormats { get; } = new() { "mp3", "m4a", "flac", "opus", "wav", "aac" };
+    public List<string> AudioFormats { get; } = new() { "webm", "mp3", "m4a", "opus" };
     public List<string> AudioBitrates { get; } = new() { "320 kbps (Best)", "256 kbps (High)", "192 kbps (Medium)", "128 kbps (Standard)", "96 kbps (Low)" };
+
+    public ObservableCollection<CookieOptionItem> CookieOptions { get; } = new();
+
+    [ObservableProperty]
+    private CookieOptionItem? _selectedCookieOption;
+
+    [ObservableProperty]
+    private bool _hasCookieOptions;
+
+    [ObservableProperty]
+    private bool _isAuthWarningVisible;
+
+    [ObservableProperty]
+    private string _authWarningTitle = "Authentication Cookies Required";
+
+    [ObservableProperty]
+    private string _authWarningMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool _isCookiesDisabled;
+
+    public event Func<string, string, Task>? RequestAuthRecovery;
+
+    [RelayCommand]
+    public void GoToSettings()
+    {
+        App.NavigateToSettings();
+    }
+
+    [RelayCommand]
+    public void DismissAuthWarning()
+    {
+        IsAuthWarningVisible = false;
+    }
 
     public HomeViewModel(
         IMetadataService metadataService,
@@ -96,34 +130,113 @@ public partial class HomeViewModel : ObservableObject
         _historyService = historyService;
     }
 
+    public void PopulateCookieOptions(string? activeCookiePath = null)
+    {
+        CookieOptions.Clear();
+        var defaultOption = new CookieOptionItem { DisplayName = "No Cookies", FilePath = string.Empty };
+        CookieOptions.Add(defaultOption);
+
+        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var profiles = _cookieService.GetProfiles();
+        foreach (var p in profiles)
+        {
+            if (!string.IsNullOrWhiteSpace(p.FilePath) && File.Exists(p.FilePath))
+            {
+                string baseName = System.IO.Path.GetFileName(p.FilePath);
+                CookieOptions.Add(new CookieOptionItem
+                {
+                    DisplayName = $"{p.Name} ({baseName})",
+                    FilePath = p.FilePath
+                });
+                seenPaths.Add(p.FilePath);
+            }
+        }
+
+        var settings = _settingsService.GetSettings();
+        if (!string.IsNullOrWhiteSpace(settings.ActiveCookieFile) && File.Exists(settings.ActiveCookieFile) && !seenPaths.Contains(settings.ActiveCookieFile))
+        {
+            string baseName = System.IO.Path.GetFileName(settings.ActiveCookieFile);
+            CookieOptions.Add(new CookieOptionItem
+            {
+                DisplayName = $"Default Cookie ({baseName})",
+                FilePath = settings.ActiveCookieFile
+            });
+            seenPaths.Add(settings.ActiveCookieFile);
+        }
+
+        HasCookieOptions = CookieOptions.Count > 1 || settings.UseCookies || !string.IsNullOrWhiteSpace(activeCookiePath);
+
+        CookieOptionItem? chosen = null;
+        if (!string.IsNullOrWhiteSpace(activeCookiePath))
+        {
+            chosen = CookieOptions.FirstOrDefault(c => string.Equals(c.FilePath, activeCookiePath, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (chosen == null && settings.UseCookies)
+        {
+            string? active = _cookieService.GetActiveCookiePath();
+            if (!string.IsNullOrWhiteSpace(active))
+            {
+                chosen = CookieOptions.FirstOrDefault(c => string.Equals(c.FilePath, active, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
+        SelectedCookieOption = chosen ?? defaultOption;
+    }
+
+    public static bool IsAuthError(string? errorMsg, string? url = null)
+    {
+        if (string.IsNullOrWhiteSpace(errorMsg)) return false;
+
+        string lower = errorMsg.ToLowerInvariant();
+
+        // If it explicitly says no video formats found, it's an image-only post / non-video post, not an auth error
+        if (lower.Contains("no video formats found") || lower.Contains("no video format"))
+        {
+            return false;
+        }
+
+        string[] authKeywords = { "sign in", "login", "cookie", "bot", "confirm", "private", "members", "403", "forbidden", "authenticate", "permission", "unauthorized", "account", "checkpoint", "rate-limit" };
+        return authKeywords.Any(k => lower.Contains(k));
+    }
+
     [RelayCommand]
     public async Task FetchMetadataAsync()
     {
-        if (string.IsNullOrWhiteSpace(UrlInput)) return;
+        string? activeCookie = _settingsService.GetSettings().UseCookies
+            ? _cookieService.GetActiveCookiePath()
+            : null;
+        await FetchMetadataInternalAsync(UrlInput?.Trim() ?? string.Empty, activeCookie);
+    }
 
-        IsLoading = true;
-        StatusMessage = "Fetching video details...";
-        AlreadyDownloadedInfo = string.Empty;
-        PreviewMetadata = null;
+    public async Task FetchMetadataWithCookieAsync(string url, string? cookiePath)
+    {
+        UrlInput = url;
+        await FetchMetadataInternalAsync(url, cookiePath);
+    }
+
+    private async Task FetchMetadataInternalAsync(string url, string? cookiePath)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return;
+
         Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
         {
+            IsLoading = true;
+            StatusMessage = "Fetching video details...";
+            AlreadyDownloadedInfo = string.Empty;
+            PreviewMetadata = null;
             PlaylistItems.Clear();
             IsPlaylist = false;
+            IsAuthWarningVisible = false;
         });
 
         try
         {
-            var cookie = _cookieService.GetActiveProfile()?.FilePath;
-            var meta = await _metadataService.FetchMetadataAsync(UrlInput.Trim(), cookie);
-            PreviewMetadata = meta;
+            var meta = await _metadataService.FetchMetadataAsync(url, cookiePath);
 
             if (meta != null)
             {
-                Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
-                {
-                    IsPlaylist = meta.IsPlaylist;
-                });
-
                 if (!string.IsNullOrWhiteSpace(meta.ThumbnailUrl) && (meta.ThumbnailUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || meta.ThumbnailUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
                 {
                     try
@@ -140,9 +253,36 @@ public partial class HomeViewModel : ObservableObject
                     catch { }
                 }
 
-                if (meta.IsPlaylist)
+                string existingInfo = string.Empty;
+                try
                 {
-                    Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
+                    var history = await _historyService.GetAllAsync();
+                    var existing = history.FirstOrDefault(h => 
+                        (!string.IsNullOrWhiteSpace(h.Url) && h.Url.Equals(url, StringComparison.OrdinalIgnoreCase)) ||
+                        (!string.IsNullOrWhiteSpace(meta.Id) && !string.IsNullOrWhiteSpace(h.Url) && h.Url.Contains(meta.Id)));
+                    
+                    if (existing != null)
+                    {
+                        existingInfo = $"Note: Previously downloaded on {existing.Timestamp.ToLocalTime():MMM dd, yyyy} ({existing.Mode}, {existing.Quality})";
+                    }
+                }
+                catch { }
+
+                var qList = new List<string> { "Best" };
+                qList.AddRange(meta.AvailableQualities);
+
+                Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
+                {
+                    PreviewMetadata = meta;
+                    IsPlaylist = meta.IsPlaylist;
+                    AlreadyDownloadedInfo = existingInfo;
+                    AvailableQualities = qList;
+                    SelectedQuality = "Best";
+                    StatusMessage = string.Empty;
+                    IsAuthWarningVisible = false;
+                    PopulateCookieOptions(meta.UsedCookieFile);
+
+                    if (meta.IsPlaylist)
                     {
                         PlaylistItems.Clear();
                         foreach (var entry in meta.PlaylistEntries)
@@ -157,58 +297,91 @@ public partial class HomeViewModel : ObservableObject
                             PlaylistItems.Add(entry);
                         }
                         UpdatePlaylistStats();
-                    });
-                }
-                else
-                {
-                    Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
+                    }
+                    else
                     {
                         DownloadButtonText = "Start Download";
-                    });
-                }
-
-                var qList = new List<string> { "Best" };
-                qList.AddRange(meta.AvailableQualities);
+                    }
+                });
+            }
+            else
+            {
                 Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
                 {
-                    AvailableQualities = qList;
-                    SelectedQuality = "Best";
-                    StatusMessage = string.Empty;
+                    StatusMessage = "No media information found for this URL.";
                 });
-
-                try
-                {
-                    var history = await _historyService.GetAllAsync();
-                    var existing = history.FirstOrDefault(h => 
-                        (!string.IsNullOrWhiteSpace(h.Url) && h.Url.Equals(UrlInput.Trim(), StringComparison.OrdinalIgnoreCase)) ||
-                        (!string.IsNullOrWhiteSpace(meta.Id) && !string.IsNullOrWhiteSpace(h.Url) && h.Url.Contains(meta.Id)));
-                    
-                    if (existing != null)
-                    {
-                        AlreadyDownloadedInfo = $"Note: Previously downloaded on {existing.Timestamp.ToLocalTime():MMM dd, yyyy} ({existing.Mode}, {existing.Quality})";
-                    }
-                }
-                catch { }
             }
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Error: {ex.Message}";
+            bool isNoVideo = ex.Message.Contains("No video formats found", StringComparison.OrdinalIgnoreCase) ||
+                             ex.Message.Contains("no video format", StringComparison.OrdinalIgnoreCase);
+            bool isAuth = !isNoVideo && IsAuthError(ex.Message, url);
+            bool cookiesDisabled = !_settingsService.GetSettings().UseCookies;
+
+            Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
+            {
+                if (isNoVideo)
+                {
+                    IsAuthWarningVisible = false;
+                    StatusMessage = "No video found: This post contains only static photos/images. Glypdl downloads video and audio streams (Reels, Videos, Stories, IGTV).";
+                }
+                else if (isAuth)
+                {
+                    IsCookiesDisabled = cookiesDisabled;
+                    IsAuthWarningVisible = true;
+                    AuthWarningTitle = "Authentication / Cookies Required";
+
+                    if (cookiesDisabled)
+                    {
+                        AuthWarningMessage = "This site requires authentication cookies to access media. Cookies are currently turned OFF. Please enable Cookies in Settings or import a cookies.txt file to download.";
+                        StatusMessage = "Authentication Required: Cookies toggle is OFF in Settings. Please turn ON cookies and import cookies.txt.";
+                    }
+                    else
+                    {
+                        AuthWarningMessage = "This site requires login credentials or an updated cookies.txt file. Please select or import a cookie profile.";
+                        StatusMessage = "Authentication Required: Please select or import a valid cookies.txt file.";
+                    }
+                }
+                else
+                {
+                    IsAuthWarningVisible = false;
+                    StatusMessage = $"Error: {ex.Message}";
+                }
+            });
+
+            if (isAuth && RequestAuthRecovery != null)
+            {
+                Utilities.DispatcherHelper.ExecuteOnUIThread(async () =>
+                {
+                    try
+                    {
+                        await RequestAuthRecovery.Invoke(ex.Message, url);
+                    }
+                    catch { }
+                });
+            }
         }
         finally
         {
-            IsLoading = false;
+            Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
+            {
+                IsLoading = false;
+            });
         }
     }
 
     public void UpdatePlaylistStats()
     {
-        TotalPlaylistCount = PlaylistItems.Count;
-        SelectedPlaylistCount = PlaylistItems.Count(i => i.IsSelected);
-        PlaylistSelectionSummary = $"{SelectedPlaylistCount} of {TotalPlaylistCount} items selected";
-        DownloadButtonText = SelectedPlaylistCount > 0 
-            ? $"Download {SelectedPlaylistCount} Selected {(SelectedPlaylistCount == 1 ? "Video" : "Videos")}" 
-            : "Select at least 1 video";
+        Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
+        {
+            TotalPlaylistCount = PlaylistItems.Count;
+            SelectedPlaylistCount = PlaylistItems.Count(i => i.IsSelected);
+            PlaylistSelectionSummary = $"{SelectedPlaylistCount} of {TotalPlaylistCount} items selected";
+            DownloadButtonText = SelectedPlaylistCount > 0 
+                ? $"Download {SelectedPlaylistCount} Selected {(SelectedPlaylistCount == 1 ? "Video" : "Videos")}" 
+                : "Select at least 1 video";
+        });
     }
 
     [RelayCommand]
@@ -246,7 +419,10 @@ public partial class HomeViewModel : ObservableObject
     {
         if (PreviewMetadata == null) return;
 
-        var cookie = _cookieService.GetActiveProfile()?.FilePath;
+        string cookie = !string.IsNullOrWhiteSpace(SelectedCookieOption?.FilePath)
+            ? SelectedCookieOption.FilePath
+            : (_settingsService.GetSettings().UseCookies ? (_cookieService.GetActiveCookiePath() ?? string.Empty) : string.Empty);
+
         string formatSpec = _metadataService.GetFormatSpec(PreviewMetadata, SelectedQuality, SelectedMode);
 
         if (IsPlaylist)

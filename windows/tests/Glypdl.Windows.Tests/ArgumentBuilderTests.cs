@@ -51,4 +51,44 @@ public class ArgumentBuilderTests
         Assert.Contains("mp3", args);
         Assert.Contains("--audio-quality", args);
     }
+
+    [Fact]
+    public void BuildMetadataArguments_WithCookieFile_ShouldIncludeCookieFlag()
+    {
+        var settingsService = new MockSettingsService();
+        var ytdlpService = new YtDlpService(settingsService);
+
+        string tempCookie = Path.GetTempFileName();
+        try
+        {
+            var args = ytdlpService.BuildMetadataArguments("https://example.com/video", tempCookie);
+            Assert.Contains("--cookies", args);
+            Assert.Contains(tempCookie, args);
+        }
+        finally
+        {
+            if (File.Exists(tempCookie)) File.Delete(tempCookie);
+        }
+    }
+
+    [Fact]
+    public void CookieService_ValidateCookieFile_ShouldValidateExistence()
+    {
+        var settingsService = new MockSettingsService();
+        var cookieService = new CookieService(settingsService);
+
+        Assert.False(cookieService.ValidateCookieFile(null));
+        Assert.False(cookieService.ValidateCookieFile(""));
+        Assert.False(cookieService.ValidateCookieFile(@"C:\non_existent_cookies_12345.txt"));
+
+        string tempFile = Path.GetTempFileName();
+        try
+        {
+            Assert.True(cookieService.ValidateCookieFile(tempFile));
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
 }

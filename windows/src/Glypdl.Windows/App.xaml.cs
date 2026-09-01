@@ -13,15 +13,22 @@ public partial class App : Application
     {
         UnhandledException += (sender, e) =>
         {
+            e.Handled = true;
             try
             {
                 var dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Glypdl");
                 System.IO.Directory.CreateDirectory(dir);
                 System.IO.File.WriteAllText(System.IO.Path.Combine(dir, "crash_details.log"),
-                    $"Message: {e.Message}\nException: {e.Exception}\nStackTrace:\n{e.Exception?.StackTrace}");
+                    $"[{DateTime.Now}] Message: {e.Message}\nException: {e.Exception}\nStackTrace:\n{e.Exception?.StackTrace}\n");
             }
             catch { }
         };
+
+        try
+        {
+            Microsoft.Windows.AppNotifications.AppNotificationManager.Default.Register();
+        }
+        catch { }
 
         InitializeComponent();
         ConfigureServices();
@@ -44,7 +51,7 @@ public partial class App : Application
         var downloadsVm = new DownloadsViewModel(queueService);
         var historyVm = new HistoryViewModel(historyService, queueService);
         var settingsVm = new SettingsViewModel(settingsService, cookieService, ytdlpService);
-        var aboutVm = new AboutViewModel(updateService);
+        var aboutVm = new AboutViewModel(updateService, ytdlpService);
 
         var mainVm = new MainViewModel(homeVm, downloadsVm, historyVm, settingsVm, aboutVm);
 
@@ -68,60 +75,38 @@ public partial class App : Application
         Services = provider;
     }
 
-    public static void ApplyTheme(Models.AppTheme theme)
+    public static void UpdateTitleBar()
     {
-        var elementTheme = theme switch
+        if (MainWindow?.AppWindow?.TitleBar == null) return;
+        try
         {
-            Models.AppTheme.Light => ElementTheme.Light,
-            Models.AppTheme.Dark => ElementTheme.Dark,
-            _ => ElementTheme.Default
-        };
+            var titleBar = MainWindow.AppWindow.TitleBar;
+            titleBar.ButtonBackgroundColor = global::Windows.UI.Color.FromArgb(0, 0, 0, 0);
+            titleBar.ButtonInactiveBackgroundColor = global::Windows.UI.Color.FromArgb(0, 0, 0, 0);
 
-        if (MainWindow != null)
-        {
-            if (MainWindow.Content is FrameworkElement rootElement)
+            bool isDark = (MainWindow.Content as FrameworkElement)?.ActualTheme == ElementTheme.Dark
+                || Current.RequestedTheme == ApplicationTheme.Dark;
+
+            if (isDark)
             {
-                rootElement.RequestedTheme = elementTheme;
+                titleBar.ButtonForegroundColor = global::Windows.UI.Color.FromArgb(255, 255, 255, 255);
+                titleBar.ButtonHoverForegroundColor = global::Windows.UI.Color.FromArgb(255, 255, 255, 255);
+                titleBar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(40, 255, 255, 255);
+                titleBar.ButtonPressedForegroundColor = global::Windows.UI.Color.FromArgb(255, 255, 255, 255);
+                titleBar.ButtonPressedBackgroundColor = global::Windows.UI.Color.FromArgb(70, 255, 255, 255);
+                titleBar.ButtonInactiveForegroundColor = global::Windows.UI.Color.FromArgb(140, 255, 255, 255);
             }
-
-            if (MainWindow.ContentFrame?.Content is FrameworkElement pageElement)
+            else
             {
-                pageElement.RequestedTheme = elementTheme;
+                titleBar.ButtonForegroundColor = global::Windows.UI.Color.FromArgb(255, 30, 30, 30);
+                titleBar.ButtonHoverForegroundColor = global::Windows.UI.Color.FromArgb(255, 0, 0, 0);
+                titleBar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(25, 0, 0, 0);
+                titleBar.ButtonPressedForegroundColor = global::Windows.UI.Color.FromArgb(255, 0, 0, 0);
+                titleBar.ButtonPressedBackgroundColor = global::Windows.UI.Color.FromArgb(45, 0, 0, 0);
+                titleBar.ButtonInactiveForegroundColor = global::Windows.UI.Color.FromArgb(120, 0, 0, 0);
             }
-
-            try
-            {
-                var titleBar = MainWindow.AppWindow?.TitleBar;
-                if (titleBar != null)
-                {
-                    bool isDark = elementTheme == ElementTheme.Dark || 
-                        (elementTheme == ElementTheme.Default && Current.RequestedTheme == ApplicationTheme.Dark);
-
-                    titleBar.ButtonBackgroundColor = global::Windows.UI.Color.FromArgb(0, 0, 0, 0);
-                    titleBar.ButtonInactiveBackgroundColor = global::Windows.UI.Color.FromArgb(0, 0, 0, 0);
-
-                    if (isDark)
-                    {
-                        titleBar.ButtonForegroundColor = global::Windows.UI.Color.FromArgb(255, 255, 255, 255);
-                        titleBar.ButtonHoverForegroundColor = global::Windows.UI.Color.FromArgb(255, 255, 255, 255);
-                        titleBar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(35, 255, 255, 255);
-                        titleBar.ButtonPressedForegroundColor = global::Windows.UI.Color.FromArgb(255, 255, 255, 255);
-                        titleBar.ButtonPressedBackgroundColor = global::Windows.UI.Color.FromArgb(60, 255, 255, 255);
-                        titleBar.ButtonInactiveForegroundColor = global::Windows.UI.Color.FromArgb(140, 255, 255, 255);
-                    }
-                    else
-                    {
-                        titleBar.ButtonForegroundColor = global::Windows.UI.Color.FromArgb(255, 0, 0, 0);
-                        titleBar.ButtonHoverForegroundColor = global::Windows.UI.Color.FromArgb(255, 0, 0, 0);
-                        titleBar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(35, 0, 0, 0);
-                        titleBar.ButtonPressedForegroundColor = global::Windows.UI.Color.FromArgb(255, 0, 0, 0);
-                        titleBar.ButtonPressedBackgroundColor = global::Windows.UI.Color.FromArgb(60, 0, 0, 0);
-                        titleBar.ButtonInactiveForegroundColor = global::Windows.UI.Color.FromArgb(140, 0, 0, 0);
-                    }
-                }
-            }
-            catch { }
         }
+        catch { }
     }
 
     public static void NavigateToHomeWithUrl(string url)
@@ -137,6 +122,14 @@ public partial class App : Application
         if (MainWindow != null)
         {
             MainWindow.NavigateToDownloads();
+        }
+    }
+
+    public static void NavigateToSettings()
+    {
+        if (MainWindow != null)
+        {
+            MainWindow.NavigateToSettings();
         }
     }
 
@@ -159,12 +152,7 @@ public partial class App : Application
             });
 
             MainWindow.Activate();
-
-            var settingsService = (ISettingsService?)Services.GetService(typeof(ISettingsService));
-            if (settingsService != null)
-            {
-                ApplyTheme(settingsService.GetSettings().Theme);
-            }
+            UpdateTitleBar();
         }
         catch (Exception ex)
         {
@@ -183,10 +171,19 @@ public class SimpleServiceProvider : IServiceProvider
     public void Register<T>(T implementation) where T : notnull
     {
         _services[typeof(T)] = implementation;
+        foreach (var iface in typeof(T).GetInterfaces())
+        {
+            _services[iface] = implementation;
+        }
     }
 
     public object? GetService(Type serviceType)
     {
-        return _services.TryGetValue(serviceType, out var instance) ? instance : null;
+        if (_services.TryGetValue(serviceType, out var instance))
+        {
+            return instance;
+        }
+
+        return _services.Values.FirstOrDefault(v => serviceType.IsInstanceOfType(v));
     }
 }

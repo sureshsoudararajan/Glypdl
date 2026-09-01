@@ -35,6 +35,7 @@ public partial class MediaMetadata : ObservableObject
     public string Description { get; set; } = string.Empty;
     public bool IsPlaylist { get; set; }
     public int PlaylistCount { get; set; }
+    public string UsedCookieFile { get; set; } = string.Empty;
     public List<MediaFormat> Formats { get; set; } = new();
     public ObservableCollection<PlaylistItem> PlaylistEntries { get; set; } = new();
 
@@ -42,9 +43,22 @@ public partial class MediaMetadata : ObservableObject
         ? (Duration >= 3600 ? TimeSpan.FromSeconds(Duration).ToString(@"h\:mm\:ss") : TimeSpan.FromSeconds(Duration).ToString(@"m\:ss"))
         : "";
 
-    public List<string> AvailableQualities => Formats
-        .Where(f => f.HasVideo && !string.IsNullOrWhiteSpace(f.Resolution))
-        .Select(f => f.Resolution)
-        .Distinct()
-        .ToList();
+    public List<string> AvailableQualities
+    {
+        get
+        {
+            var detected = Formats
+                .Where(f => f.HasVideo && !string.IsNullOrWhiteSpace(f.Resolution))
+                .Select(f => f.Resolution)
+                .Distinct()
+                .ToList();
+
+            if (detected.Count > 0)
+            {
+                return detected;
+            }
+
+            return new List<string> { "2160p (4K)", "1440p (2K)", "1080p (Full HD)", "720p (HD)", "480p (SD)", "360p" };
+        }
+    }
 }

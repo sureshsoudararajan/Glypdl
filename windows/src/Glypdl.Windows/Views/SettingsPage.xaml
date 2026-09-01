@@ -4,10 +4,16 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:converters="using:Glypdl.Windows.Converters"
     xmlns:models="using:Glypdl.Windows.Models"
     xmlns:vm="using:Glypdl.Windows.ViewModels"
-    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+    Background="Transparent"
     mc:Ignorable="d">
+
+    <Page.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolConverter" />
+        <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolConverter" />
+    </Page.Resources>
 
     <ScrollViewer
         HorizontalScrollBarVisibility="Disabled"
@@ -19,6 +25,15 @@
                     <TextBlock Text="Settings" Style="{ThemeResource TitleTextBlockStyle}" FontWeight="Bold" />
                     <TextBlock Text="Configure downloads, theme, and engine preferences" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="13" />
                 </StackPanel>
+
+                <!-- Save Status InfoBar -->
+                <InfoBar
+                    IsOpen="{x:Bind StringToBool(ViewModel.SaveStatusMessage), Mode=OneWay}"
+                    Severity="Success"
+                    Title="Saved"
+                    Message="{x:Bind ViewModel.SaveStatusMessage, Mode=OneWay}"
+                    IsClosable="True"
+                    Visibility="{x:Bind StringToVisibility(ViewModel.SaveStatusMessage), Mode=OneWay}" />
 
                 <!-- Downloads Section -->
                 <StackPanel Spacing="10">
@@ -58,26 +73,10 @@
                     </Border>
                 </StackPanel>
 
-                <!-- Appearance & Notifications Section -->
+                <!-- Notifications Section -->
                 <StackPanel Spacing="10">
-                    <TextBlock Text="Appearance &amp; System" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" FontSize="15" />
+                    <TextBlock Text="Notifications" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" FontSize="15" />
 
-                    <!-- Theme -->
-                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
-                        <Grid>
-                            <StackPanel Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Text="App Theme" FontWeight="SemiBold" />
-                                <TextBlock Text="Switch between System default, Light, and Dark" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
-                            </StackPanel>
-                            <ComboBox SelectedIndex="{x:Bind ViewModel.ThemeIndex, Mode=TwoWay}" HorizontalAlignment="Right" VerticalAlignment="Center" Width="140">
-                                <ComboBoxItem Content="System" />
-                                <ComboBoxItem Content="Light" />
-                                <ComboBoxItem Content="Dark" />
-                            </ComboBox>
-                        </Grid>
-                    </Border>
-
-                    <!-- Notifications -->
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
                         <Grid>
                             <StackPanel Spacing="3" VerticalAlignment="Center">
@@ -87,6 +86,103 @@
                             <ToggleSwitch IsOn="{x:Bind ViewModel.EnableNotifications, Mode=TwoWay}" HorizontalAlignment="Right" VerticalAlignment="Center" OffContent="" OnContent="" />
                         </Grid>
                     </Border>
+                </StackPanel>
+
+                <!-- Cookies & Authentication Section -->
+                <StackPanel Spacing="10">
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="Authentication Cookies" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" FontSize="15" />
+                        <TextBlock Text="Use a Netscape cookies.txt file for sites requiring login" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                    </StackPanel>
+
+                    <!-- Enable Cookies Toggle Card -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                        <Grid>
+                            <StackPanel Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="Enable Cookies" FontWeight="SemiBold" />
+                                <TextBlock Text="Pass authentication cookies to yt-dlp for media downloads" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                            </StackPanel>
+                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseCookies, Mode=TwoWay}" HorizontalAlignment="Right" VerticalAlignment="Center" OffContent="" OnContent="" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Active Cookie File Card -->
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center" Margin="0,0,16,0">
+                                <TextBlock Text="Active Cookie File" FontWeight="SemiBold" />
+                                <TextBlock Text="{x:Bind ViewModel.ActiveCookieFile, Mode=OneWay, TargetNullValue='None selected', FallbackValue='None selected'}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Button Content="Choose File..." Click="ChooseCookieFile_Click" Padding="14,6" />
+                                <Button ToolTipService.ToolTip="Clear Active Cookie File" Click="ClearCookieFile_Click" Padding="8,6">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Saved Cookie Profiles Group -->
+                    <StackPanel Spacing="8" Margin="0,8,0,0">
+                        <Grid>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Saved Cookie Profiles" FontWeight="SemiBold" FontSize="14" />
+                                <TextBlock Text="Save cookies.txt files for different websites and click 'Use Profile' to switch" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                            </StackPanel>
+                            <Button Content="Add Profile..." HorizontalAlignment="Right" VerticalAlignment="Center" Click="AddProfile_Click" Style="{ThemeResource AccentButtonStyle}" Padding="16,6" />
+                        </Grid>
+
+                        <!-- Empty State when no profiles -->
+                        <Border Visibility="{x:Bind ViewModel.HasNoCookieProfiles, Converter={StaticResource BoolConverter}, Mode=OneWay}" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="20">
+                            <StackPanel Spacing="8" HorizontalAlignment="Center" Margin="0,8">
+                                <FontIcon Glyph="&#xE72D;" FontSize="24" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                                <TextBlock Text="No Saved Profiles" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" />
+                                <TextBlock Text="Save cookie profiles for different websites to quickly authenticate" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" HorizontalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Profiles List -->
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.CookieProfiles, Mode=OneWay}" Visibility="{x:Bind ViewModel.HasCookieProfiles, Converter={StaticResource BoolConverter}, Mode=OneWay}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:CookieProfile">
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock Text="{x:Bind Name, Mode=OneWay}" FontWeight="SemiBold" FontSize="13" />
+                                                <TextBlock Text="{x:Bind FilePath, Mode=OneWay}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" TextWrapping="Wrap" />
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <!-- Active Badge -->
+                                                <Border Visibility="{x:Bind IsActive, Converter={StaticResource BoolConverter}, Mode=OneWay}" Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}" BorderBrush="{ThemeResource SystemFillColorSuccessBrush}" BorderThickness="1" CornerRadius="12" Padding="10,4" VerticalAlignment="Center">
+                                                    <TextBlock Text="Active" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                                                </Border>
+
+                                                <!-- Use Profile Button (shown if not active) -->
+                                                <Button Content="Use Profile" Visibility="{x:Bind IsActive, Converter={StaticResource InverseBoolConverter}, Mode=OneWay}" Click="UseProfile_Click" Tag="{x:Bind}" Padding="12,5" />
+
+                                                <!-- Delete Button -->
+                                                <Button Click="DeleteProfile_Click" Tag="{x:Bind}" ToolTipService.ToolTip="Delete Profile" Padding="8,5">
+                                                    <FontIcon Glyph="&#xE74D;" FontSize="13" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
                 </StackPanel>
 
                 <!-- Engine Section -->

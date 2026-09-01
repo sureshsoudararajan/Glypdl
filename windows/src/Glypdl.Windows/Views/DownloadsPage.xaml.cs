@@ -15,22 +15,6 @@ public partial class DownloadsPage : Page
         InitializeComponent();
         ViewModel = (DownloadsViewModel)App.Services.GetService(typeof(DownloadsViewModel))!;
         DataContext = ViewModel;
-        Loaded += (s, e) => ApplyCurrentTheme();
-    }
-
-    private void ApplyCurrentTheme()
-    {
-        var settingsService = (ISettingsService?)App.Services.GetService(typeof(ISettingsService));
-        if (settingsService != null)
-        {
-            var theme = settingsService.GetSettings().Theme;
-            RequestedTheme = theme switch
-            {
-                AppTheme.Light => ElementTheme.Light,
-                AppTheme.Dark => ElementTheme.Dark,
-                _ => ElementTheme.Default
-            };
-        }
     }
 
     public Visibility CountToEmptyVisibility(int count) => count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -60,6 +44,17 @@ public partial class DownloadsPage : Page
 
     public Visibility IsCompletedToVisibility(DownloadState state) =>
         state == DownloadState.Completed ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility IsFailedToVisibility(DownloadState state) =>
+        (state == DownloadState.Failed || state == DownloadState.Cancelled) ? Visibility.Visible : Visibility.Collapsed;
+
+    private void RetryButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: DownloadItem item })
+        {
+            ViewModel.RetryDownload(item);
+        }
+    }
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {

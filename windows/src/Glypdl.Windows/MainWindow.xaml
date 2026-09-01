@@ -9,9 +9,23 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="RootGrid" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Custom Fluent TitleBar -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="40" Background="Transparent">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0" Spacing="10">
+                <Image Source="Assets/icon.png" Width="18" Height="18" />
+                <TextBlock Text="Glypdl" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+            </StackPanel>
+        </Grid>
+
         <NavigationView
             x:Name="NavView"
+            Grid.Row="1"
             x:FieldModifier="public"
             IsBackButtonVisible="Collapsed"
             PaneDisplayMode="LeftCompact"

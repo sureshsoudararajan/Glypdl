@@ -15,4 +15,5 @@ public class AppSettings
     public bool EnableDebugLogging { get; set; } = false;
     public bool UseCookies { get; set; } = false;
     public string ActiveCookieProfileId { get; set; } = string.Empty;
+    public string ActiveCookieFile { get; set; } = string.Empty;
 }

@@ -22,19 +22,24 @@ public class YtDlpService : IYtDlpService
             return settings.CustomYtDlpPath;
         }
 
-        // 2. Check application bin directory in LocalAppData
-        string localBin = Path.Combine(PathUtils.GetBinDir(), "yt-dlp.exe");
-        if (File.Exists(localBin))
-        {
-            return localBin;
-        }
-
-        // 3. Check application execution directory
+        // 2. Check application execution directory (bundled with the app)
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
         string appDirBin = Path.Combine(baseDir, "yt-dlp.exe");
         if (File.Exists(appDirBin))
         {
             return appDirBin;
+        }
+        string appDirSubBin = Path.Combine(baseDir, "bin_bundle", "yt-dlp.exe");
+        if (File.Exists(appDirSubBin))
+        {
+            return appDirSubBin;
+        }
+
+        // 3. Check application bin directory in LocalAppData
+        string localBin = Path.Combine(PathUtils.GetBinDir(), "yt-dlp.exe");
+        if (File.Exists(localBin))
+        {
+            return localBin;
         }
 
         // 4. Check Windows PATH
@@ -49,17 +54,24 @@ public class YtDlpService : IYtDlpService
             return settings.CustomFFmpegPath;
         }
 
-        string localBin = Path.Combine(PathUtils.GetBinDir(), "ffmpeg.exe");
-        if (File.Exists(localBin))
-        {
-            return localBin;
-        }
-
+        // 1. Check application execution directory (bundled with the app)
         string baseDir = AppDomain.CurrentDomain.BaseDirectory;
         string appDirBin = Path.Combine(baseDir, "ffmpeg.exe");
         if (File.Exists(appDirBin))
         {
             return appDirBin;
+        }
+        string appDirSubBin = Path.Combine(baseDir, "bin_bundle", "ffmpeg.exe");
+        if (File.Exists(appDirSubBin))
+        {
+            return appDirSubBin;
+        }
+
+        // 2. Check application bin directory in LocalAppData
+        string localBin = Path.Combine(PathUtils.GetBinDir(), "ffmpeg.exe");
+        if (File.Exists(localBin))
+        {
+            return localBin;
         }
 
         return FindOnPath("ffmpeg.exe") ?? FindOnPath("ffmpeg");
@@ -83,6 +95,35 @@ public class YtDlpService : IYtDlpService
         {
             var res = await ProcessRunner.RunAsync(binary, new[] { "--version" });
             return res.Success ? res.StandardOutput.Trim() : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public async Task<string?> GetFFmpegVersionAsync()
+    {
+        string? binary = DetectFFmpeg();
+        if (binary == null) return null;
+
+        try
+        {
+            var res = await ProcessRunner.RunAsync(binary, new[] { "-version" });
+            if (res.Success && !string.IsNullOrWhiteSpace(res.StandardOutput))
+            {
+                var firstLine = res.StandardOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                if (firstLine != null && firstLine.StartsWith("ffmpeg version", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parts = firstLine.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 3)
+                    {
+                        return parts[2];
+                    }
+                }
+                return firstLine?.Trim();
+            }
+            return null;
         }
         catch
         {
@@ -225,7 +266,9 @@ public class YtDlpService : IYtDlpService
             args.Add("-x");
             string fmt = (!string.IsNullOrWhiteSpace(audioFormat) && !audioFormat.Equals("best", StringComparison.OrdinalIgnoreCase))
                 ? audioFormat.ToLowerInvariant()
-                : "mp3";
+                : "webm";
+            if (fmt == "mp4") fmt = "m4a";
+            if (fmt == "webm") fmt = "best";
             args.Add("--audio-format");
             args.Add(fmt);
 
@@ -241,11 +284,21 @@ public class YtDlpService : IYtDlpService
             args.Add("--audio-quality");
             args.Add(qualityVal);
         }
+        else
+        {
+            args.Add("--merge-output-format");
+            args.Add("mp4");
+        }
 
         if (!string.IsNullOrWhiteSpace(formatSpec))
         {
             args.Add("-f");
             args.Add(formatSpec);
+        }
+        else if (extractAudio)
+        {
+            args.Add("-f");
+            args.Add("ba/b");
         }
 
         if (!string.IsNullOrWhiteSpace(outputTemplate))

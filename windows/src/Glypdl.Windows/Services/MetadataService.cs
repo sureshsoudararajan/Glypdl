@@ -70,7 +70,8 @@ public class MetadataService : IMetadataService
                 ThumbnailUrl = thumb,
                 Extractor = GetStringSafe(root, "extractor"),
                 Description = GetStringSafe(root, "description"),
-                IsPlaylist = isPlaylist
+                IsPlaylist = isPlaylist,
+                UsedCookieFile = cookieFile ?? string.Empty
             };
 
             if (isPlaylist && root.TryGetProperty("entries", out var entriesEl) && entriesEl.ValueKind == JsonValueKind.Array)
@@ -219,9 +220,9 @@ public class MetadataService : IMetadataService
             return mode == DownloadMode.VideoOnly ? "bestvideo/best" : "bestvideo+bestaudio/best";
         }
 
-        // Parse height from quality (e.g., "1080p" -> 1080)
-        string digits = new string(quality.Where(char.IsDigit).ToArray());
-        if (int.TryParse(digits, out int height))
+        // Match the leading number in quality (e.g., "1080p", "2160p (4K)" -> 2160, "1440p (2K)" -> 1440)
+        var match = System.Text.RegularExpressions.Regex.Match(quality, @"^(\d+)");
+        if (match.Success && int.TryParse(match.Groups[1].Value, out int height))
         {
             return mode == DownloadMode.VideoOnly
                 ? $"bestvideo[height<={height}]/best[height<={height}]"
