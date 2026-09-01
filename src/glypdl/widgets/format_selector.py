@@ -47,13 +47,14 @@ class FormatSelector(Gtk.Box):
         self.pref_group.add(self.quality_row)
 
         # 3. Cookie Profile Selector
-        self._cookie_paths = [""]
+        # 3. Authentication Cookie Selector
+        self._cookie_options = [{"type": "none", "label": "No Cookies", "spec": "", "path": "", "desc": "No authentication cookies"}]
         self.cookie_model = Gtk.StringList.new(['No Cookies'])
         
         self.cookie_dd = Gtk.DropDown(model=self.cookie_model, valign=Gtk.Align.CENTER)
         self.cookie_dd.connect('notify::selected', self._on_cookie_selection_changed)
         
-        self.cookie_row = Adw.ActionRow(title='Cookie Profile')
+        self.cookie_row = Adw.ActionRow(title='Authentication Cookies')
         self.cookie_row.add_suffix(self.cookie_dd)
         self.cookie_row.set_activatable_widget(self.cookie_dd)
         self.cookie_row.set_visible(False)
@@ -83,75 +84,172 @@ class FormatSelector(Gtk.Box):
 
     def _on_cookie_selection_changed(self, dropdown, pspec):
         idx = dropdown.get_selected()
-        if 0 <= idx < len(self._cookie_paths):
-            path = self._cookie_paths[idx]
-            if path:
-                self.cookie_row.set_subtitle(path)
-            else:
-                self.cookie_row.set_subtitle("No cookies attached")
+        if 0 <= idx < len(self._cookie_options):
+            opt = self._cookie_options[idx]
+            self.cookie_row.set_subtitle(opt.get("desc") or opt.get("label") or "No cookies attached")
 
-    def set_cookie_profiles(self, profiles: list, default_cookie_path: str = "", active_cookie_path: str = "", use_cookies: bool = False):
-        """Populate cookie profiles dropdown and auto-select active cookie file if used during retrieval."""
-        labels = ["No Cookies"]
-        paths = [""]
-        seen_paths = set()
+    def set_cookie_profiles(
+        self,
+        profiles: list = None,
+        default_cookie_path: str = "",
+        active_cookie_path: str = "",
+        cookie_method: str = "none",
+        active_browser_spec: str = "",
+        installed_browsers: list = None,
+        use_cookies: bool = False
+    ):
+        """Populate cookie profiles dropdown with both browser cookies and file profiles."""
+        options = []
+        labels = []
+        selected_idx = 0
 
+        # 1. Active / Configured Browser Option
+        if active_browser_spec:
+            spec_display = active_browser_spec
+            # Extract friendly browser name if possible
+            b_name = active_browser_spec.split(':')[0].split('+')[0].capitalize()
+            p_name = active_browser_spec.split(':')[-1] if ':' in active_browser_spec else ""
+            prof_disp = f" ({p_name})" if p_name and p_name != active_browser_spec else ""
+            opt_label = f"🌐 Browser: {b_name}{prof_disp}"
+            options.append({
+                "type": "browser",
+                "label": opt_label,
+                "spec": active_browser_spec,
+                "path": "",
+                "desc": f"Extracting cookies directly from {b_name}{prof_disp}"
+            })
+            labels.append(opt_label)
+
+        # 2. Add other installed browsers if discovered
+        if installed_browsers:
+            for b in installed_browsers:
+                if b.get("is_installed"):
+                    b_id = b.get("id")
+                    b_title = b.get("name")
+                    for prof in b.get("profiles", ["Default"]):
+                        b_spec = f"{b_id}:{prof}" if prof and prof != "Default" else b_id
+                        if b_id == "librewolf" and prof:
+                            b_spec = f"librewolf:{prof}"
+                        
+                        # Don't duplicate if already added as active_browser_spec
+                        if any(o.get("spec") == b_spec for o in options):
+                            continue
+
+                        p_disp = f" ({prof})" if prof else ""
+                        opt_label = f"🌐 Browser: {b_title}{p_disp}"
+                        options.append({
+                            "type": "browser",
+                            "label": opt_label,
+                            "spec": b_spec,
+                            "path": "",
+                            "desc": f"Extract cookies directly from {b_title}{p_disp}"
+                        })
+                        labels.append(opt_label)
+
+        # 3. Add Saved File Profiles
         for p in profiles or []:
             name = p.get('name', 'Profile')
             path = p.get('path', '')
             if path:
                 base = os.path.basename(path)
-                labels.append(f"{name} ({base})")
-                paths.append(path)
-                seen_paths.add(path)
+                opt_label = f"📄 File: {name} ({base})"
+                options.append({
+                    "type": "file",
+                    "label": opt_label,
+                    "spec": "",
+                    "path": path,
+                    "desc": path
+                })
+                labels.append(opt_label)
 
-        if default_cookie_path and default_cookie_path not in seen_paths:
+        # 4. Default / Custom Cookie File if present and not in profiles
+        if default_cookie_path and not any(o.get("path") == default_cookie_path for o in options):
             base = os.path.basename(default_cookie_path)
-            labels.append(f"Default Cookie ({base})")
-            paths.append(default_cookie_path)
-            seen_paths.add(default_cookie_path)
+            opt_label = f"📄 Default File ({base})"
+            options.append({
+                "type": "file",
+                "label": opt_label,
+                "spec": "",
+                "path": default_cookie_path,
+                "desc": default_cookie_path
+            })
+            labels.append(opt_label)
 
-        if active_cookie_path and active_cookie_path not in seen_paths:
+        if active_cookie_path and not any(o.get("path") == active_cookie_path for o in options):
             base = os.path.basename(active_cookie_path)
-            labels.append(f"Custom Cookie ({base})")
-            paths.append(active_cookie_path)
-            seen_paths.add(active_cookie_path)
+            opt_label = f"📄 Custom File ({base})"
+            options.append({
+                "type": "file",
+                "label": opt_label,
+                "spec": "",
+                "path": active_cookie_path,
+                "desc": active_cookie_path
+            })
+            labels.append(opt_label)
 
-        self._cookie_paths = paths
+        # 5. Always provide "No Cookies" option
+        options.append({
+            "type": "none",
+            "label": "No Cookies (Anonymous)",
+            "spec": "",
+            "path": "",
+            "desc": "No authentication cookies attached"
+        })
+        labels.append("No Cookies (Anonymous)")
+
+        self._cookie_options = options
         self.cookie_model = Gtk.StringList.new(labels)
         self.cookie_dd.set_model(self.cookie_model)
 
-        # Show if we have profiles, or if cookies are enabled, or if an active cookie was used
-        has_profiles = len(paths) > 1
-        self.cookie_row.set_visible(has_profiles or use_cookies or bool(active_cookie_path))
-        
-        # Priority selection:
-        # 1. active_cookie_path (the exact cookie used to successfully fetch metadata)
-        # 2. default_cookie_path (if use_cookies is True)
-        # 3. No Cookies (index 0)
-        selected_idx = 0
-        if active_cookie_path:
-            for i, p in enumerate(paths):
-                if p == active_cookie_path:
-                    selected_idx = i
+        # Make cookie row visible if any cookie options are available or cookies are active
+        has_any_cookies = (len(options) > 1)
+        self.cookie_row.set_visible(has_any_cookies)
+
+        # Auto-selection logic
+        if active_browser_spec:
+            for idx, opt in enumerate(options):
+                if opt["type"] == "browser" and opt["spec"] == active_browser_spec:
+                    selected_idx = idx
                     break
-        elif use_cookies and default_cookie_path:
-            for i, p in enumerate(paths):
-                if p == default_cookie_path:
-                    selected_idx = i
+        elif active_cookie_path:
+            for idx, opt in enumerate(options):
+                if opt["type"] == "file" and opt["path"] == active_cookie_path:
+                    selected_idx = idx
                     break
-            if selected_idx == 0 and len(paths) > 1:
-                selected_idx = 1
+        elif cookie_method == "browser" and len(options) > 1:
+            selected_idx = 0
+        elif cookie_method == "file" and default_cookie_path:
+            for idx, opt in enumerate(options):
+                if opt["type"] == "file" and opt["path"] == default_cookie_path:
+                    selected_idx = idx
+                    break
+        else:
+            # Select No Cookies (last item)
+            selected_idx = len(options) - 1
 
         self.cookie_dd.set_selected(selected_idx)
         self._on_cookie_selection_changed(self.cookie_dd, None)
 
-    def get_selected_cookie_file(self) -> str:
-        """Return the file path of the selected cookie profile."""
+    def get_selected_cookie_config(self) -> tuple:
+        """Return (cookie_file, cookies_from_browser) based on dropdown selection."""
         idx = self.cookie_dd.get_selected()
-        if 0 <= idx < len(self._cookie_paths):
-            return self._cookie_paths[idx]
-        return ""
+        if 0 <= idx < len(self._cookie_options):
+            opt = self._cookie_options[idx]
+            if opt["type"] == "browser":
+                return (None, opt["spec"])
+            elif opt["type"] == "file":
+                return (opt["path"], None)
+        return (None, None)
+
+    def get_selected_cookie_file(self) -> str:
+        """Return the file path if a file profile is selected."""
+        file_path, _ = self.get_selected_cookie_config()
+        return file_path or ""
+
+    def get_selected_cookies_from_browser(self) -> str:
+        """Return the browser spec if a browser cookie is selected."""
+        _, browser_spec = self.get_selected_cookie_config()
+        return browser_spec or ""
 
     def set_formats(self, metadata: dict):
         """Populate available qualities and detailed formats from metadata dict."""

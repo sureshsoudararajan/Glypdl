@@ -313,15 +313,31 @@ class GlypdlWindow(Adw.ApplicationWindow):
         if not metadata:
             return
 
-        used_cookie = metadata.get('used_cookie_file', '')
+        used_cookie_file = metadata.get('used_cookie_file', '')
+        used_browser_spec = metadata.get('used_cookies_from_browser', '')
+        cookie_method = self.app.settings.get_cookie_method()
+        default_cookie = self.app.settings.get('cookie_file', '')
+        
+        if not used_browser_spec and cookie_method == 'browser':
+            b_name = self.app.settings.get_browser_name()
+            b_prof = self.app.settings.get_browser_profile()
+            b_key = self.app.settings.get_browser_keyring()
+            if self.app.cookie_service:
+                used_browser_spec = self.app.cookie_service.build_browser_spec(b_name, profile=b_prof, keyring=b_key)
 
-        # Check if returned metadata represents a YouTube playlist
+        installed_browsers = self.app.cookie_service.discover_installed_browsers() if self.app.cookie_service else []
+        profiles = self.app.cookie_service.get_profiles() if self.app.cookie_service else []
+
+        # Check if returned metadata represents a YouTube playlist or multi-item album
         if metadata.get('_type') == 'playlist' or 'entries' in metadata:
             preview = PlaylistPreviewCard(playlist_data=metadata)
             preview.format_selector.set_cookie_profiles(
-                profiles=self.app.cookie_service.get_profiles(),
-                default_cookie_path=self.app.settings.get('cookie_file', ''),
-                active_cookie_path=used_cookie,
+                profiles=profiles,
+                default_cookie_path=default_cookie,
+                active_cookie_path=used_cookie_file,
+                cookie_method=cookie_method,
+                active_browser_spec=used_browser_spec,
+                installed_browsers=installed_browsers,
                 use_cookies=self.app.settings.get('use_cookies', False)
             )
             preview.connect('download-playlist-requested', self._on_download_playlist_requested)
@@ -330,9 +346,12 @@ class GlypdlWindow(Adw.ApplicationWindow):
         else:
             preview = MetadataPreviewCard(metadata=metadata)
             preview.format_selector.set_cookie_profiles(
-                profiles=self.app.cookie_service.get_profiles(),
-                default_cookie_path=self.app.settings.get('cookie_file', ''),
-                active_cookie_path=used_cookie,
+                profiles=profiles,
+                default_cookie_path=default_cookie,
+                active_cookie_path=used_cookie_file,
+                cookie_method=cookie_method,
+                active_browser_spec=used_browser_spec,
+                installed_browsers=installed_browsers,
                 use_cookies=self.app.settings.get('use_cookies', False)
             )
             preview.connect('download-requested', self._on_download_requested)
@@ -344,70 +363,152 @@ class GlypdlWindow(Adw.ApplicationWindow):
         self.fetch_spinner_box.set_visible(False)
 
         # Check if authentication / cookies are likely required
-        auth_keywords = ['sign in', 'login', 'cookie', 'bot', 'confirm', 'private', 'members', '403', 'forbidden', 'authenticate', 'permission', 'unauthorized', 'account']
+        auth_keywords = ['sign in', 'login', 'cookie', 'bot', 'confirm', 'private', 'members', '403', 'forbidden', 'authenticate', 'permission', 'unauthorized', 'account', 'secretstorage', 'unreachable']
         is_auth_error = any(k in error_msg.lower() for k in auth_keywords)
 
         profiles = self.app.cookie_service.get_profiles() if self.app.cookie_service else []
         default_cookie = self.app.settings.get('cookie_file', '')
+        installed_browsers = self.app.cookie_service.discover_installed_browsers() if self.app.cookie_service else []
 
         dialog = Adw.MessageDialog(
             transient_for=self,
             heading="Authentication / Cookies Required" if is_auth_error else "Could Not Fetch Media Information",
             body=(
-                f"This video or site requires login credentials or authentication cookies:\n\n{error_msg[:300]}\n\nPlease select a Cookie Profile or browse for a Netscape cookies.txt file to retry."
+                f"This video or site requires user authentication or cookies:\n\n{error_msg[:300]}\n\nSelect a browser or cookie file to retry:"
                 if is_auth_error else
                 f"yt-dlp reported an issue:\n\n{error_msg[:300]}"
             )
         )
 
-        # Extra widget for selecting cookie profile
         container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         container.set_margin_top(8)
         container.set_margin_bottom(8)
 
-        cookie_labels = []
-        cookie_paths = []
+        auth_options = []
+        labels = []
 
+        # 1. Add detected installed browsers
+        for b in installed_browsers:
+            if b.get("is_installed"):
+                b_id = b.get("id")
+                b_name = b.get("name")
+                for prof in b.get("profiles", ["Default"]):
+                    spec = self.app.cookie_service.build_browser_spec(b_id, profile=prof)
+                    prof_disp = f" ({prof})" if prof else ""
+                    opt_label = f"🌐 Browser: {b_name}{prof_disp}"
+                    auth_options.append({"type": "browser", "spec": spec})
+                    labels.append(opt_label)
+
+        # 2. Add custom browser selector option
+        auth_options.append({"type": "custom_browser"})
+        labels.append("🌐 Select Another Browser / Profile…")
+
+        # 3. Add default active cookie file if set
         if default_cookie and os.path.isfile(default_cookie):
-            cookie_labels.append(f"Default Cookie ({os.path.basename(default_cookie)})")
-            cookie_paths.append(default_cookie)
+            auth_options.append({"type": "file", "path": default_cookie})
+            labels.append(f"📄 Default Cookie File ({os.path.basename(default_cookie)})")
 
+        # 4. Add saved cookie profiles
         for p in profiles:
             p_name = p.get('name', 'Profile')
             p_path = p.get('path', '')
             if p_path and os.path.isfile(p_path):
-                cookie_labels.append(f"{p_name} ({os.path.basename(p_path)})")
-                cookie_paths.append(p_path)
+                auth_options.append({"type": "file", "path": p_path})
+                labels.append(f"📄 Saved File: {p_name} ({os.path.basename(p_path)})")
 
-        cookie_labels.append("Browse for other cookie file…")
-        cookie_paths.append("__BROWSE__")
+        # 5. Add browse for file
+        auth_options.append({"type": "browse"})
+        labels.append("📁 Browse for Netscape cookies.txt file…")
 
-        lbl = Gtk.Label(label="Select Cookie Profile to authenticate:", halign=Gtk.Align.START)
+        lbl = Gtk.Label(label="Select Authentication Method to retry:", halign=Gtk.Align.START)
         lbl.add_css_class("dim-label")
         container.append(lbl)
 
-        combo_model = Gtk.StringList.new(cookie_labels)
+        combo_model = Gtk.StringList.new(labels)
         dropdown = Gtk.DropDown(model=combo_model, hexpand=True)
         container.append(dropdown)
 
         dialog.set_extra_child(container)
         dialog.add_response("cancel", "Cancel")
-        dialog.add_response("retry", "Retry with Cookie Profile")
+        dialog.add_response("retry", "Authenticate & Retry")
         dialog.set_response_appearance("retry", Adw.ResponseAppearance.SUGGESTED)
 
         def _on_error_dialog_response(dlg, resp):
             if resp == "retry":
                 sel_idx = dropdown.get_selected()
-                if sel_idx < len(cookie_paths):
-                    chosen_path = cookie_paths[sel_idx]
-                    if chosen_path == "__BROWSE__":
-                        self._browse_and_retry_metadata(url)
-                    elif chosen_path and os.path.isfile(chosen_path):
-                        self._on_url_submitted(self.url_input, url, cookie_override=chosen_path)
-                    else:
+                if 0 <= sel_idx < len(auth_options):
+                    chosen = auth_options[sel_idx]
+                    c_type = chosen.get("type")
+                    if c_type == "browser":
+                        self._on_url_submitted(self.url_input, url, browser_override=chosen.get("spec"))
+                    elif c_type == "custom_browser":
+                        self._show_browser_picker_and_retry(url)
+                    elif c_type == "file":
+                        self._on_url_submitted(self.url_input, url, cookie_override=chosen.get("path"))
+                    elif c_type == "browse":
                         self._browse_and_retry_metadata(url)
 
         dialog.connect("response", _on_error_dialog_response)
+        dialog.present()
+
+    def _show_browser_picker_and_retry(self, url: str):
+        """Show a quick browser selection popup and retry metadata fetching."""
+        installed = self.app.cookie_service.discover_installed_browsers() if self.app.cookie_service else []
+        if not installed:
+            self._browse_and_retry_metadata(url)
+            return
+
+        dialog = Adw.MessageDialog(
+            transient_for=self,
+            heading="Select Browser for Cookies",
+            body="Choose the web browser to extract session cookies from:"
+        )
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        box.set_margin_top(8)
+        box.set_margin_bottom(8)
+
+        # Browser Dropdown
+        b_labels = [f"{b['name']}{' (Installed)' if b.get('is_installed') else ''}" for b in installed]
+        b_model = Gtk.StringList.new(b_labels)
+        b_dd = Gtk.DropDown(model=b_model, hexpand=True)
+        box.append(b_dd)
+
+        # Profile Dropdown
+        p_model = Gtk.StringList()
+        p_dd = Gtk.DropDown(model=p_model, hexpand=True)
+        box.append(p_dd)
+
+        def _update_p_model():
+            b_idx = b_dd.get_selected()
+            if 0 <= b_idx < len(installed):
+                profs = installed[b_idx].get("profiles", ["Default"])
+                while p_model.get_n_items() > 0:
+                    p_model.remove(0)
+                for p in profs:
+                    p_model.append(p)
+                p_dd.set_selected(0)
+
+        b_dd.connect("notify::selected", lambda *_: _update_p_model())
+        _update_p_model()
+
+        dialog.set_extra_child(box)
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("retry", "Use Browser & Retry")
+        dialog.set_response_appearance("retry", Adw.ResponseAppearance.SUGGESTED)
+
+        def _on_resp(dlg, resp):
+            if resp == "retry":
+                b_idx = b_dd.get_selected()
+                p_idx = p_dd.get_selected()
+                if 0 <= b_idx < len(installed):
+                    b_id = installed[b_idx]["id"]
+                    profs = installed[b_idx].get("profiles", ["Default"])
+                    p_name = profs[p_idx] if 0 <= p_idx < len(profs) else "Default"
+                    spec = self.app.cookie_service.build_browser_spec(b_id, profile=p_name)
+                    self._on_url_submitted(self.url_input, url, browser_override=spec)
+
+        dialog.connect("response", _on_resp)
         dialog.present()
 
     def _browse_and_retry_metadata(self, url: str):
@@ -511,9 +612,12 @@ class GlypdlWindow(Adw.ApplicationWindow):
             cookie_file = self.app.settings.get('cookie_file', '')
 
         if hasattr(widget, 'format_selector'):
-            sel_cookie = widget.format_selector.get_selected_cookie_file()
-            if sel_cookie and os.path.isfile(sel_cookie):
-                cookie_file = sel_cookie
+            sel_file, sel_browser = widget.format_selector.get_selected_cookie_config()
+            if sel_browser:
+                cookies_from_browser = sel_browser
+                cookie_file = None
+            elif sel_file:
+                cookie_file = sel_file
                 cookies_from_browser = None
 
         dl_dir = self.app.settings.get('download_dir') or str(get_default_download_dir())
@@ -585,9 +689,12 @@ class GlypdlWindow(Adw.ApplicationWindow):
             cookie_file = self.app.settings.get('cookie_file', '')
 
         if hasattr(widget, 'format_selector'):
-            sel_cookie = widget.format_selector.get_selected_cookie_file()
-            if sel_cookie and os.path.isfile(sel_cookie):
-                cookie_file = sel_cookie
+            sel_file, sel_browser = widget.format_selector.get_selected_cookie_config()
+            if sel_browser:
+                cookies_from_browser = sel_browser
+                cookie_file = None
+            elif sel_file:
+                cookie_file = sel_file
                 cookies_from_browser = None
 
         dl_dir = self.app.settings.get('download_dir') or str(get_default_download_dir())
