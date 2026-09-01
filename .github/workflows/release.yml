@@ -105,15 +105,16 @@ jobs:
       - name: Run Windows Tests
         run: dotnet test windows/tests/Glypdl.Windows.Tests/Glypdl.Windows.Tests.csproj -c Release -p:Platform=x64 --no-build
 
-      - name: Publish Windows App (win-x64)
-        run: msbuild windows/src/Glypdl.Windows/Glypdl.Windows.csproj -p:Configuration=Release -p:Platform=x64 -t:Publish -p:PublishDir="..\..\publish\" -p:SelfContained=true -p:RuntimeIdentifier=win-x64 -p:PublishSingleFile=false
+      - name: Publish Windows App (win-x64 Self-Contained)
+        run: msbuild windows/src/Glypdl.Windows/Glypdl.Windows.csproj -t:Publish -p:Configuration=Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64 -p:SelfContained=true -p:PublishSelfContained=true -p:PublishDir=..\..\publish\
 
       - name: Install Inno Setup
         run: choco install innosetup -y
 
       - name: Build Windows Setup.exe
+        shell: powershell
         run: |
-          mkdir windows\dist
+          New-Item -ItemType Directory -Path windows\dist -Force
           iscc windows/packaging/inno/setup.iss
 
       - name: Upload Windows Setup
@@ -138,5 +139,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist-release/**/*
+          tag_name: ${{ github.ref_name }}
+          name: Glypdl ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
