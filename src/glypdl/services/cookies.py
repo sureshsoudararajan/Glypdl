@@ -395,11 +395,13 @@ class CookieService:
                 stdout_out = proc.stdout.strip()
                 combined_output = (stderr_out + "\n" + stdout_out).strip()
 
-                if proc.returncode == 0:
+                extracted_match = re.search(r'Extracted\s+(\d+)\s+cookies', combined_output, re.IGNORECASE)
+                if proc.returncode == 0 or extracted_match:
+                    cookie_count_str = f" ({extracted_match.group(1)} cookies loaded)" if extracted_match else ""
                     GLib.idle_add(
                         callback,
                         True,
-                        f"Browser cookies successfully read from '{browser_spec}'.",
+                        f"Browser cookies successfully read from '{browser_spec}'{cookie_count_str}.",
                         combined_output or "OK"
                     )
                 else:

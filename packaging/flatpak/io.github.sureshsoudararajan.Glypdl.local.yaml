@@ -27,7 +27,7 @@ modules:
         url: https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp
         sha256: 1fa6733c37ea6fb51c99ad8fe785e7b7e5f3246c9b980230329d4fb72ed8d4d6
 
-  # Glypdl Application
+  # Glypdl Application (Local Source)
   - name: glypdl
     buildsystem: simple
     build-commands:
@@ -39,6 +39,5 @@ modules:
       - install -Dm644 data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg
       - install -Dm644 data/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glypdl.png ${FLATPAK_DEST}/share/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glypdl.png
     sources:
-      - type: git
-        url: https://github.com/sureshsoudararajan/Glypdl.git
-        tag: v1.0.0
+      - type: dir
+        path: ../../
