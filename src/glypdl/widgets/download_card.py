@@ -79,7 +79,6 @@ class DownloadCard(Gtk.Box):
         self.title_label.set_ellipsize(Pango.EllipsizeMode.END)
         self.title_label.set_hexpand(True)
         self.title_label.set_halign(Gtk.Align.FILL)
-        self.title_label.set_max_width_chars(1)
         vbox.append(self.title_label)
 
         self.info_sublabel = Gtk.Label(halign=Gtk.Align.START, xalign=0.0)
@@ -87,7 +86,6 @@ class DownloadCard(Gtk.Box):
         self.info_sublabel.set_ellipsize(Pango.EllipsizeMode.END)
         self.info_sublabel.set_hexpand(True)
         self.info_sublabel.set_halign(Gtk.Align.FILL)
-        self.info_sublabel.set_max_width_chars(1)
         vbox.append(self.info_sublabel)
 
         # Progress bar: Always occupies full available width of container
@@ -110,7 +108,6 @@ class DownloadCard(Gtk.Box):
         self.progress_text.add_css_class('numeric')
         self.progress_text.set_hexpand(False)
         self.progress_text.set_ellipsize(Pango.EllipsizeMode.END)
-        self.progress_text.set_max_width_chars(1)
         self.stats_box.append(self.progress_text)
 
         self.speed_eta_text = Gtk.Label(halign=Gtk.Align.END, xalign=1.0)
@@ -119,7 +116,6 @@ class DownloadCard(Gtk.Box):
         self.speed_eta_text.set_hexpand(True)
         self.speed_eta_text.set_halign(Gtk.Align.END)
         self.speed_eta_text.set_ellipsize(Pango.EllipsizeMode.END)
-        self.speed_eta_text.set_max_width_chars(1)
         self.stats_box.append(self.speed_eta_text)
 
         # Status label (for queued, merging, failed, etc.)
@@ -128,7 +124,6 @@ class DownloadCard(Gtk.Box):
         self.status_label.set_ellipsize(Pango.EllipsizeMode.END)
         self.status_label.set_hexpand(True)
         self.status_label.set_halign(Gtk.Align.FILL)
-        self.status_label.set_max_width_chars(1)
         vbox.append(self.status_label)
 
         # Right Action Buttons

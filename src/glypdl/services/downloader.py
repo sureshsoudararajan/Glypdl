@@ -300,9 +300,10 @@ class DownloadManager:
         return value * multipliers.get(unit, 1)
 
     def _parse_eta_value(self, eta_str):
-        """Parse ETA string like '00:41' or '1:23:45' to seconds."""
-        if not eta_str:
+        """Parse ETA string like '00:41', '1:23:45', or '41s' to seconds."""
+        if not eta_str or eta_str.lower() == 'unknown':
             return 0
+        eta_str = eta_str.rstrip('sS')
         parts = eta_str.split(':')
         try:
             if len(parts) == 3:

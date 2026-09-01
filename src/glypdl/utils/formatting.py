@@ -85,15 +85,16 @@ def parse_progress_line(line: str) -> Dict[str, Any]:
             except ValueError:
                 pass
                 
-        # Parse ETA
-        eta_match = re.search(r'ETA\s+(\d+:\d+(?::\d+)?)', line)
+        # Parse ETA: e.g. "ETA 00:15", "ETA 01:20:30", "ETA 45s"
+        eta_match = re.search(r'ETA\s+([\d:]+|\d+s)', line)
         if eta_match:
             result["eta"] = eta_match.group(1)
             
-        # Parse speed
-        speed_match = re.search(r'at\s+([^ ]+/s)', line)
+        # Parse speed: e.g. "at 4.50MiB/s", "at 500.00KiB/s"
+        speed_match = re.search(r'at\s+([~]?\s*[\d.]+\s*[KMGT]?i?B/s)', line, re.IGNORECASE)
         if speed_match:
-            result["speed"] = speed_match.group(1).replace('iB', 'B')
+            spd_clean = speed_match.group(1).replace('~', '').strip().replace('iB', 'B').replace('ib', 'B')
+            result["speed"] = spd_clean
             
         # Parse fragments
         frag_match = re.search(r'\(frag\s+(\d+)/(\d+)\)', line)
@@ -107,8 +108,8 @@ def parse_progress_line(line: str) -> Dict[str, Any]:
         # Parse downloaded and total sizes
         mults = {'B': 1, 'KB': 1024, 'MB': 1024**2, 'GB': 1024**3, 'TB': 1024**4}
         
-        # Check "X of Y" e.g. "1.42MiB of 15.00MiB"
-        dl_tot_m = re.search(r'([\d.]+)\s*([KMGT]?i?B)\s+of\s+~?([\d.]+)\s*([KMGT]?i?B)', line)
+        # Check "X of Y" e.g. "1.42MiB of 15.00MiB" or "1.42MiB of ~ 15.00MiB"
+        dl_tot_m = re.search(r'([\d.]+)\s*([KMGT]?i?B)\s+of\s+~?\s*([\d.]+)\s*([KMGT]?i?B)', line)
         if dl_tot_m:
             try:
                 dl_val, dl_unit, tot_val, tot_unit = dl_tot_m.groups()
@@ -117,8 +118,8 @@ def parse_progress_line(line: str) -> Dict[str, Any]:
             except (ValueError, TypeError):
                 pass
         else:
-            # Check "of ~1.82GiB"
-            tot_m = re.search(r'of\s+~?([\d.]+)\s*([KMGT]?i?B)', line)
+            # Check "of ~ 1.82GiB"
+            tot_m = re.search(r'of\s+~?\s*([\d.]+)\s*([KMGT]?i?B)', line)
             if tot_m:
                 try:
                     val = float(tot_m.group(1))
