@@ -52,6 +52,7 @@ class TestCookieService(unittest.TestCase):
         self.assertIn("chrome", browser_ids)
         self.assertIn("chromium", browser_ids)
         self.assertIn("firefox", browser_ids)
+        self.assertIn("librewolf", browser_ids)
         self.assertIn("brave", browser_ids)
         self.assertIn("edge", browser_ids)
         self.assertIn("opera", browser_ids)
@@ -71,6 +72,10 @@ class TestCookieService(unittest.TestCase):
         # Standard browser
         self.assertEqual(service.build_browser_spec("chrome"), "chrome")
         self.assertEqual(service.build_browser_spec("firefox"), "firefox")
+
+        # LibreWolf support
+        self.assertTrue(service.build_browser_spec("librewolf").startswith("firefox"))
+        self.assertEqual(service.build_browser_spec("librewolf", profile="/custom/path/librewolf"), "firefox:/custom/path/librewolf")
 
         # Browser with profile
         self.assertEqual(service.build_browser_spec("chrome", profile="Default"), "chrome:Default")

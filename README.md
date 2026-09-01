@@ -62,7 +62,7 @@
   * **Auto-Provisioning FFmpeg**: If `ffmpeg` is missing on your host OS, Glypdl automatically downloads a static standalone binary in the background to `~/.local/share/glypdl/bin/`.
 
 * **🔒 Direct Browser Cookies & Cookie File Authentication**:
-  * **Direct Browser Extraction**: Seamlessly extract session cookies directly from installed browsers (**Google Chrome**, **Chromium**, **Mozilla Firefox**, **Brave Browser**, **Microsoft Edge**, **Opera**, **Vivaldi**) using yt-dlp's `--cookies-from-browser` engine without manually exporting files.
+  * **Direct Browser Extraction**: Seamlessly extract session cookies directly from installed browsers (**Google Chrome**, **Chromium**, **Mozilla Firefox**, **LibreWolf**, **Brave Browser**, **Microsoft Edge**, **Opera**, **Vivaldi**) using yt-dlp's `--cookies-from-browser` engine without manually exporting files.
   * **Profile & Keyring Support**: Select specific browser profiles (*e.g., Default, Profile 1, default-release*) and configure desktop decryption keyrings (GNOME Keyring, KWallet, Basic Text).
   * **Local Privacy & Security**: Cookies are processed 100% locally by yt-dlp. Glypdl never stores, logs, or transmits your credentials over the network.
   * **Saved `cookies.txt` Profiles**: Save and name multiple Netscape `cookies.txt` files (*e.g., YouTube, Patreon, Vimeo*) in Preferences with one-click **Use Profile** switching and active status badges.

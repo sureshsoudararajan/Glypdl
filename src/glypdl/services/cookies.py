@@ -27,6 +27,7 @@ class CookieService:
         {"id": "chrome", "name": "Google Chrome", "icon": "google-chrome"},
         {"id": "chromium", "name": "Chromium", "icon": "chromium"},
         {"id": "firefox", "name": "Mozilla Firefox", "icon": "firefox"},
+        {"id": "librewolf", "name": "LibreWolf", "icon": "librewolf"},
         {"id": "brave", "name": "Brave Browser", "icon": "brave"},
         {"id": "edge", "name": "Microsoft Edge", "icon": "microsoft-edge"},
         {"id": "opera", "name": "Opera", "icon": "opera"},
@@ -98,6 +99,17 @@ class CookieService:
                 "paths": [
                     home / ".mozilla" / "firefox",
                     home / ".var" / "app" / "org.mozilla.firefox" / ".mozilla" / "firefox",
+                ],
+                "type": "firefox"
+            },
+            "librewolf": {
+                "binaries": ["librewolf", "io.gitlab.librewolf-community.LibreWolf"],
+                "paths": [
+                    home / ".librewolf",
+                    home / ".config" / "librewolf",
+                    home / ".var" / "app" / "io.gitlab.librewolf-community" / ".librewolf",
+                    home / ".var" / "app" / "io.gitlab.LibreWolf" / ".librewolf",
+                    home / "snap" / "librewolf" / "common" / ".librewolf",
                 ],
                 "type": "firefox"
             },
@@ -242,6 +254,49 @@ class CookieService:
 
         return profiles if profiles else ["default-release", "default"]
 
+    def _resolve_librewolf_profile_path(self, profile: Optional[str] = None) -> Optional[str]:
+        """Resolve a physical directory path for a LibreWolf profile."""
+        home = Path.home()
+        librewolf_dirs = [
+            home / ".librewolf",
+            home / ".config" / "librewolf",
+            home / ".var" / "app" / "io.gitlab.librewolf-community" / ".librewolf",
+            home / ".var" / "app" / "io.gitlab.LibreWolf" / ".librewolf",
+            home / "snap" / "librewolf" / "common" / ".librewolf",
+        ]
+
+        for base in librewolf_dirs:
+            if not base.exists() or not base.is_dir():
+                continue
+
+            # Check profiles.ini
+            ini_path = base / "profiles.ini"
+            if ini_path.exists() and ini_path.is_file():
+                try:
+                    cp = configparser.ConfigParser()
+                    cp.read(str(ini_path))
+                    for sec in cp.sections():
+                        if sec.startswith("Profile") or sec.startswith("Install"):
+                            name = cp.get(sec, "Name", fallback=None)
+                            path_val = cp.get(sec, "Path", fallback=None)
+                            is_relative = cp.get(sec, "IsRelative", fallback="1") == "1"
+                            if path_val:
+                                full_p = (base / path_val).resolve() if is_relative else Path(path_val)
+                                if profile and (profile == name or profile == path_val or profile == full_p.name):
+                                    if full_p.exists():
+                                        return str(full_p)
+                except Exception:
+                    pass
+
+            # Check subdirectories directly
+            for item in sorted(base.iterdir()):
+                if item.is_dir():
+                    if (item / "cookies.sqlite").exists():
+                        if not profile or profile == "Default" or profile in item.name:
+                            return str(item.resolve())
+
+        return None
+
     def build_browser_spec(self, browser_name: str, profile: Optional[str] = None, keyring: Optional[str] = None) -> str:
         """
         Construct yt-dlp's `--cookies-from-browser` argument string.
@@ -252,6 +307,17 @@ class CookieService:
 
         # Normalize browser ID
         b_name = browser_name.lower().strip()
+
+        # LibreWolf uses Firefox cookie format via directory path
+        if b_name == 'librewolf':
+            if profile and ('/' in profile or '\\' in profile):
+                return f"firefox:{profile}"
+            resolved = self._resolve_librewolf_profile_path(profile)
+            if resolved:
+                return f"firefox:{resolved}"
+            if profile and profile != "Default":
+                return f"firefox:{profile}"
+            return "firefox"
 
         # Append optional keyring if specific keyring requested
         keyring_suffix = ""
