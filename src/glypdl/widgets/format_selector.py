@@ -11,50 +11,89 @@ from glypdl.models.download import DownloadMode
 from glypdl.utils.formatting import format_size
 
 
+def _format_browser_spec_display(spec: str) -> tuple:
+    """Return (browser_name, profile_short_name, display_label, description) from yt-dlp spec."""
+    spec_lower = spec.lower()
+    if "librewolf" in spec_lower:
+        b_name = "LibreWolf"
+    elif "chrome" in spec_lower and "brave" not in spec_lower:
+        b_name = "Google Chrome"
+    elif "chromium" in spec_lower:
+        b_name = "Chromium"
+    elif "brave" in spec_lower:
+        b_name = "Brave"
+    elif "firefox" in spec_lower:
+        b_name = "Firefox"
+    elif "edge" in spec_lower:
+        b_name = "Edge"
+    elif "opera" in spec_lower:
+        b_name = "Opera"
+    elif "vivaldi" in spec_lower:
+        b_name = "Vivaldi"
+    else:
+        b_name = spec.split(':')[0].capitalize()
+
+    p_name = ""
+    if ":" in spec:
+        raw_p = spec.split(":", 1)[1]
+        if "/" in raw_p:
+            base = os.path.basename(raw_p)
+            if "." in base:
+                p_name = base.split(".", 1)[1]
+            else:
+                p_name = base
+        else:
+            p_name = raw_p
+
+    if p_name and p_name != "Default":
+        label = f"🌐 {b_name} ({p_name})"
+    else:
+        label = f"🌐 {b_name}"
+
+    desc = f"Session cookies from {b_name}"
+    return b_name, p_name, label, desc
+
+
 class FormatSelector(Gtk.Box):
-    """Allows selecting download mode (Video+Audio, Video, Audio), resolution/audio format, cookie profile, and inspecting streams."""
+    """Widget for selecting download modes, resolutions, formats, and authentication cookies."""
+
     __gtype_name__ = 'GlypdlFormatSelector'
 
-    STANDARD_QUALITIES = ['2160p', '1440p', '1080p', '720p', '480p', '360p', '240p', '144p']
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.set_orientation(Gtk.Orientation.VERTICAL)
-        self.set_spacing(10)
+    def __init__(self):
+        super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
 
         self.pref_group = Adw.PreferencesGroup()
         self.append(self.pref_group)
 
-        # 1. Download Mode Selector
+        # 1. Download Mode
         self.mode_model = Gtk.StringList.new(['Video + Audio', 'Video Only', 'Audio Only'])
         self.mode_dd = Gtk.DropDown(model=self.mode_model, valign=Gtk.Align.CENTER)
         self.mode_dd.connect('notify::selected', self._on_mode_changed)
-        
+
         self.mode_row = Adw.ActionRow(title='Download Type')
         self.mode_row.add_suffix(self.mode_dd)
         self.mode_row.set_activatable_widget(self.mode_dd)
         self.pref_group.add(self.mode_row)
 
-        # 2. Quality / Format Selector
-        self._current_qualities = ['Best'] + self.STANDARD_QUALITIES
-        self.video_quality_model = Gtk.StringList.new(self._current_qualities)
+        # 2. Quality / Format Dropdown
+        self.video_quality_model = Gtk.StringList.new(['Best'])
         self.audio_quality_model = Gtk.StringList.new(['Best', 'MP3', 'M4A', 'Opus', 'FLAC', 'WAV'])
-        
+
         self.quality_dd = Gtk.DropDown(model=self.video_quality_model, valign=Gtk.Align.CENTER)
         self.quality_row = Adw.ActionRow(title='Quality / Format')
         self.quality_row.add_suffix(self.quality_dd)
         self.quality_row.set_activatable_widget(self.quality_dd)
         self.pref_group.add(self.quality_row)
 
-        # 3. Cookie Profile Selector
         # 3. Authentication Cookie Selector
-        self._cookie_options = [{"type": "none", "label": "No Cookies", "spec": "", "path": "", "desc": "No authentication cookies"}]
-        self.cookie_model = Gtk.StringList.new(['No Cookies'])
+        self._cookie_options = [{"type": "none", "label": "None (Anonymous)", "spec": "", "path": "", "desc": "No authentication cookies"}]
+        self.cookie_model = Gtk.StringList.new(['None (Anonymous)'])
         
         self.cookie_dd = Gtk.DropDown(model=self.cookie_model, valign=Gtk.Align.CENTER)
+        self.cookie_dd.set_hexpand(False)
         self.cookie_dd.connect('notify::selected', self._on_cookie_selection_changed)
         
-        self.cookie_row = Adw.ActionRow(title='Authentication Cookies')
+        self.cookie_row = Adw.ActionRow(title='Authentication')
         self.cookie_row.add_suffix(self.cookie_dd)
         self.cookie_row.set_activatable_widget(self.cookie_dd)
         self.cookie_row.set_visible(False)
@@ -86,7 +125,7 @@ class FormatSelector(Gtk.Box):
         idx = dropdown.get_selected()
         if 0 <= idx < len(self._cookie_options):
             opt = self._cookie_options[idx]
-            self.cookie_row.set_subtitle(opt.get("desc") or opt.get("label") or "No cookies attached")
+            self.cookie_row.set_subtitle(opt.get("desc") or "No cookies attached")
 
     def set_cookie_profiles(
         self,
@@ -98,25 +137,20 @@ class FormatSelector(Gtk.Box):
         installed_browsers: list = None,
         use_cookies: bool = False
     ):
-        """Populate cookie profiles dropdown with both browser cookies and file profiles."""
+        """Populate cookie profiles dropdown with clean, short browser names and file profiles."""
         options = []
         labels = []
         selected_idx = 0
 
-        # 1. Active / Configured Browser Option
+        # 1. Active / Used Browser Option
         if active_browser_spec:
-            spec_display = active_browser_spec
-            # Extract friendly browser name if possible
-            b_name = active_browser_spec.split(':')[0].split('+')[0].capitalize()
-            p_name = active_browser_spec.split(':')[-1] if ':' in active_browser_spec else ""
-            prof_disp = f" ({p_name})" if p_name and p_name != active_browser_spec else ""
-            opt_label = f"🌐 Browser: {b_name}{prof_disp}"
+            b_name, p_name, opt_label, opt_desc = _format_browser_spec_display(active_browser_spec)
             options.append({
                 "type": "browser",
                 "label": opt_label,
                 "spec": active_browser_spec,
                 "path": "",
-                "desc": f"Extracting cookies directly from {b_name}{prof_disp}"
+                "desc": opt_desc
             })
             labels.append(opt_label)
 
@@ -131,18 +165,16 @@ class FormatSelector(Gtk.Box):
                         if b_id == "librewolf" and prof:
                             b_spec = f"librewolf:{prof}"
                         
-                        # Don't duplicate if already added as active_browser_spec
-                        if any(o.get("spec") == b_spec for o in options):
+                        _, _, opt_label, opt_desc = _format_browser_spec_display(b_spec)
+                        if any(o.get("label") == opt_label for o in options):
                             continue
 
-                        p_disp = f" ({prof})" if prof else ""
-                        opt_label = f"🌐 Browser: {b_title}{p_disp}"
                         options.append({
                             "type": "browser",
                             "label": opt_label,
                             "spec": b_spec,
                             "path": "",
-                            "desc": f"Extract cookies directly from {b_title}{p_disp}"
+                            "desc": opt_desc
                         })
                         labels.append(opt_label)
 
@@ -152,50 +184,50 @@ class FormatSelector(Gtk.Box):
             path = p.get('path', '')
             if path:
                 base = os.path.basename(path)
-                opt_label = f"📄 File: {name} ({base})"
+                opt_label = f"📄 {name} ({base})"
                 options.append({
                     "type": "file",
                     "label": opt_label,
                     "spec": "",
                     "path": path,
-                    "desc": path
+                    "desc": f"Cookie file: {base}"
                 })
                 labels.append(opt_label)
 
         # 4. Default / Custom Cookie File if present and not in profiles
         if default_cookie_path and not any(o.get("path") == default_cookie_path for o in options):
             base = os.path.basename(default_cookie_path)
-            opt_label = f"📄 Default File ({base})"
+            opt_label = f"📄 Default ({base})"
             options.append({
                 "type": "file",
                 "label": opt_label,
                 "spec": "",
                 "path": default_cookie_path,
-                "desc": default_cookie_path
+                "desc": f"Cookie file: {base}"
             })
             labels.append(opt_label)
 
         if active_cookie_path and not any(o.get("path") == active_cookie_path for o in options):
             base = os.path.basename(active_cookie_path)
-            opt_label = f"📄 Custom File ({base})"
+            opt_label = f"📄 Custom ({base})"
             options.append({
                 "type": "file",
                 "label": opt_label,
                 "spec": "",
                 "path": active_cookie_path,
-                "desc": active_cookie_path
+                "desc": f"Cookie file: {base}"
             })
             labels.append(opt_label)
 
-        # 5. Always provide "No Cookies" option
+        # 5. Always provide "None" option
         options.append({
             "type": "none",
-            "label": "No Cookies (Anonymous)",
+            "label": "None (Anonymous)",
             "spec": "",
             "path": "",
             "desc": "No authentication cookies attached"
         })
-        labels.append("No Cookies (Anonymous)")
+        labels.append("None (Anonymous)")
 
         self._cookie_options = options
         self.cookie_model = Gtk.StringList.new(labels)
@@ -208,7 +240,7 @@ class FormatSelector(Gtk.Box):
         # Auto-selection logic
         if active_browser_spec:
             for idx, opt in enumerate(options):
-                if opt["type"] == "browser" and opt["spec"] == active_browser_spec:
+                if opt["type"] == "browser" and (opt["spec"] == active_browser_spec or opt["label"] == _format_browser_spec_display(active_browser_spec)[2]):
                     selected_idx = idx
                     break
         elif active_cookie_path:
@@ -224,7 +256,6 @@ class FormatSelector(Gtk.Box):
                     selected_idx = idx
                     break
         else:
-            # Select No Cookies (last item)
             selected_idx = len(options) - 1
 
         self.cookie_dd.set_selected(selected_idx)
