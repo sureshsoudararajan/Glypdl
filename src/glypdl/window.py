@@ -281,20 +281,21 @@ class GlypdlWindow(Adw.ApplicationWindow):
         except Exception:
             pass
 
-    def _on_url_submitted(self, widget, url: str, cookie_override: str = None):
+    def _on_url_submitted(self, widget, url: str, cookie_override: str = None, browser_override: str = None):
         self._dismiss_preview()
         self.fetch_spinner_box.set_visible(True)
         self.fetch_spinner.start()
 
         cookie_file = cookie_override
-        cookies_from_browser = None
-        if cookie_file is None:
+        cookies_from_browser = browser_override
+        if cookie_file is None and cookies_from_browser is None:
             method = self.app.settings.get_cookie_method()
             if method == 'browser':
                 b_name = self.app.settings.get_browser_name()
                 b_prof = self.app.settings.get_browser_profile()
                 b_key = self.app.settings.get_browser_keyring()
-                cookies_from_browser = self.app.cookie_service.build_browser_spec(b_name, profile=b_prof, keyring=b_key)
+                if self.app.cookie_service:
+                    cookies_from_browser = self.app.cookie_service.build_browser_spec(b_name, profile=b_prof, keyring=b_key)
             elif method == 'file':
                 cookie_file = self.app.settings.get('cookie_file', '')
 
