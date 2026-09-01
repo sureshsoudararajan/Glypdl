@@ -28,11 +28,20 @@ class TestFormatting(unittest.TestCase):
         self.assertEqual(format_duration(45), "0:45")
         self.assertEqual(format_duration(765), "12:45")
         self.assertEqual(format_duration(3665), "1:01:05")
+        # Float duration (from yt-dlp metadata)
+        self.assertEqual(format_duration(214.0), "3:34")
+        self.assertEqual(format_duration(45.67), "0:46")
+        self.assertEqual(format_duration("125.4"), "2:05")
+        self.assertEqual(format_duration(None), "0:00")
 
     def test_format_eta(self):
         self.assertEqual(format_eta(41), "41s")
         self.assertEqual(format_eta(133), "2m 13s")
         self.assertEqual(format_eta(3905), "1h 5m")
+        # Float ETA
+        self.assertEqual(format_eta(41.2), "41s")
+        self.assertEqual(format_eta("133.8"), "2m 14s")
+        self.assertEqual(format_eta(None), "0s")
 
     def test_parse_progress_line(self):
         # Standard yt-dlp download line

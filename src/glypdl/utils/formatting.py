@@ -4,13 +4,18 @@ import re
 from typing import Dict, Any
 
 
-def format_size(bytes_val: int) -> str:
+def format_size(bytes_val: Any) -> str:
     """Format bytes into human-readable string (e.g. 1.42 GB, 340 MB)."""
-    if bytes_val <= 0:
+    try:
+        b = float(bytes_val)
+    except (ValueError, TypeError):
+        return "0 B"
+
+    if b <= 0:
         return "0 B"
     units = ["B", "KB", "MB", "GB", "TB", "PB"]
     unit_index = 0
-    size = float(bytes_val)
+    size = b
     while size >= 1024.0 and unit_index < len(units) - 1:
         size /= 1024.0
         unit_index += 1
@@ -20,35 +25,50 @@ def format_size(bytes_val: int) -> str:
     return f"{size:.2f} {units[unit_index]}"
 
 
-def format_speed(bytes_per_sec: float) -> str:
+def format_speed(bytes_per_sec: Any) -> str:
     """Format bytes per second into human-readable speed string (e.g. 9.70 MB/s)."""
-    if bytes_per_sec <= 0:
+    try:
+        b = float(bytes_per_sec)
+    except (ValueError, TypeError):
         return "0 B/s"
-    return f"{format_size(int(bytes_per_sec))}/s"
+
+    if b <= 0:
+        return "0 B/s"
+    return f"{format_size(int(b))}/s"
 
 
-def format_duration(seconds: int) -> str:
+def format_duration(seconds: Any) -> str:
     """Format seconds into HH:MM:SS or MM:SS."""
-    if seconds <= 0:
+    try:
+        sec = int(round(float(seconds)))
+    except (ValueError, TypeError):
+        return "0:00"
+
+    if sec <= 0:
         return "0:00"
     
-    h = seconds // 3600
-    m = (seconds % 3600) // 60
-    s = seconds % 60
+    h = sec // 3600
+    m = (sec % 3600) // 60
+    s = sec % 60
     
     if h > 0:
         return f"{h}:{m:02d}:{s:02d}"
     return f"{m}:{s:02d}"
 
 
-def format_eta(seconds: int) -> str:
+def format_eta(seconds: Any) -> str:
     """Format ETA in seconds into human-readable string (e.g. 41s, 2m 13s, 1h 5m)."""
-    if seconds <= 0:
+    try:
+        sec = int(round(float(seconds)))
+    except (ValueError, TypeError):
+        return "0s"
+
+    if sec <= 0:
         return "0s"
     
-    h = seconds // 3600
-    m = (seconds % 3600) // 60
-    s = seconds % 60
+    h = sec // 3600
+    m = (sec % 3600) // 60
+    s = sec % 60
     
     if h > 0:
         return f"{h}h {m}m"
