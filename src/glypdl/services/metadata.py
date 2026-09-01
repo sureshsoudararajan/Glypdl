@@ -15,6 +15,55 @@ class MetadataService:
     def __init__(self, ytdlp_service):
         self.ytdlp_service = ytdlp_service
 
+    def _normalize_entries(self, raw_entries: list, original_url: str = "", main_uploader: str = "", main_extractor: str = "") -> list:
+        """Normalize raw yt-dlp playlist entries into consistent items with verified, non-empty URLs."""
+        normalized = []
+        for entry in raw_entries or []:
+            if not entry:
+                continue
+
+            vid_id = str(entry.get('id') or '').strip()
+            extractor = (entry.get('extractor') or main_extractor or '').lower()
+            uploader = entry.get('uploader') or entry.get('channel') or main_uploader or ''
+
+            # Robust URL extraction
+            vid_url = entry.get('webpage_url') or entry.get('url') or entry.get('original_url') or ''
+
+            if not vid_url:
+                if 'instagram' in extractor or 'instagram.com' in original_url:
+                    if uploader and vid_id:
+                        vid_url = f"https://www.instagram.com/stories/{uploader}/{vid_id}/"
+                    elif vid_id:
+                        vid_url = f"https://www.instagram.com/p/{vid_id}/"
+                    else:
+                        vid_url = original_url
+                elif 'tiktok' in extractor or 'tiktok.com' in original_url:
+                    vid_url = f"https://www.tiktok.com/@{uploader}/video/{vid_id}" if uploader and vid_id else original_url
+                elif 'youtube' in extractor or 'youtube.com' in original_url or 'youtu.be' in original_url:
+                    vid_url = f"https://www.youtube.com/watch?v={vid_id}" if vid_id else original_url
+                else:
+                    vid_url = original_url
+
+            # Extract thumbnail
+            thumb_url = ""
+            if entry.get('thumbnails'):
+                thumb_url = entry['thumbnails'][-1].get('url', '')
+            if not thumb_url:
+                thumb_url = entry.get('thumbnail', '')
+
+            title = entry.get('title') or entry.get('fulltitle') or (f"Media by {uploader}" if uploader else "Untitled Media")
+
+            normalized.append({
+                'id': vid_id,
+                'url': vid_url,
+                'title': title,
+                'duration': entry.get('duration') or 0,
+                'uploader': uploader,
+                'thumbnail': thumb_url,
+                'selected': True
+            })
+        return normalized
+
     def fetch_async(self, url: str, callback, error_callback=None, cookie_file: Optional[str] = None, cookies_from_browser: Optional[str] = None):
         """Fetch metadata asynchronously (single video or playlist) and invoke callback(metadata_dict) on GTK main thread."""
         def _fetch():
@@ -31,36 +80,25 @@ class MetadataService:
                         timeout=40
                     )
                     data = json.loads(p_res.stdout)
-                    if data.get('_type') == 'playlist' and 'entries' in data:
-                        normalized_entries = []
-                        for entry in data.get('entries') or []:
-                            if not entry:
-                                continue
-                            
-                            # Extract thumbnail
-                            thumb_url = ""
-                            if entry.get('thumbnails'):
-                                thumb_url = entry['thumbnails'][-1].get('url', '')
-                            if not thumb_url:
-                                thumb_url = entry.get('thumbnail', '')
-
-                            vid_id = entry.get('id', '')
-                            vid_url = entry.get('url') or (f"https://www.youtube.com/watch?v={vid_id}" if vid_id else '')
-                            
-                            normalized_entries.append({
-                                'id': vid_id,
-                                'url': vid_url,
-                                'title': entry.get('title') or 'Untitled Video',
-                                'duration': entry.get('duration') or 0,
-                                'uploader': entry.get('uploader') or entry.get('channel') or data.get('uploader') or '',
-                                'thumbnail': thumb_url,
-                                'selected': True
-                            })
+                    if data.get('_type') == 'playlist' or 'entries' in data:
+                        normalized_entries = self._normalize_entries(
+                            data.get('entries'),
+                            original_url=url,
+                            main_uploader=data.get('uploader') or data.get('channel') or '',
+                            main_extractor=data.get('extractor') or ''
+                        )
+                        if not normalized_entries:
+                            err = "No active media or stories found at this URL. Stories may have expired (24-hour limit) or the account has not posted any active stories."
+                            if error_callback:
+                                GLib.idle_add(error_callback, err, url)
+                            else:
+                                GLib.idle_add(callback, None)
+                            return
 
                         playlist_dict = {
                             '_type': 'playlist',
                             'original_url': url,
-                            'title': data.get('title') or 'YouTube Playlist',
+                            'title': data.get('title') or (f"Stories by {data.get('uploader')}" if 'instagram' in url else "Playlist"),
                             'uploader': data.get('uploader') or data.get('channel') or '',
                             'playlist_count': len(normalized_entries),
                             'entries': normalized_entries,
@@ -70,7 +108,7 @@ class MetadataService:
                         GLib.idle_add(callback, playlist_dict)
                         return
 
-                # Fetch single video metadata
+                # Fetch single video or multi-item metadata
                 args = self.ytdlp_service.build_metadata_args(url, cookie_file=cookie_file, cookies_from_browser=cookies_from_browser)
                 result = subprocess.run(
                     args,
@@ -80,15 +118,48 @@ class MetadataService:
                     timeout=30
                 )
                 metadata_dict = json.loads(result.stdout)
+
+                # If yt-dlp resolved the URL into a playlist / story album
+                if metadata_dict.get('_type') == 'playlist' or 'entries' in metadata_dict:
+                    normalized_entries = self._normalize_entries(
+                        metadata_dict.get('entries'),
+                        original_url=url,
+                        main_uploader=metadata_dict.get('uploader') or metadata_dict.get('channel') or '',
+                        main_extractor=metadata_dict.get('extractor') or ''
+                    )
+                    if not normalized_entries:
+                        err = "No active media or stories found at this URL. Stories may have expired (24-hour limit) or the account has not posted any active stories."
+                        if error_callback:
+                            GLib.idle_add(error_callback, err, url)
+                        else:
+                            GLib.idle_add(callback, None)
+                        return
+
+                    playlist_dict = {
+                        '_type': 'playlist',
+                        'original_url': url,
+                        'title': metadata_dict.get('title') or (f"Stories by {metadata_dict.get('uploader')}" if 'instagram' in url else "Playlist"),
+                        'uploader': metadata_dict.get('uploader') or metadata_dict.get('channel') or '',
+                        'playlist_count': len(normalized_entries),
+                        'entries': normalized_entries,
+                        'used_cookie_file': cookie_file or '',
+                        'used_cookies_from_browser': cookies_from_browser or ''
+                    }
+                    GLib.idle_add(callback, playlist_dict)
+                    return
+
+                # Single video / post metadata
                 metadata_dict['original_url'] = url
+                if not metadata_dict.get('webpage_url'):
+                    metadata_dict['webpage_url'] = url
                 metadata_dict['used_cookie_file'] = cookie_file or ''
                 metadata_dict['used_cookies_from_browser'] = cookies_from_browser or ''
-                
+
                 # Fetch and cache thumbnail in background if available
                 thumb_url = metadata_dict.get('thumbnail')
                 if thumb_url:
                     load_thumbnail_async(thumb_url, lambda cached_path: metadata_dict.__setitem__('thumbnail_path', cached_path))
-                
+
                 GLib.idle_add(callback, metadata_dict)
 
             except subprocess.CalledProcessError as e:

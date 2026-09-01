@@ -517,10 +517,16 @@ class GlypdlWindow(Adw.ApplicationWindow):
                 cookies_from_browser = None
 
         dl_dir = self.app.settings.get('download_dir') or str(get_default_download_dir())
+        fallback_url = getattr(widget, 'playlist_data', {}).get('original_url') or getattr(widget, 'playlist_data', {}).get('webpage_url') or ''
+        queued_count = 0
 
         for entry in selected_entries:
+            target_url = entry.get('url') or entry.get('webpage_url') or entry.get('original_url') or fallback_url
+            if not target_url:
+                continue
+
             item = DownloadItem(
-                url=entry.get('url', ''),
+                url=target_url,
                 title=entry.get('title', 'Untitled Video'),
                 uploader=entry.get('uploader', ''),
                 duration=entry.get('duration', 0),
@@ -538,9 +544,11 @@ class GlypdlWindow(Adw.ApplicationWindow):
             self.downloads.append(item)
             self._add_download_card(item)
             self.app.download_manager.start_download(item)
+            queued_count += 1
 
         self._update_downloads_ui()
-        self._send_notification("Playlist Queued", f"Added {len(selected_entries)} videos to download queue")
+        if queued_count > 0:
+            self._send_notification("Playlist Queued", f"Added {queued_count} media items to download queue")
 
     def _find_existing_download(self, url: str, mode: DownloadMode, quality: str, audio_format: str) -> str:
         """Return path of existing downloaded file if matching URL and format is found in history."""
@@ -583,10 +591,13 @@ class GlypdlWindow(Adw.ApplicationWindow):
                 cookies_from_browser = None
 
         dl_dir = self.app.settings.get('download_dir') or str(get_default_download_dir())
+        target_url = url or getattr(widget, 'metadata', {}).get('webpage_url') or getattr(widget, 'metadata', {}).get('original_url') or ''
+        if not target_url:
+            return
 
         item = DownloadItem(
-            url=url,
-            title=getattr(widget, 'metadata', {}).get('title', url),
+            url=target_url,
+            title=getattr(widget, 'metadata', {}).get('title', target_url),
             uploader=getattr(widget, 'metadata', {}).get('uploader', ''),
             duration=getattr(widget, 'metadata', {}).get('duration', 0),
             thumbnail_url=getattr(widget, 'metadata', {}).get('thumbnail', ''),
