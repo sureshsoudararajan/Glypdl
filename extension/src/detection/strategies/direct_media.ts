@@ -1,5 +1,13 @@
 import { MediaItem } from '../../shared/types';
-import { extractDomain, formatSize, generateMediaId, inferFormatFromMime, inferFormatFromUrl } from '../../shared/utils';
+import {
+  cleanFilenameToTitle,
+  extractDomain,
+  formatSize,
+  generateMediaId,
+  inferFormatFromMime,
+  inferFormatFromUrl,
+  inferMediaQuality
+} from '../../shared/utils';
 
 export class DirectMediaStrategy {
   /**
@@ -10,7 +18,8 @@ export class DirectMediaStrategy {
     pageUrl: string,
     title?: string,
     contentLength?: number,
-    mimeType?: string
+    mimeType?: string,
+    thumbnailUrl?: string
   ): MediaItem | null {
     let inferred = mimeType ? inferFormatFromMime(mimeType) : null;
     if (!inferred) {
@@ -24,21 +33,24 @@ export class DirectMediaStrategy {
         const parsed = new URL(url);
         const name = parsed.pathname.split('/').pop();
         if (name && name.includes('.')) {
-          cleanTitle = decodeURIComponent(name);
+          cleanTitle = cleanFilenameToTitle(decodeURIComponent(name));
         }
       } catch {
         cleanTitle = `Direct ${inferred.type} (${inferred.format})`;
       }
     }
 
+    const quality = inferred.type === 'video' ? inferMediaQuality(url) : 'audio';
+
     return {
       id: generateMediaId(url, pageUrl),
       url,
       pageUrl,
       title: cleanTitle || `Media from ${extractDomain(pageUrl)}`,
+      thumbnailUrl,
       type: inferred.type,
       format: inferred.format,
-      quality: inferred.type === 'video' ? '1080p' : 'audio',
+      quality,
       fileSize: contentLength,
       formattedSize: formatSize(contentLength),
       mimeType,

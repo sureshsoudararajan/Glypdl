@@ -1,5 +1,13 @@
 import { MediaFormat, MediaItem, MediaQuality, MediaType } from '../../shared/types';
-import { extractDomain, formatDuration, generateMediaId, inferFormatFromMime, inferFormatFromUrl } from '../../shared/utils';
+import {
+  cleanFilenameToTitle,
+  extractDomain,
+  formatDuration,
+  generateMediaId,
+  inferFormatFromMime,
+  inferFormatFromUrl,
+  inferMediaQuality
+} from '../../shared/utils';
 import { DrmDetector } from '../drm';
 import { YouTubeStrategy } from './youtube';
 
@@ -74,41 +82,79 @@ export class Html5Strategy {
       }
     }
 
-    // Infer quality from video dimensions
-    let quality: MediaQuality = type === 'video' ? '1080p' : 'audio';
-    if (element instanceof HTMLVideoElement && element.videoHeight > 0) {
-      const h = element.videoHeight;
-      if (h >= 2160) quality = '2160p';
-      else if (h >= 1440) quality = '1440p';
-      else if (h >= 1080) quality = '1080p';
-      else if (h >= 720) quality = '720p';
-      else if (h >= 480) quality = '480p';
-      else if (h >= 360) quality = '360p';
-      else quality = '240p';
-    }
+    // 1. Accurately infer quality from resolution in URL tokens and video dimensions
+    const quality: MediaQuality = type === 'video' ? inferMediaQuality(src, element) : 'audio';
 
-    // Extract title from page or element attributes
-    let title = element.getAttribute('title') || element.getAttribute('aria-label') || '';
-    if (!title) {
-      const ogTitle = doc.querySelector('meta[property="og:title"]')?.getAttribute('content');
-      if (ogTitle) title = ogTitle.trim();
-    }
-    if (!title) {
-      const h1 = doc.querySelector('h1');
-      if (h1 && h1.textContent) title = h1.textContent.trim();
-    }
-    if (!title) {
-      title = doc.title || `Media from ${extractDomain(pageUrl)}`;
-    }
+    // 2. Find closest card / article container for element-scoped metadata
+    const cardContainer = element.closest(
+      'article, [class*="card"], [class*="item"], [class*="media"], [data-testid*="video"], a, div[class*="video"]'
+    );
 
-    // Poster thumbnail for videos
+    // 3. Extract thumbnail scoped strictly to this media element / card
     let thumbnailUrl: string | undefined;
     if (element instanceof HTMLVideoElement && element.poster) {
       thumbnailUrl = element.poster;
     }
-    if (!thumbnailUrl) {
+    if (!thumbnailUrl && element.getAttribute('data-poster')) {
+      thumbnailUrl = element.getAttribute('data-poster') || undefined;
+    }
+
+    // Look for image inside the same card
+    if (!thumbnailUrl && cardContainer) {
+      const cardImg = cardContainer.querySelector('img') as HTMLImageElement | null;
+      if (cardImg) {
+        thumbnailUrl = cardImg.currentSrc || cardImg.src || cardImg.getAttribute('data-src') || cardImg.getAttribute('srcset')?.split(' ')[0] || undefined;
+      }
+    }
+
+    // Only fallback to global og:image if there is ONLY 1 video element on the whole page
+    const allVideos = doc.querySelectorAll('video');
+    if (!thumbnailUrl && allVideos.length <= 1) {
       const ogImg = doc.querySelector('meta[property="og:image"]')?.getAttribute('content');
       if (ogImg) thumbnailUrl = ogImg;
+    }
+
+    // 4. Extract title scoped strictly to this media element / card
+    let title = element.getAttribute('title') || element.getAttribute('aria-label') || '';
+
+    if (!title && cardContainer) {
+      const cardHeading = cardContainer.querySelector('h1, h2, h3, h4, [class*="title"], [class*="heading"], a[title]');
+      if (cardHeading) {
+        title = cardHeading.getAttribute('title') || cardHeading.textContent?.trim() || '';
+      }
+      if (!title) {
+        const cardImg = cardContainer.querySelector('img');
+        if (cardImg && cardImg.alt && cardImg.alt.trim().length > 2) {
+          title = cardImg.alt.trim();
+        }
+      }
+    }
+
+    // If still no title, extract human-readable title from URL filename
+    if (!title) {
+      try {
+        const parsed = new URL(src);
+        const filename = parsed.pathname.split('/').pop() || '';
+        const cleaned = cleanFilenameToTitle(decodeURIComponent(filename));
+        if (cleaned && cleaned.length > 3) {
+          title = cleaned;
+        }
+      } catch {
+        // Ignored
+      }
+    }
+
+    // Only fallback to global page title if this is the ONLY video on the page
+    if (!title && allVideos.length <= 1) {
+      const ogTitle = doc.querySelector('meta[property="og:title"]')?.getAttribute('content');
+      if (ogTitle) title = ogTitle.trim();
+    }
+    if (!title && allVideos.length <= 1) {
+      title = doc.title;
+    }
+
+    if (!title) {
+      title = `Video from ${extractDomain(pageUrl)}`;
     }
 
     const duration = element.duration && !isNaN(element.duration) && element.duration > 0 ? element.duration : undefined;
