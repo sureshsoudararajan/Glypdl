@@ -34,8 +34,6 @@ class OptionsController {
     setChecked('detectDash', this.settings.detectDash);
     setChecked('showPlayerButton', this.settings.showPlayerButton);
     setValue('minFileSizeKb', this.settings.minFileSizeKb);
-    setValue('floatingPanelPosition', this.settings.floatingPanelPosition);
-    setValue('theme', this.settings.theme);
   }
 
   private bindEvents(): void {
@@ -54,8 +52,6 @@ class OptionsController {
     bindChange('detectDash', 'detectDash', true);
     bindChange('showPlayerButton', 'showPlayerButton', true);
     bindChange('minFileSizeKb', 'minFileSizeKb', false);
-    bindChange('floatingPanelPosition', 'floatingPanelPosition', false);
-    bindChange('theme', 'theme', false);
 
     document.getElementById('test-connection-btn')?.addEventListener('click', () => {
       this.runConnectionTest();
