@@ -285,6 +285,9 @@ class GlypdlWindow(Adw.ApplicationWindow):
         """Handle a download request sent externally from the browser extension."""
         if not url:
             return
+        self.set_visible(True)
+        self.unminimize()
+        self.present()
         self.view_stack.set_visible_child_name("downloads")
         self.url_input.entry.set_text(url)
         self._on_url_submitted(self.url_input, url)
@@ -366,6 +369,7 @@ class GlypdlWindow(Adw.ApplicationWindow):
             preview.connect('download-requested', self._on_download_requested)
             preview.connect('cancel-preview', lambda _: self._dismiss_preview())
             self.preview_container.append(preview)
+            self.present()
 
     def _on_metadata_error(self, error_msg: str, url: str = ""):
         self.fetch_spinner.stop()
