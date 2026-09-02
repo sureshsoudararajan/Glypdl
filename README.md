@@ -1,4 +1,4 @@
-﻿# Glypdl
+# Glypdl
 
 <div align="center">
   <img src="data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg" width="128" height="128" alt="Glypdl Logo" />
@@ -268,4 +268,13 @@ Glypdl/
 
 ## 📄 License
 
-This project is licensed under the **GNU General Public License v3.0** &mdash; see the [LICENSE](LICENSE) file for details.
+Glypdl is free and open-source software licensed under the **GNU General Public License v3.0 or later (GPL-3.0-or-later)** &mdash; see the [LICENSE](LICENSE) file for details.
+
+Copyright © 2026 Suresh S.
+
+### Third-Party Licenses & Notices
+Glypdl utilizes independent third-party open-source components that retain their respective original licenses:
+* **yt-dlp**: [The Unlicense](https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE) (Public Domain dedication) / [MIT License](https://opensource.org/licenses/MIT)
+* **FFmpeg**: [GNU Lesser General Public License (LGPL) v2.1+](https://www.ffmpeg.org/legal.html) / [GNU General Public License (GPL) v2+](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
+* **Windows App SDK & WinUI 3**: [MIT License](https://github.com/microsoft/WindowsAppSDK/blob/main/LICENSE)
+* **CommunityToolkit.Mvvm**: [MIT License](https://github.com/CommunityToolkit/dotnet/blob/main/License.md)
