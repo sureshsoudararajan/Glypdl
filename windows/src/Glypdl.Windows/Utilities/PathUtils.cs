@@ -22,7 +22,7 @@ public static class PathUtils
 
     public static string GetThumbnailsDir()
     {
-        string path = Path.Combine(GetCacheDir(), "Thumbnails");
+        string path = Path.Combine(GetAppDataDir(), "thumbnails");
         Directory.CreateDirectory(path);
         return path;
     }
