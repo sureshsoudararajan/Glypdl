@@ -18,6 +18,27 @@ export class HlsDashStrategy {
   }
 
   /**
+   * Check if an HLS URL is an internal sub-rendition, chunklist, or segment playlist
+   * rather than the primary/master playlist.
+   */
+  static isSubVariantPlaylist(url: string): boolean {
+    const cleanUrl = url.toLowerCase();
+    // Common sub-renditions / chunklists / audio-only / subtitle playlists
+    if (/(?:chunklist|layer_|sub-|subtitle|audio[\/_]|tracks?[\/-]|rendition[\/-]|frag-|seg-|\bpart\d+\.m3u8)/i.test(cleanUrl)) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Check if an HLS URL is likely the top-level Master / Root playlist.
+   */
+  static isMasterPlaylist(url: string): boolean {
+    const cleanUrl = url.toLowerCase();
+    return /(?:master|playlist|manifest|main|video|index)\.m3u8/i.test(cleanUrl);
+  }
+
+  /**
    * Create MediaItem for HLS or DASH stream.
    */
   static createStreamItem(url: string, type: 'hls' | 'dash', pageUrl: string, title?: string, mime?: string): MediaItem {

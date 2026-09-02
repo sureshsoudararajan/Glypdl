@@ -79,4 +79,69 @@ describe('MediaDeduplicator', () => {
     expect(dedup.getAll().length).toBe(1);
     expect(dedup.getAll()[0].thumbnailUrl).toBe('https://i.ytimg.com/vi/abc/maxresdefault.jpg');
   });
+
+  it('clusters HLS master and variant streams on same page into a single enriched item', () => {
+    const dedup = new MediaDeduplicator();
+
+    // 1. DOM detector discovers video element using MSE/blob, falls back to pageUrl with rich title & thumbnail
+    const domItem: MediaItem = {
+      id: 'dom-1',
+      url: 'https://mysite.com/watch/video-99',
+      pageUrl: 'https://mysite.com/watch/video-99',
+      title: 'Ullhplm13c3',
+      thumbnailUrl: 'https://mysite.com/posters/99.jpg',
+      duration: 1443,
+      formattedDuration: '24:03',
+      type: 'video',
+      format: 'mp4',
+      quality: '1080p',
+      site: 'mysite.com',
+      timestamp: 1000,
+      sourceStrategy: 'html5'
+    };
+
+    // 2. Network sniffer detects master playlist
+    const masterStream: MediaItem = {
+      id: 'net-master',
+      url: 'https://hls-cdn.mysite.com/hls/99/master.m3u8',
+      pageUrl: 'https://mysite.com/watch/video-99',
+      title: 'HLS Stream from hls-cdn.mysite.com',
+      type: 'hls',
+      format: 'm3u8',
+      quality: 'auto',
+      site: 'mysite.com',
+      timestamp: 1050,
+      sourceStrategy: 'hls'
+    };
+
+    // 3. Network sniffer detects rendition sub-playlist (chunklist/index)
+    const variantStream: MediaItem = {
+      id: 'net-variant',
+      url: 'https://hls-cdn.mysite.com/hls/99/1080p/index.m3u8',
+      pageUrl: 'https://mysite.com/watch/video-99',
+      title: 'HLS Stream from hls-cdn.mysite.com',
+      type: 'hls',
+      format: 'm3u8',
+      quality: 'auto',
+      site: 'mysite.com',
+      timestamp: 1100,
+      sourceStrategy: 'hls'
+    };
+
+    dedup.add(domItem);
+    dedup.add(masterStream);
+    dedup.add(variantStream);
+
+    const items = dedup.getAll();
+    // Must result in EXACTLY 1 clean item, not 3 duplicates!
+    expect(items.length).toBe(1);
+
+    const merged = items[0];
+    expect(merged.title).toBe('Ullhplm13c3');
+    expect(merged.thumbnailUrl).toBe('https://mysite.com/posters/99.jpg');
+    expect(merged.duration).toBe(1443);
+    expect(merged.quality).toBe('1080p');
+    expect(merged.url).toBe('https://hls-cdn.mysite.com/hls/99/master.m3u8');
+    expect(merged.format).toBe('m3u8');
+  });
 });

@@ -57,21 +57,22 @@ class PopupController {
     const activeTab = tabs[0];
     if (!activeTab || !activeTab.id) return;
 
-    // 1. Get cached tab media from background
-    browserApi.runtime.sendMessage({ action: 'get_tab_media', tabId: activeTab.id }, (response: any) => {
-      if (response?.items && response.items.length > 0) {
-        this.mediaItems = response.items;
-        this.renderMediaList();
-      }
-    });
-
-    // 2. Trigger active tab content script scan for immediate detection
-    try {
-      browserApi.tabs.sendMessage(activeTab.id, { action: 'scan_now' }, (res: any) => {
-        if (res?.items && res.items.length > 0) {
-          this.mediaItems = res.items;
+    const fetchUnifiedList = () => {
+      browserApi.runtime.sendMessage({ action: 'get_tab_media', tabId: activeTab.id }, (response: any) => {
+        if (response?.items) {
+          this.mediaItems = response.items;
           this.renderMediaList();
         }
+      });
+    };
+
+    // 1. Initial load from background
+    fetchUnifiedList();
+
+    // 2. Trigger active tab content script scan for immediate detection and sync
+    try {
+      browserApi.tabs.sendMessage(activeTab.id, { action: 'scan_now' }, () => {
+        fetchUnifiedList();
       });
     } catch {
       // Content script may not be loaded on internal pages
