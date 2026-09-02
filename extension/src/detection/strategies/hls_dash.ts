@@ -23,8 +23,7 @@ export class HlsDashStrategy {
    */
   static isSubVariantPlaylist(url: string): boolean {
     const cleanUrl = url.toLowerCase();
-    // Common sub-renditions / chunklists / audio-only / subtitle playlists
-    if (/(?:chunklist|layer_|sub-|subtitle|audio[\/_]|tracks?[\/-]|rendition[\/-]|frag-|seg-|\bpart\d+\.m3u8)/i.test(cleanUrl)) {
+    if (/(?:chunklist|layer_|sub-|subtitle|audio[\/_]|tracks?[\/-]|rendition[\/-]|frag-|seg-|\bpart\d+\.m3u8|\/audio\/|\/subtitles?\/)/i.test(cleanUrl)) {
       return true;
     }
     return false;
@@ -35,7 +34,8 @@ export class HlsDashStrategy {
    */
   static isMasterPlaylist(url: string): boolean {
     const cleanUrl = url.toLowerCase();
-    return /(?:master|playlist|manifest|main|video|index)\.m3u8/i.test(cleanUrl);
+    if (this.isSubVariantPlaylist(cleanUrl)) return false;
+    return /(?:master|playlist|manifest|main|video|all|index|hls|stream)\.m3u8/i.test(cleanUrl) || cleanUrl.endsWith('.m3u8');
   }
 
   /**

@@ -55,10 +55,12 @@ export class NetworkMediaSniffer {
       }
     }
 
+    const pageUrl = details.documentUrl || details.initiator || url;
+
     // 1. Check for HLS (.m3u8) or DASH (.mpd) stream manifests
     const streamType = HlsDashStrategy.isHlsOrDash(url, contentType);
     if (streamType) {
-      const item = HlsDashStrategy.createStreamItem(url, streamType, details.initiator || url);
+      const item = HlsDashStrategy.createStreamItem(url, streamType, pageUrl);
       this.onMediaDetected(tabId, item);
       return;
     }
@@ -84,22 +86,22 @@ export class NetworkMediaSniffer {
       }
 
       if (!title) {
-        title = `${inferred.type.toUpperCase()} stream from ${extractDomain(details.initiator || url)}`;
+        title = `${inferred.type.toUpperCase()} stream from ${extractDomain(pageUrl)}`;
       }
 
       const quality = inferred.type === 'video' ? inferMediaQuality(url) : 'audio';
 
       const item: MediaItem = {
-        id: generateMediaId(url, details.initiator || url),
+        id: generateMediaId(url, pageUrl),
         url,
-        pageUrl: details.initiator || url,
+        pageUrl,
         title,
         type: inferred.type,
         format: inferred.format,
         quality,
         fileSize: contentLength > 0 ? contentLength : undefined,
         mimeType: contentType,
-        site: extractDomain(details.initiator || url),
+        site: extractDomain(pageUrl),
         timestamp: Date.now(),
         sourceStrategy: 'network'
       };

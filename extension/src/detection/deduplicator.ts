@@ -1,56 +1,54 @@
 import { MediaItem } from '../shared/types';
-import { normalizeUrl } from '../shared/utils';
+import { extractDomain, normalizeUrl } from '../shared/utils';
 import { HlsDashStrategy } from './strategies/hls_dash';
 
 export class MediaDeduplicator {
-  private seen = new Map<string, MediaItem>();
+  private items: MediaItem[] = [];
 
   /**
    * Add a media item if it is not a duplicate. Returns true if newly added or updated with better metadata.
    */
   add(item: MediaItem): boolean {
-    // 1. If this is an HLS sub-variant playlist and we already have a stream on this page, absorb it
-    const isSubVariant = item.format === 'm3u8' && HlsDashStrategy.isSubVariantPlaylist(item.url);
-
-    // 2. Check for existing match across all stored items
     const existingMatch = this.findMatchingItem(item);
 
     if (existingMatch) {
       return this.mergeItems(existingMatch, item);
     }
 
-    // If it is an unattached sub-variant but no master exists yet, record it with master priority flag
-    const key = this.getDeduplicationKey(item);
-    
-    // Inherit thumbnail or title from existing page items if available
+    // Inherit thumbnail, duration or title from existing items if available
     this.propagatePageMetadata(item);
 
-    this.seen.set(key, item);
+    this.items.unshift(item);
     return true;
   }
 
   getAll(): MediaItem[] {
-    return Array.from(this.seen.values()).sort((a, b) => b.timestamp - a.timestamp);
+    return [...this.items].sort((a, b) => b.timestamp - a.timestamp);
   }
 
   get(id: string): MediaItem | undefined {
-    for (const it of this.seen.values()) {
-      if (it.id === id) return it;
-    }
-    return undefined;
+    return this.items.find((it) => it.id === id);
   }
 
   clear(): void {
-    this.seen.clear();
+    this.items = [];
   }
 
   private findMatchingItem(item: MediaItem): MediaItem | undefined {
     const itemNormUrl = normalizeUrl(item.url);
     const itemNormPage = normalizeUrl(item.pageUrl);
+    const itemDomain = extractDomain(item.pageUrl) || extractDomain(item.url);
+    const itemIsHls = item.type === 'hls' || item.format === 'm3u8' || item.url.includes('.m3u8');
+    const itemIsDash = item.type === 'dash' || item.format === 'mpd' || item.url.includes('.mpd');
+    const itemIsFallback = itemNormUrl === itemNormPage || item.sourceStrategy === 'html5' && !this.hasDirectMediaExt(item.url);
 
-    for (const existing of this.seen.values()) {
+    for (const existing of this.items) {
       const existNormUrl = normalizeUrl(existing.url);
       const existNormPage = normalizeUrl(existing.pageUrl);
+      const existDomain = extractDomain(existing.pageUrl) || extractDomain(existing.url);
+      const existIsHls = existing.type === 'hls' || existing.format === 'm3u8' || existing.url.includes('.m3u8');
+      const existIsDash = existing.type === 'dash' || existing.format === 'mpd' || existing.url.includes('.mpd');
+      const existIsFallback = existNormUrl === existNormPage || existing.sourceStrategy === 'html5' && !this.hasDirectMediaExt(existing.url);
 
       // 1. Exact URL match
       if (existNormUrl === itemNormUrl) {
@@ -59,47 +57,46 @@ export class MediaDeduplicator {
 
       // 2. YouTube canonical video match
       if (item.sourceStrategy === 'youtube' || existing.sourceStrategy === 'youtube') {
-        if (existNormPage === itemNormPage) {
+        if (existNormPage === itemNormPage || (itemDomain === 'youtube.com' && existDomain === 'youtube.com')) {
           return existing;
         }
       }
 
-      // 3. DOM fallback vs Real Stream match on same page:
-      // When DOM element was using MSE/blob and registered pageUrl, but network sniffer found real stream
-      if (existNormPage === itemNormPage) {
-        if (existNormUrl === existNormPage || itemNormUrl === itemNormPage) {
-          return existing;
-        }
+      // 3. Match DOM fallback item with real downloadable stream on the same page/tab
+      if ((existIsFallback && !itemIsFallback) || (!existIsFallback && itemIsFallback)) {
+        return existing;
+      }
 
-        // 4. Same HLS / DASH stream cluster on the same page
-        if ((existing.type === 'hls' || existing.format === 'm3u8') && (item.type === 'hls' || item.format === 'm3u8')) {
-          if (this.isSameHlsCluster(existing.url, item.url)) {
-            return existing;
-          }
-        }
+      // 4. Same HLS stream cluster on the tab (master playlist vs rendition/variant playlists)
+      if (existIsHls && itemIsHls) {
+        return existing;
+      }
 
-        if ((existing.type === 'dash' || existing.format === 'mpd') && (item.type === 'dash' || item.format === 'mpd')) {
-          return existing;
-        }
+      // 5. Same DASH stream cluster on the tab
+      if (existIsDash && itemIsDash) {
+        return existing;
+      }
+
+      // 6. Same direct media filename / video id in URL
+      if (this.isSameDirectMedia(existing.url, item.url)) {
+        return existing;
       }
     }
 
     return undefined;
   }
 
-  private isSameHlsCluster(url1: string, url2: string): boolean {
+  private hasDirectMediaExt(url: string): boolean {
+    return /\.(?:mp4|webm|mkv|mov|flv|mp3|m4a|aac|flac|wav|ogg|opus|m3u8|mpd)(?:[?#]|$)/i.test(url);
+  }
+
+  private isSameDirectMedia(url1: string, url2: string): boolean {
     try {
-      const u1 = new URL(url1);
-      const u2 = new URL(url2);
-      if (u1.hostname !== u2.hostname) return false;
-
-      // Check if they share the same directory path or base stream identifier
-      const p1 = u1.pathname.substring(0, u1.pathname.lastIndexOf('/'));
-      const p2 = u2.pathname.substring(0, u2.pathname.lastIndexOf('/'));
-      if (p1 === p2) return true;
-
-      // Or one is parent of the other
-      if (p1.startsWith(p2) || p2.startsWith(p1)) return true;
+      const p1 = new URL(url1).pathname.split('/').pop();
+      const p2 = new URL(url2).pathname.split('/').pop();
+      if (p1 && p2 && p1 === p2 && p1.length > 4) {
+        return true;
+      }
     } catch {
       // Ignored
     }
@@ -109,13 +106,13 @@ export class MediaDeduplicator {
   private mergeItems(existing: MediaItem, incoming: MediaItem): boolean {
     let updated = false;
 
-    // 1. URL & Format Selection: Prefer direct master stream URL over pageUrl fallback or sub-rendition
-    const existingIsFallback = normalizeUrl(existing.url) === normalizeUrl(existing.pageUrl);
-    const incomingIsFallback = normalizeUrl(incoming.url) === normalizeUrl(incoming.pageUrl);
-    const incomingIsMaster = incoming.format === 'm3u8' && HlsDashStrategy.isMasterPlaylist(incoming.url);
-    const existingIsMaster = existing.format === 'm3u8' && HlsDashStrategy.isMasterPlaylist(existing.url);
-    const incomingIsSubVariant = incoming.format === 'm3u8' && HlsDashStrategy.isSubVariantPlaylist(incoming.url);
+    const existingIsFallback = normalizeUrl(existing.url) === normalizeUrl(existing.pageUrl) || !this.hasDirectMediaExt(existing.url);
+    const incomingIsFallback = normalizeUrl(incoming.url) === normalizeUrl(incoming.pageUrl) || !this.hasDirectMediaExt(incoming.url);
+    const incomingIsMaster = HlsDashStrategy.isMasterPlaylist(incoming.url);
+    const existingIsMaster = HlsDashStrategy.isMasterPlaylist(existing.url);
+    const incomingIsSubVariant = HlsDashStrategy.isSubVariantPlaylist(incoming.url);
 
+    // 1. Upgrade URL to real downloadable master stream
     if (existingIsFallback && !incomingIsFallback) {
       existing.url = incoming.url;
       existing.format = incoming.format;
@@ -130,7 +127,7 @@ export class MediaDeduplicator {
       updated = true;
     }
 
-    // 2. Title: Prefer human-readable title over generic "HLS Stream...", "Video from...", "Media from..."
+    // 2. Title: Prefer human-readable video title over generic placeholder
     const existingIsGenericTitle = this.isGenericTitle(existing.title);
     const incomingIsGenericTitle = this.isGenericTitle(incoming.title);
 
@@ -169,25 +166,21 @@ export class MediaDeduplicator {
   }
 
   private propagatePageMetadata(item: MediaItem): void {
-    const itemNormPage = normalizeUrl(item.pageUrl);
-
-    for (const existing of this.seen.values()) {
-      if (normalizeUrl(existing.pageUrl) === itemNormPage) {
-        if (!item.thumbnailUrl && existing.thumbnailUrl) {
-          item.thumbnailUrl = existing.thumbnailUrl;
-        }
-        if (this.isGenericTitle(item.title) && !this.isGenericTitle(existing.title) && existing.title) {
-          item.title = existing.title;
-        }
-        if ((!item.duration || item.duration <= 0) && existing.duration && existing.duration > 0) {
-          item.duration = existing.duration;
-          item.formattedDuration = existing.formattedDuration;
-        }
-        if ((item.quality === 'auto' || !item.quality) && existing.quality && existing.quality !== 'auto') {
-          item.quality = existing.quality;
-        }
-        break;
+    for (const existing of this.items) {
+      if (!item.thumbnailUrl && existing.thumbnailUrl) {
+        item.thumbnailUrl = existing.thumbnailUrl;
       }
+      if (this.isGenericTitle(item.title) && !this.isGenericTitle(existing.title) && existing.title) {
+        item.title = existing.title;
+      }
+      if ((!item.duration || item.duration <= 0) && existing.duration && existing.duration > 0) {
+        item.duration = existing.duration;
+        item.formattedDuration = existing.formattedDuration;
+      }
+      if ((item.quality === 'auto' || !item.quality) && existing.quality && existing.quality !== 'auto') {
+        item.quality = existing.quality;
+      }
+      break;
     }
   }
 
@@ -201,12 +194,5 @@ export class MediaDeduplicator {
       lower.startsWith('dash stream from') ||
       lower.startsWith('audio stream from')
     );
-  }
-
-  private getDeduplicationKey(item: MediaItem): string {
-    if (item.sourceStrategy === 'youtube') {
-      return `youtube:${normalizeUrl(item.pageUrl)}`;
-    }
-    return `${normalizeUrl(item.url)}:${item.type}:${item.format}`;
   }
 }
