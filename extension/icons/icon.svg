@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 128 128" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3584e4" />
+      <stop offset="100%" stop-color="#1c71d8" />
+    </linearGradient>
+    <linearGradient id="badge-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e01b24" />
+      <stop offset="100%" stop-color="#c01c28" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity="0.25" />
+    </filter>
+  </defs>
+  
+  <!-- Base Squircle -->
+  <rect x="12" y="12" width="104" height="104" rx="24" ry="24" fill="url(#bg-grad)" filter="url(#shadow)" />
+
+  <!-- Media Badge Background -->
+  <rect x="22" y="22" width="84" height="52" rx="12" ry="12" fill="#ffffff" fill-opacity="0.15" />
+
+  <!-- Play Symbol / Film indicator -->
+  <polygon points="56,36 76,48 56,60" fill="#ffffff" fill-opacity="0.9" />
+
+  <!-- Downward Download Arrow -->
+  <g transform="translate(64, 82)">
+    <path d="M -16,-14 L 16,-14 L 16,-2 L 26,-2 L 0,22 L -26,-2 L -16,-2 Z" fill="#ffffff" />
+    <!-- Bottom bar -->
+    <rect x="-24" y="24" width="48" height="6" rx="3" ry="3" fill="#ffffff" />
+  </g>
+</svg>

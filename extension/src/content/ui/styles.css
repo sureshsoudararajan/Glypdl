@@ -1,0 +1,212 @@
+/* Scoped CSS for Glypdl in-page widgets */
+
+.glypdl-player-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 999999;
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.glypdl-player-btn:hover {
+  background: #3584e4;
+  border-color: #3584e4;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(53, 132, 228, 0.4);
+}
+
+.glypdl-player-btn:active {
+  transform: translateY(0);
+}
+
+.glypdl-floating-panel {
+  position: fixed;
+  z-index: 999998;
+  width: 320px;
+  background: #242424;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+  animation: glypdl-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.glypdl-floating-panel.bottom-right {
+  bottom: 20px;
+  right: 20px;
+}
+
+.glypdl-floating-panel.top-right {
+  top: 20px;
+  right: 20px;
+}
+
+.glypdl-floating-panel.bottom-left {
+  bottom: 20px;
+  left: 20px;
+}
+
+.glypdl-floating-panel.top-left {
+  top: 20px;
+  left: 20px;
+}
+
+@keyframes glypdl-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.glypdl-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glypdl-panel-brand {
+  font-size: 13px;
+  font-weight: 700;
+  color: #3584e4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.glypdl-panel-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.glypdl-panel-close:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.glypdl-panel-body {
+  padding: 12px 14px;
+  display: flex;
+  gap: 12px;
+}
+
+.glypdl-panel-thumb {
+  width: 72px;
+  height: 48px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #181818;
+  flex-shrink: 0;
+}
+
+.glypdl-panel-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.glypdl-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.glypdl-panel-meta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.glypdl-badge {
+  background: rgba(53, 132, 228, 0.2);
+  color: #78aeed;
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.glypdl-badge.protected {
+  background: rgba(230, 97, 0, 0.25);
+  color: #ffbe6f;
+}
+
+.glypdl-panel-actions {
+  padding: 8px 14px 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.glypdl-btn {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.glypdl-btn-primary {
+  background: #3584e4;
+  color: #ffffff;
+}
+
+.glypdl-btn-primary:hover {
+  background: #1c71d8;
+}
+
+.glypdl-btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.glypdl-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}

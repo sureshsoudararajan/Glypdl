@@ -323,6 +323,9 @@ class PreferencesDialog(Adw.PreferencesDialog):
         self.browser_dd.connect('notify::selected', self._on_browser_changed)
         self.profile_dd.connect('notify::selected', self._on_profile_changed)
 
+        # 4. Browser Extension Page
+        self._setup_extension_page()
+
     def _select_cookie_method(self, index: int):
         self.method_dd.set_selected(index)
 
@@ -594,3 +597,37 @@ class PreferencesDialog(Adw.PreferencesDialog):
         self.profiles_group.remove(row)
         if not self.cookie_service or not self.cookie_service.get_profiles():
             self._populate_profiles()
+
+    def _setup_extension_page(self):
+        """Build Browser Extension settings page."""
+        extension_page = Adw.PreferencesPage(
+            title="Extension",
+            icon_name="applications-internet-symbolic"
+        )
+        self.add(extension_page)
+
+        ext_group = Adw.PreferencesGroup(
+            title="Browser Companion",
+            description="Connect Firefox, LibreWolf, and Flatpak Firefox to Glypdl for one-click media downloads."
+        )
+        extension_page.add(ext_group)
+
+        self.native_host_row = Adw.ActionRow(
+            title="Firefox Native Messaging Host",
+            subtitle="Registers Glypdl host manifest with Firefox & LibreWolf"
+        )
+        register_btn = Gtk.Button(label="Register Host", valign=Gtk.Align.CENTER)
+        register_btn.connect('clicked', self._on_register_native_host)
+        self.native_host_row.add_suffix(register_btn)
+        ext_group.add(self.native_host_row)
+
+    def _on_register_native_host(self, button):
+        from glypdl.services.native_host import install_manifests
+        installed = install_manifests()
+        if installed:
+            self.native_host_row.set_subtitle(f"Registered in {len(installed)} browser locations.")
+            button.set_label("Registered ✓")
+            button.set_sensitive(False)
+        else:
+            self.native_host_row.set_subtitle("Registration failed. Check file permissions.")
+

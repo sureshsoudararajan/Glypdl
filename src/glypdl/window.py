@@ -281,6 +281,14 @@ class GlypdlWindow(Adw.ApplicationWindow):
         except Exception:
             pass
 
+    def handle_external_url(self, url: str, job_dict: dict = None):
+        """Handle a download request sent externally from the browser extension."""
+        if not url:
+            return
+        self.view_stack.set_visible_child_name("downloads")
+        self.url_input.entry.set_text(url)
+        self._on_url_submitted(self.url_input, url)
+
     def _on_url_submitted(self, widget, url: str, cookie_override: str = None, browser_override: str = None):
         self._dismiss_preview()
         self.fetch_spinner_box.set_visible(True)

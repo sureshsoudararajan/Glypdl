@@ -16,6 +16,7 @@ from glypdl.services.metadata import MetadataService
 from glypdl.services.downloader import DownloadManager
 from glypdl.services.history import HistoryService
 from glypdl.services.cookies import CookieService
+from glypdl.services.ipc import IPCServer
 from glypdl.utils.paths import ensure_dirs
 from glypdl.window import GlypdlWindow
 from glypdl.widgets.preferences import PreferencesDialog
@@ -27,7 +28,7 @@ class GlypdlApp(Adw.Application):
     def __init__(self):
         super().__init__(
             application_id=APP_ID,
-            flags=Gio.ApplicationFlags.FLAGS_NONE
+            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE
         )
         self.win = None
         self.settings = None
@@ -36,6 +37,7 @@ class GlypdlApp(Adw.Application):
         self.download_manager = None
         self.history_service = None
         self.cookie_service = None
+        self.ipc_server = None
 
     def do_startup(self):
         Adw.Application.do_startup(self)
@@ -54,12 +56,40 @@ class GlypdlApp(Adw.Application):
         self.download_manager = DownloadManager(self.ytdlp_service, self.settings)
         self.history_service = HistoryService()
 
+        # Start IPC server for browser extension native messaging
+        self.ipc_server = IPCServer(on_job_received=self._on_ipc_job_received)
+        self.ipc_server.start()
+
         # Apply appearance / theme
         self._apply_theme()
 
         # Actions and shortcuts
         self._setup_actions()
         self._setup_shortcuts()
+
+    def do_shutdown(self):
+        if self.ipc_server:
+            self.ipc_server.stop()
+        Adw.Application.do_shutdown(self)
+
+    def do_command_line(self, command_line):
+        args = command_line.get_arguments()
+        self.activate()
+        if len(args) > 1:
+            for arg in args[1:]:
+                if arg.startswith(("http://", "https://")):
+                    GLib.idle_add(lambda u=arg: self.win.handle_external_url(u) if self.win else None)
+                    break
+        return 0
+
+    def _on_ipc_job_received(self, job_dict: dict):
+        if not self.win:
+            self.activate()
+        if self.win:
+            self.win.present()
+            url = job_dict.get("url") or (job_dict.get("source") or {}).get("url")
+            if url:
+                self.win.handle_external_url(url, job_dict)
 
     def _setup_icon_theme(self):
         """Add application icon paths to Gtk.IconTheme search paths."""

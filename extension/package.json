@@ -1,0 +1,29 @@
+{
+  "name": "glypdl-firefox-extension",
+  "version": "1.0.0",
+  "description": "Firefox companion extension for Glypdl media downloader",
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch --mode development",
+    "build": "vite build && node scripts/package.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "glypdl",
+    "firefox",
+    "webextension",
+    "media-downloader",
+    "yt-dlp",
+    "video-downloader"
+  ],
+  "author": "Suresh Soundararajan <sureshsoundararajan18@gmail.com>",
+  "license": "GPL-3.0-or-later",
+  "devDependencies": {
+    "@types/webextension-polyfill": "^0.10.7",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11",
+    "vitest": "^1.6.0",
+    "webextension-polyfill": "^0.12.0"
+  }
+}

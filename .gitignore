@@ -22,6 +22,11 @@ build-dir/
 .flatpak-builder/
 repo/
 *.flatpak
+node_modules/
+extension/node_modules/
+extension/dist/
+*.xpi
+
 
 # Local Databases, Logs, and Test Artifacts
 *.db

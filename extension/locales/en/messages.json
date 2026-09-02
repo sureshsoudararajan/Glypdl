@@ -1,0 +1,14 @@
+{
+  "extensionName": {
+    "message": "Glypdl - Media Downloader Companion",
+    "description": "Name of the extension"
+  },
+  "extensionDescription": {
+    "message": "Detects video & audio media streams (YouTube, HTML5, HLS, DASH) and sends downloads directly to the Glypdl desktop application.",
+    "description": "Description of the extension"
+  },
+  "downloadWithGlypdl": {
+    "message": "Download with Glypdl",
+    "description": "Context menu title"
+  }
+}

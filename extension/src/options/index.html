@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Glypdl Extension Preferences</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="#3584e4">
+        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+      </svg>
+      <div>
+        <div class="title">Glypdl Companion Settings</div>
+        <div class="subtitle">Configure browser media detection and desktop app communication</div>
+      </div>
+    </header>
+
+    <!-- Connection Diagnostics -->
+    <div class="section">
+      <div class="section-title">Desktop Connection Status</div>
+      <div class="row">
+        <div>
+          <div class="row-label">Native Messaging Host</div>
+          <div class="row-desc">Connects the extension to the Glypdl desktop application via IPC</div>
+        </div>
+        <button id="test-connection-btn" class="btn">Test Connection</button>
+      </div>
+      <div id="connection-result" class="status-box" style="display: none;"></div>
+    </div>
+
+    <!-- Media Detection -->
+    <div class="section">
+      <div class="section-title">Media Detection Rules</div>
+      
+      <div class="row">
+        <div>
+          <div class="row-label">Enable Automatic Media Detection</div>
+          <div class="row-desc">Detect videos and audio streams on active webpages</div>
+        </div>
+        <input type="checkbox" id="autoDetect" />
+      </div>
+
+      <div class="row">
+        <div>
+          <div class="row-label">Detect HTML5 Video Elements</div>
+          <div class="row-desc">Inspect &lt;video&gt; and &lt;source&gt; tags</div>
+        </div>
+        <input type="checkbox" id="detectHtml5Video" />
+      </div>
+
+      <div class="row">
+        <div>
+          <div class="row-label">Detect HTML5 Audio Elements</div>
+          <div class="row-desc">Inspect &lt;audio&gt; tags and audio streams</div>
+        </div>
+        <input type="checkbox" id="detectHtml5Audio" />
+      </div>
+
+      <div class="row">
+        <div>
+          <div class="row-label">Detect HLS Streams (.m3u8)</div>
+          <div class="row-desc">HTTP Live Streaming manifests</div>
+        </div>
+        <input type="checkbox" id="detectHls" />
+      </div>
+
+      <div class="row">
+        <div>
+          <div class="row-label">Detect DASH Streams (.mpd)</div>
+          <div class="row-desc">Dynamic Adaptive Streaming over HTTP</div>
+        </div>
+        <input type="checkbox" id="detectDash" />
+      </div>
+
+      <div class="row">
+        <div>
+          <div class="row-label">Minimum File Size Filter (KB)</div>
+          <div class="row-desc">Ignore resources smaller than this size</div>
+        </div>
+        <input type="number" id="minFileSizeKb" min="0" max="10000" step="50" style="width: 80px;" />
+      </div>
+    </div>
+
+    <!-- In-Page UI -->
+    <div class="section">
+      <div class="section-title">In-Page Interface</div>
+
+      <div class="row">
+        <div>
+          <div class="row-label">Video Player Overlay Download Button</div>
+          <div class="row-desc">Display download button directly over HTML5 video players</div>
+        </div>
+        <input type="checkbox" id="showPlayerButton" />
+      </div>
+
+      <div class="row">
+        <div>
+          <div class="row-label">Floating Notification Badge Position</div>
+          <div class="row-desc">Corner position for the in-page detection notification</div>
+        </div>
+        <select id="floatingPanelPosition">
+          <option value="bottom-right">Bottom Right</option>
+          <option value="top-right">Top Right</option>
+          <option value="bottom-left">Bottom Left</option>
+          <option value="top-left">Top Left</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <div>
+          <div class="row-label">Theme</div>
+          <div class="row-desc">Color scheme for in-page widgets and popup</div>
+        </div>
+        <select id="theme">
+          <option value="system">System Default</option>
+          <option value="dark">Dark Theme</option>
+          <option value="light">Light Theme</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Privacy & Security -->
+    <div class="section">
+      <div class="section-title">Privacy & Local Operation</div>
+      <div class="row-desc" style="line-height: 1.6;">
+        🛡️ <b>100% Local & Private:</b> Glypdl never collects browsing history, passwords, or personal metrics.<br/>
+        🍪 <b>Zero Cookie Transmission:</b> Browser cookies are never extracted or transmitted by this extension. For authenticated media, Glypdl's local desktop application handles authentication directly on your computer.<br/>
+        🔒 <b>No DRM Circumvention:</b> Protected media is detected and flagged without attempting decryption.
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="index.ts"></script>
+</body>
+</html>

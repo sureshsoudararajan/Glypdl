@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Glypdl Companion</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+      </svg>
+      <span>Glypdl</span>
+    </div>
+    <div id="connection-status" class="status-badge disconnected">
+      <span class="status-dot"></span>
+      <span id="status-text">Connecting…</span>
+    </div>
+  </header>
+
+  <div class="content">
+    <div id="section-title" class="section-header" style="display: none;">Detected Media</div>
+    <div id="media-container" class="media-list"></div>
+
+    <div id="empty-state" class="empty-state">
+      <div class="empty-icon">🎬</div>
+      <div class="empty-title">No media detected</div>
+      <div class="empty-sub">Play a video or navigate to a media page to detect downloadable streams.</div>
+    </div>
+  </div>
+
+  <footer>
+    <button id="download-all-btn" class="footer-btn footer-btn-primary" style="display: none;">
+      Download All
+    </button>
+    <button id="options-btn" class="footer-btn">
+      Settings
+    </button>
+  </footer>
+
+  <script type="module" src="index.ts"></script>
+</body>
+</html>

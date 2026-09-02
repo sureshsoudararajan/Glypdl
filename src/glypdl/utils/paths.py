@@ -32,6 +32,15 @@ def get_default_download_dir() -> pathlib.Path:
 def get_database_path() -> pathlib.Path:
     return get_data_dir() / "history.db"
 
+def get_runtime_dir() -> pathlib.Path:
+    runtime = GLib.get_user_runtime_dir()
+    if runtime:
+        return pathlib.Path(runtime) / APP_NAME
+    return get_config_dir()
+
+def get_ipc_socket_path() -> pathlib.Path:
+    return get_runtime_dir() / "ipc.sock"
+
 def ensure_dirs() -> None:
     dirs = [
         get_data_dir(),
@@ -39,7 +48,9 @@ def ensure_dirs() -> None:
         get_cache_dir(),
         get_config_dir(),
         get_thumbnail_cache_dir(),
-        get_temp_dir()
+        get_temp_dir(),
+        get_runtime_dir()
     ]
     for d in dirs:
         d.mkdir(parents=True, exist_ok=True)
+

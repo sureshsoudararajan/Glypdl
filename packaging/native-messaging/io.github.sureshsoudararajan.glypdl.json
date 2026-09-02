@@ -1,0 +1,9 @@
+{
+  "name": "io.github.sureshsoudararajan.glypdl",
+  "description": "Glypdl Native Messaging Host for Firefox & LibreWolf",
+  "path": "/usr/bin/glypdl-host",
+  "type": "stdio",
+  "allowed_extensions": [
+    "glypdl@suresh.io"
+  ]
+}
