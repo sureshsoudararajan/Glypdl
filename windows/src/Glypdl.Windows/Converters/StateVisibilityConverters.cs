@@ -69,3 +69,36 @@ public class InverseBoolToVisibilityConverter : IValueConverter
 
     public object ConvertBack(object? value, Type targetType, object? parameter, string? language) => throw new NotImplementedException();
 }
+
+public class InverseBoolConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, string? language)
+    {
+        return value is bool b ? !b : true;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, string? language)
+    {
+        return value is bool b ? !b : false;
+    }
+}
+
+public class BoolToInfoBarSeverityConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, string? language)
+    {
+        return value is true ? Microsoft.UI.Xaml.Controls.InfoBarSeverity.Success : Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, string? language) => throw new NotImplementedException();
+}
+
+public class BoolToTestTitleConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, string? language)
+    {
+        return value is true ? "Browser Authentication Success" : "Browser Authentication Notice";
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, string? language) => throw new NotImplementedException();
+}

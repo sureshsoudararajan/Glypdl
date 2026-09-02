@@ -34,13 +34,65 @@ public partial class SettingsViewModel : ObservableObject
     private string _extraArguments = string.Empty;
 
     [ObservableProperty]
-    private bool _useCookies;
+    private int _cookieMethodIndex; // 0: None, 1: Browser, 2: File
 
-    partial void OnUseCookiesChanged(bool value)
+    partial void OnCookieMethodIndexChanged(int value)
     {
+        OnPropertyChanged(nameof(IsCookieMethodNone));
+        OnPropertyChanged(nameof(IsCookieMethodBrowser));
+        OnPropertyChanged(nameof(IsCookieMethodFile));
+        UseCookies = value != 0;
         UpdateProfileActiveStates();
         SaveSettings();
     }
+
+    public bool IsCookieMethodNone => CookieMethodIndex == 0;
+    public bool IsCookieMethodBrowser => CookieMethodIndex == 1;
+    public bool IsCookieMethodFile => CookieMethodIndex == 2;
+
+    [ObservableProperty]
+    private BrowserInfo? _selectedBrowser;
+
+    partial void OnSelectedBrowserChanged(BrowserInfo? value)
+    {
+        RefreshBrowserProfiles();
+        UpdateChromiumPolicyInfo();
+        SaveSettings();
+    }
+
+    [ObservableProperty]
+    private string? _selectedBrowserProfile = "Default";
+
+    partial void OnSelectedBrowserProfileChanged(string? value)
+    {
+        SaveSettings();
+    }
+
+    [ObservableProperty]
+    private KeyringInfo? _selectedKeyring;
+
+    partial void OnSelectedKeyringChanged(KeyringInfo? value)
+    {
+        SaveSettings();
+    }
+
+    [ObservableProperty]
+    private bool _isTestingBrowser;
+
+    [ObservableProperty]
+    private string _browserTestStatus = string.Empty;
+
+    [ObservableProperty]
+    private bool _browserTestSuccess;
+
+    [ObservableProperty]
+    private bool _showBrowserTestResult;
+
+    [ObservableProperty]
+    private string _browserTestDetails = string.Empty;
+
+    [ObservableProperty]
+    private bool _useCookies;
 
     [ObservableProperty]
     private string _activeCookieFile = string.Empty;
@@ -57,6 +109,24 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _detectedYtDlpVersion = "Checking...";
 
+    [ObservableProperty]
+    private bool _isChromiumBrowserSelected;
+
+    [ObservableProperty]
+    private string _chromiumEnablePolicyCommand = string.Empty;
+
+    [ObservableProperty]
+    private string _chromiumRestorePolicyCommand = string.Empty;
+
+    [ObservableProperty]
+    private string _selectedBrowserFriendlyName = string.Empty;
+
+    [ObservableProperty]
+    private string _copyStatusMessage = string.Empty;
+
+    public ObservableCollection<BrowserInfo> DiscoveredBrowsers { get; } = new();
+    public ObservableCollection<string> BrowserProfiles { get; } = new();
+    public ObservableCollection<KeyringInfo> SupportedKeyrings { get; } = new();
     public ObservableCollection<CookieProfile> CookieProfiles { get; } = new();
 
     public SettingsViewModel(
@@ -83,6 +153,26 @@ public partial class SettingsViewModel : ObservableObject
         UseCookies = s.UseCookies;
         ActiveCookieFile = s.ActiveCookieFile;
 
+        string effectiveMethod = s.GetEffectiveCookieMethod();
+        CookieMethodIndex = effectiveMethod switch
+        {
+            "browser" => 1,
+            "file" => 2,
+            _ => 0
+        };
+
+        // Initialize keyrings
+        SupportedKeyrings.Clear();
+        foreach (var k in _cookieService.GetSupportedKeyrings())
+        {
+            SupportedKeyrings.Add(k);
+        }
+        SelectedKeyring = SupportedKeyrings.FirstOrDefault(k => k.Id.Equals(s.BrowserKeyring, StringComparison.OrdinalIgnoreCase))
+            ?? SupportedKeyrings.FirstOrDefault();
+
+        // Initialize browsers
+        RefreshDiscoveredBrowsers(s.BrowserName, s.BrowserProfile);
+
         RefreshProfiles();
 
         if (!string.IsNullOrWhiteSpace(s.ActiveCookieProfileId))
@@ -94,8 +184,152 @@ public partial class SettingsViewModel : ObservableObject
             ActiveCookieFile = SelectedCookieProfile.FilePath;
         }
 
+        UpdateChromiumPolicyInfo();
         UpdateProfileActiveStates();
         _ = RefreshVersionAsync();
+    }
+
+    public void RefreshDiscoveredBrowsers(string? targetBrowser = null, string? targetProfile = null)
+    {
+        DiscoveredBrowsers.Clear();
+        var list = _cookieService.DiscoverInstalledBrowsers(forceRefresh: true);
+        foreach (var b in list)
+        {
+            DiscoveredBrowsers.Add(b);
+        }
+
+        if (!string.IsNullOrWhiteSpace(targetBrowser))
+        {
+            SelectedBrowser = DiscoveredBrowsers.FirstOrDefault(b => b.Id.Equals(targetBrowser, StringComparison.OrdinalIgnoreCase))
+                ?? DiscoveredBrowsers.FirstOrDefault(b => b.IsInstalled)
+                ?? DiscoveredBrowsers.FirstOrDefault();
+        }
+        else
+        {
+            SelectedBrowser = DiscoveredBrowsers.FirstOrDefault(b => b.IsInstalled) ?? DiscoveredBrowsers.FirstOrDefault();
+        }
+
+        RefreshBrowserProfiles(targetProfile);
+    }
+
+    private void RefreshBrowserProfiles(string? targetProfile = null)
+    {
+        BrowserProfiles.Clear();
+        if (SelectedBrowser != null && SelectedBrowser.Profiles.Count > 0)
+        {
+            foreach (var p in SelectedBrowser.Profiles)
+            {
+                BrowserProfiles.Add(p);
+            }
+        }
+        else
+        {
+            BrowserProfiles.Add("Default");
+        }
+
+        if (!string.IsNullOrWhiteSpace(targetProfile) && BrowserProfiles.Contains(targetProfile))
+        {
+            SelectedBrowserProfile = targetProfile;
+        }
+        else
+        {
+            SelectedBrowserProfile = BrowserProfiles.FirstOrDefault() ?? "Default";
+        }
+    }
+
+    [RelayCommand]
+    public async Task TestBrowserCookiesAsync()
+    {
+        if (SelectedBrowser == null) return;
+
+        IsTestingBrowser = true;
+        ShowBrowserTestResult = false;
+        BrowserTestStatus = "Testing browser cookie extraction...";
+
+        string spec = _cookieService.BuildBrowserSpec(
+            SelectedBrowser.Id,
+            SelectedBrowserProfile,
+            SelectedKeyring?.Id);
+
+        var (success, msg, details) = await _cookieService.TestBrowserCookiesAsync(spec);
+
+        Utilities.DispatcherHelper.ExecuteOnUIThread(() =>
+        {
+            IsTestingBrowser = false;
+            BrowserTestSuccess = success;
+            BrowserTestStatus = msg;
+            BrowserTestDetails = details;
+            ShowBrowserTestResult = true;
+        });
+    }
+
+    [RelayCommand]
+    public void RefreshBrowsers()
+    {
+        RefreshDiscoveredBrowsers(SelectedBrowser?.Id, SelectedBrowserProfile);
+        UpdateChromiumPolicyInfo();
+    }
+
+    public void UpdateChromiumPolicyInfo()
+    {
+        string? id = SelectedBrowser?.Id?.ToLowerInvariant();
+        if (id == "firefox" || id == "librewolf" || string.IsNullOrWhiteSpace(id))
+        {
+            IsChromiumBrowserSelected = false;
+            ChromiumEnablePolicyCommand = string.Empty;
+            ChromiumRestorePolicyCommand = string.Empty;
+            SelectedBrowserFriendlyName = SelectedBrowser?.Name ?? "Browser";
+            return;
+        }
+
+        IsChromiumBrowserSelected = true;
+        SelectedBrowserFriendlyName = SelectedBrowser?.Name ?? "Chromium Browser";
+
+        string policySubKey = id switch
+        {
+            "edge" => @"Microsoft\Edge",
+            "chrome" => @"Google\Chrome",
+            "brave" => @"BraveSoftware\Brave",
+            "chromium" => @"Chromium",
+            "vivaldi" => @"Vivaldi",
+            "opera" => @"Opera Software",
+            _ => @"Google\Chrome"
+        };
+
+        ChromiumEnablePolicyCommand = $"reg add \"HKLM\\SOFTWARE\\Policies\\{policySubKey}\" /v ApplicationBoundEncryptionEnabled /t REG_DWORD /d 0 /f";
+        ChromiumRestorePolicyCommand = $"reg delete \"HKLM\\SOFTWARE\\Policies\\{policySubKey}\" /v ApplicationBoundEncryptionEnabled /f";
+    }
+
+    [RelayCommand]
+    public async Task CopyEnableAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ChromiumEnablePolicyCommand)) return;
+        try
+        {
+            var dataPackage = new global::Windows.ApplicationModel.DataTransfer.DataPackage();
+            dataPackage.SetText(ChromiumEnablePolicyCommand);
+            global::Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+            CopyStatusMessage = $"Command for {SelectedBrowserFriendlyName} copied! ✅";
+            await Task.Delay(3000);
+            CopyStatusMessage = string.Empty;
+        }
+        catch { }
+    }
+
+    [RelayCommand]
+    public async Task CopyRestoreAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ChromiumRestorePolicyCommand)) return;
+        try
+        {
+            var dataPackage = new global::Windows.ApplicationModel.DataTransfer.DataPackage();
+            dataPackage.SetText(ChromiumRestorePolicyCommand);
+            global::Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
+            CopyStatusMessage = $"Restore command for {SelectedBrowserFriendlyName} copied! ✅";
+            await Task.Delay(3000);
+            CopyStatusMessage = string.Empty;
+        }
+        catch { }
     }
 
     [ObservableProperty]
@@ -118,6 +352,13 @@ public partial class SettingsViewModel : ObservableObject
 
     public void SaveSettings()
     {
+        string method = CookieMethodIndex switch
+        {
+            1 => "browser",
+            2 => "file",
+            _ => "none"
+        };
+
         var s = new AppSettings
         {
             DownloadDirectory = DownloadDirectory,
@@ -128,9 +369,13 @@ public partial class SettingsViewModel : ObservableObject
             CustomYtDlpPath = CustomYtDlpPath,
             CustomFFmpegPath = CustomFFmpegPath,
             ExtraArguments = ExtraArguments,
-            UseCookies = UseCookies,
+            UseCookies = CookieMethodIndex != 0,
+            CookieMethod = method,
             ActiveCookieProfileId = SelectedCookieProfile?.Id ?? string.Empty,
-            ActiveCookieFile = ActiveCookieFile
+            ActiveCookieFile = ActiveCookieFile,
+            BrowserName = SelectedBrowser?.Id ?? "edge",
+            BrowserProfile = SelectedBrowserProfile ?? "Default",
+            BrowserKeyring = SelectedKeyring?.Id ?? "auto"
         };
 
         _settingsService.SaveSettings(s);

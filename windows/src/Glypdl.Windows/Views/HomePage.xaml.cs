@@ -45,13 +45,35 @@ public partial class HomePage : Page
             };
 
             var items = new List<CookieOptionItem>();
+
+            // 1. Add Installed Browsers
+            var discoveredBrowsers = cookieService.DiscoverInstalledBrowsers().Where(b => b.IsInstalled).ToList();
+            foreach (var b in discoveredBrowsers)
+            {
+                foreach (var prof in b.Profiles)
+                {
+                    string spec = cookieService.BuildBrowserSpec(b.Id, prof, settings.BrowserKeyring);
+                    string label = prof == "Default" ? $"🌐 {b.Name}" : $"🌐 {b.Name} ({prof})";
+                    items.Add(new CookieOptionItem
+                    {
+                        Type = "browser",
+                        DisplayName = label,
+                        Spec = $"browser:{spec}",
+                        FilePath = string.Empty,
+                        Description = $"Extract session cookies directly from {b.Name}"
+                    });
+                }
+            }
+
+            // 2. Add Saved Cookie Profiles
             foreach (var p in profiles)
             {
                 if (p.Exists)
                 {
                     items.Add(new CookieOptionItem
                     {
-                        DisplayName = $"{p.Name} ({System.IO.Path.GetFileName(p.FilePath)})",
+                        Type = "file",
+                        DisplayName = $"📁 {p.Name} ({System.IO.Path.GetFileName(p.FilePath)})",
                         FilePath = p.FilePath
                     });
                 }
@@ -59,6 +81,7 @@ public partial class HomePage : Page
 
             var browseOption = new CookieOptionItem
             {
+                Type = "file",
                 DisplayName = "📂 Browse for other cookie file…",
                 FilePath = "__browse__"
             };
@@ -81,7 +104,7 @@ public partial class HomePage : Page
                 };
                 var warningText = new TextBlock
                 {
-                    Text = "⚠️ Cookies are currently turned OFF in Settings.\nSelecting or importing a cookie file below will automatically enable cookies and retry the download.",
+                    Text = "⚠️ Cookies are currently turned OFF in Settings.\nSelecting or importing an authentication source below will automatically enable cookies and retry.",
                     TextWrapping = TextWrapping.Wrap,
                     FontSize = 12
                 };
@@ -89,18 +112,33 @@ public partial class HomePage : Page
                 stack.Children.Add(warningBorder);
             }
 
+            string friendlyErrorMsg;
+            string lowerError = (errorMsg ?? string.Empty).ToLowerInvariant();
+            if (lowerError.Contains("could not copy") || lowerError.Contains("permission denied") || lowerError.Contains("permissionerror") || lowerError.Contains("database is locked") || lowerError.Contains("locked"))
+            {
+                friendlyErrorMsg = "Your browser is currently running and has locked its cookie file. Please close your web browser completely (including background tasks in Task Manager), or select / import a Netscape cookies.txt file below.";
+            }
+            else if (lowerError.Contains("failed to decrypt with dpapi") || lowerError.Contains("10927") || lowerError.Contains("app-bound"))
+            {
+                friendlyErrorMsg = "Microsoft Edge / Chrome encryption prevents direct extraction by yt-dlp. Please select or import a Netscape cookies.txt file exported with the 'Get cookies.txt LOCALLY' extension, or use Firefox.";
+            }
+            else
+            {
+                friendlyErrorMsg = "This video or site requires login credentials or authentication cookies:\n\n" + 
+                                  (!string.IsNullOrWhiteSpace(errorMsg) && errorMsg.Length > 220 ? errorMsg.Substring(0, 220) + "..." : (errorMsg ?? string.Empty));
+            }
+
             stack.Children.Add(new TextBlock
             {
-                Text = "This video or site requires login credentials or authentication cookies:\n\n" + 
-                       (errorMsg.Length > 220 ? errorMsg.Substring(0, 220) + "..." : errorMsg),
+                Text = friendlyErrorMsg,
                 TextWrapping = TextWrapping.Wrap,
-                Opacity = 0.8,
+                Opacity = 0.9,
                 FontSize = 13
             });
 
             stack.Children.Add(new TextBlock
             {
-                Text = "Select a Cookie Profile or browse for a Netscape cookies.txt file to retry:",
+                Text = "Select an Authentication source or browse for a cookies.txt file to retry:",
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 FontSize = 13
             });
@@ -128,39 +166,52 @@ public partial class HomePage : Page
                 var selected = combo.SelectedItem as CookieOptionItem;
                 if (selected != null)
                 {
-                    string? cookiePathToUse = selected.FilePath;
-                    if (cookiePathToUse == "__browse__")
+                    if (selected.Type == "browser" && !string.IsNullOrWhiteSpace(selected.Spec))
                     {
-                        var picker = new global::Windows.Storage.Pickers.FileOpenPicker();
-                        picker.SuggestedStartLocation = global::Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary;
-                        picker.FileTypeFilter.Add(".txt");
-                        picker.FileTypeFilter.Add(".cookies");
-                        picker.FileTypeFilter.Add("*");
+                        settings.UseCookies = true;
+                        settings.CookieMethod = "browser";
+                        settings.BrowserName = selected.Spec.Replace("browser:", "").Split(':')[0];
+                        settingsService.SaveSettings(settings);
 
-                        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
-                        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+                        _ = ViewModel.FetchMetadataWithCookieAsync(url, selected.Spec);
+                    }
+                    else
+                    {
+                        string? cookiePathToUse = selected.FilePath;
+                        if (cookiePathToUse == "__browse__")
+                        {
+                            var picker = new global::Windows.Storage.Pickers.FileOpenPicker();
+                            picker.SuggestedStartLocation = global::Windows.Storage.Pickers.PickerLocationId.DocumentsLibrary;
+                            picker.FileTypeFilter.Add(".txt");
+                            picker.FileTypeFilter.Add(".cookies");
+                            picker.FileTypeFilter.Add("*");
 
-                        var file = await picker.PickSingleFileAsync();
-                        cookiePathToUse = file?.Path;
+                            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
+                            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+
+                            var file = await picker.PickSingleFileAsync();
+                            cookiePathToUse = file?.Path;
+
+                            if (!string.IsNullOrWhiteSpace(cookiePathToUse))
+                            {
+                                string autoName = file?.Name != null ? System.IO.Path.GetFileNameWithoutExtension(file.Name) : "Cookies";
+                                if (!string.IsNullOrWhiteSpace(autoName) && autoName.Length > 1)
+                                {
+                                    autoName = char.ToUpper(autoName[0]) + autoName[1..];
+                                }
+                                cookieService.AddProfile(autoName, cookiePathToUse);
+                            }
+                        }
 
                         if (!string.IsNullOrWhiteSpace(cookiePathToUse))
                         {
-                            string autoName = file?.Name != null ? System.IO.Path.GetFileNameWithoutExtension(file.Name) : "Cookies";
-                            if (!string.IsNullOrWhiteSpace(autoName) && autoName.Length > 1)
-                            {
-                                autoName = char.ToUpper(autoName[0]) + autoName[1..];
-                            }
-                            cookieService.AddProfile(autoName, cookiePathToUse);
+                            settings.UseCookies = true;
+                            settings.CookieMethod = "file";
+                            settings.ActiveCookieFile = cookiePathToUse;
+                            settingsService.SaveSettings(settings);
+
+                            _ = ViewModel.FetchMetadataWithCookieAsync(url, cookiePathToUse);
                         }
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(cookiePathToUse))
-                    {
-                        settings.UseCookies = true;
-                        settings.ActiveCookieFile = cookiePathToUse;
-                        settingsService.SaveSettings(settings);
-
-                        _ = ViewModel.FetchMetadataWithCookieAsync(url, cookiePathToUse);
                     }
                 }
             }

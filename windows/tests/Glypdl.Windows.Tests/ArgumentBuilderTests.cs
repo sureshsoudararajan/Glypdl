@@ -91,4 +91,57 @@ public class ArgumentBuilderTests
             if (File.Exists(tempFile)) File.Delete(tempFile);
         }
     }
+
+    [Fact]
+    public void CookieService_BuildBrowserSpec_ShouldFormatCorrectly()
+    {
+        var settingsService = new MockSettingsService();
+        var cookieService = new CookieService(settingsService);
+
+        Assert.Equal("edge", cookieService.BuildBrowserSpec("edge"));
+        Assert.Equal("chrome", cookieService.BuildBrowserSpec("chrome", "Default"));
+        Assert.Equal("chrome:Profile 1", cookieService.BuildBrowserSpec("chrome", "Profile 1"));
+        Assert.Equal("firefox:default-release", cookieService.BuildBrowserSpec("firefox", "default-release"));
+        Assert.Equal("edge+basictext", cookieService.BuildBrowserSpec("edge", "Default", "basictext"));
+        Assert.Equal(string.Empty, cookieService.BuildBrowserSpec("none"));
+    }
+
+    [Fact]
+    public void BuildDownloadArguments_WithBrowserCookies_ShouldIncludeCookiesFromBrowserFlag()
+    {
+        var settingsService = new MockSettingsService();
+        var ytdlpService = new YtDlpService(settingsService);
+
+        var args = ytdlpService.BuildDownloadArguments(
+            url: "https://example.com/video",
+            cookieFile: "browser:edge:Default"
+        );
+
+        Assert.Contains("--cookies-from-browser", args);
+        Assert.Contains("edge:Default", args);
+    }
+
+    [Fact]
+    public void BuildMetadataArguments_WithBrowserCookies_ShouldIncludeCookiesFromBrowserFlag()
+    {
+        var settingsService = new MockSettingsService();
+        var ytdlpService = new YtDlpService(settingsService);
+
+        var args = ytdlpService.BuildMetadataArguments("https://example.com/video", "browser:chrome");
+
+        Assert.Contains("--cookies-from-browser", args);
+        Assert.Contains("chrome", args);
+    }
+
+    [Fact]
+    public void CookieService_DiscoverInstalledBrowsers_ShouldReturnSupportedBrowsers()
+    {
+        var settingsService = new MockSettingsService();
+        var cookieService = new CookieService(settingsService);
+
+        var browsers = cookieService.DiscoverInstalledBrowsers();
+        Assert.NotEmpty(browsers);
+        Assert.Contains(browsers, b => b.Id == "edge");
+        Assert.Contains(browsers, b => b.Id == "chrome");
+    }
 }

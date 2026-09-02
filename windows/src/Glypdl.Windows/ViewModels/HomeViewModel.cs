@@ -133,11 +133,39 @@ public partial class HomeViewModel : ObservableObject
     public void PopulateCookieOptions(string? activeCookiePath = null)
     {
         CookieOptions.Clear();
-        var defaultOption = new CookieOptionItem { DisplayName = "No Cookies", FilePath = string.Empty };
+        var defaultOption = new CookieOptionItem
+        {
+            Type = "none",
+            DisplayName = "None (Anonymous)",
+            FilePath = string.Empty,
+            Spec = string.Empty,
+            Description = "No authentication cookies attached"
+        };
         CookieOptions.Add(defaultOption);
 
-        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var settings = _settingsService.GetSettings();
 
+        // 1. Add Discovered Installed Browsers
+        var installedBrowsers = _cookieService.DiscoverInstalledBrowsers().Where(b => b.IsInstalled).ToList();
+        foreach (var b in installedBrowsers)
+        {
+            foreach (var prof in b.Profiles)
+            {
+                string spec = _cookieService.BuildBrowserSpec(b.Id, prof, settings.BrowserKeyring);
+                string label = prof == "Default" ? $"🌐 {b.Name}" : $"🌐 {b.Name} ({prof})";
+                CookieOptions.Add(new CookieOptionItem
+                {
+                    Type = "browser",
+                    DisplayName = label,
+                    Spec = $"browser:{spec}",
+                    FilePath = string.Empty,
+                    Description = $"Extract session cookies from {b.Name}"
+                });
+            }
+        }
+
+        // 2. Add Saved Netscape Cookie Files & Profiles
+        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var profiles = _cookieService.GetProfiles();
         foreach (var p in profiles)
         {
@@ -146,21 +174,26 @@ public partial class HomeViewModel : ObservableObject
                 string baseName = System.IO.Path.GetFileName(p.FilePath);
                 CookieOptions.Add(new CookieOptionItem
                 {
-                    DisplayName = $"{p.Name} ({baseName})",
-                    FilePath = p.FilePath
+                    Type = "file",
+                    DisplayName = $"📁 {p.Name} ({baseName})",
+                    FilePath = p.FilePath,
+                    Spec = string.Empty,
+                    Description = $"Netscape cookie file: {p.FilePath}"
                 });
                 seenPaths.Add(p.FilePath);
             }
         }
 
-        var settings = _settingsService.GetSettings();
         if (!string.IsNullOrWhiteSpace(settings.ActiveCookieFile) && File.Exists(settings.ActiveCookieFile) && !seenPaths.Contains(settings.ActiveCookieFile))
         {
             string baseName = System.IO.Path.GetFileName(settings.ActiveCookieFile);
             CookieOptions.Add(new CookieOptionItem
             {
-                DisplayName = $"Default Cookie ({baseName})",
-                FilePath = settings.ActiveCookieFile
+                Type = "file",
+                DisplayName = $"📁 Default Cookie ({baseName})",
+                FilePath = settings.ActiveCookieFile,
+                Spec = string.Empty,
+                Description = $"Active cookie file: {settings.ActiveCookieFile}"
             });
             seenPaths.Add(settings.ActiveCookieFile);
         }
@@ -170,15 +203,31 @@ public partial class HomeViewModel : ObservableObject
         CookieOptionItem? chosen = null;
         if (!string.IsNullOrWhiteSpace(activeCookiePath))
         {
-            chosen = CookieOptions.FirstOrDefault(c => string.Equals(c.FilePath, activeCookiePath, StringComparison.OrdinalIgnoreCase));
+            if (activeCookiePath.StartsWith("browser:", StringComparison.OrdinalIgnoreCase))
+            {
+                chosen = CookieOptions.FirstOrDefault(c => string.Equals(c.Spec, activeCookiePath, StringComparison.OrdinalIgnoreCase));
+            }
+            else
+            {
+                chosen = CookieOptions.FirstOrDefault(c => string.Equals(c.FilePath, activeCookiePath, StringComparison.OrdinalIgnoreCase));
+            }
         }
 
         if (chosen == null && settings.UseCookies)
         {
-            string? active = _cookieService.GetActiveCookiePath();
-            if (!string.IsNullOrWhiteSpace(active))
+            string method = settings.GetEffectiveCookieMethod();
+            if (method == "browser")
             {
-                chosen = CookieOptions.FirstOrDefault(c => string.Equals(c.FilePath, active, StringComparison.OrdinalIgnoreCase));
+                string spec = $"browser:{_cookieService.BuildBrowserSpec(settings.BrowserName, settings.BrowserProfile, settings.BrowserKeyring)}";
+                chosen = CookieOptions.FirstOrDefault(c => string.Equals(c.Spec, spec, StringComparison.OrdinalIgnoreCase));
+            }
+            else if (method == "file")
+            {
+                string? active = _cookieService.GetActiveCookiePath();
+                if (!string.IsNullOrWhiteSpace(active))
+                {
+                    chosen = CookieOptions.FirstOrDefault(c => string.Equals(c.FilePath, active, StringComparison.OrdinalIgnoreCase));
+                }
             }
         }
 
@@ -197,16 +246,36 @@ public partial class HomeViewModel : ObservableObject
             return false;
         }
 
-        string[] authKeywords = { "sign in", "login", "cookie", "bot", "confirm", "private", "members", "403", "forbidden", "authenticate", "permission", "unauthorized", "account", "checkpoint", "rate-limit" };
+        string[] authKeywords = {
+            "sign in", "login", "cookie", "bot", "confirm", "private", "members", "403", "forbidden",
+            "authenticate", "permission", "unauthorized", "account", "checkpoint", "rate-limit",
+            "dpapi", "10927", "7271", "app-bound", "could not copy", "permission denied", "permissionerror",
+            "database is locked", "locked", "operationalerror", "extract_chrome_cookies", "extract_cookies_from_browser"
+        };
         return authKeywords.Any(k => lower.Contains(k));
     }
 
     [RelayCommand]
     public async Task FetchMetadataAsync()
     {
-        string? activeCookie = _settingsService.GetSettings().UseCookies
-            ? _cookieService.GetActiveCookiePath()
-            : null;
+        string? activeCookie = null;
+        var settings = _settingsService.GetSettings();
+        if (settings.UseCookies)
+        {
+            string method = settings.GetEffectiveCookieMethod();
+            if (method == "browser")
+            {
+                string spec = _cookieService.BuildBrowserSpec(settings.BrowserName, settings.BrowserProfile, settings.BrowserKeyring);
+                if (!string.IsNullOrWhiteSpace(spec))
+                {
+                    activeCookie = $"browser:{spec}";
+                }
+            }
+            else if (method == "file")
+            {
+                activeCookie = _cookieService.GetActiveCookiePath();
+            }
+        }
         await FetchMetadataInternalAsync(UrlInput?.Trim() ?? string.Empty, activeCookie);
     }
 
@@ -332,15 +401,26 @@ public partial class HomeViewModel : ObservableObject
                     IsAuthWarningVisible = true;
                     AuthWarningTitle = "Authentication / Cookies Required";
 
-                    if (cookiesDisabled)
+                    string lowerErr = ex.Message.ToLowerInvariant();
+                    if (lowerErr.Contains("dpapi") || lowerErr.Contains("10927") || lowerErr.Contains("app-bound"))
                     {
-                        AuthWarningMessage = "This site requires authentication cookies to access media. Cookies are currently turned OFF. Please enable Cookies in Settings or import a cookies.txt file to download.";
-                        StatusMessage = "Authentication Required: Cookies toggle is OFF in Settings. Please turn ON cookies and import cookies.txt.";
+                        AuthWarningMessage = "Due to Chromium App-Bound Encryption on Windows, cookies cannot be directly extracted from Edge/Chrome. Please use Firefox or export a cookies.txt file with a browser extension and select it below to retry.";
+                        StatusMessage = string.Empty;
+                    }
+                    else if (lowerErr.Contains("could not copy") || lowerErr.Contains("permission denied") || lowerErr.Contains("permissionerror") || lowerErr.Contains("database is locked") || lowerErr.Contains("locked"))
+                    {
+                        AuthWarningMessage = "Your browser is currently running and has locked its cookie file. Please close your web browser completely (including background tasks) or select/import a Netscape cookies.txt file.";
+                        StatusMessage = string.Empty;
+                    }
+                    else if (cookiesDisabled)
+                    {
+                        AuthWarningMessage = "This site requires authentication cookies to access media. Cookies are currently turned OFF. Please enable Cookies in Settings or select/import a cookies.txt file to download.";
+                        StatusMessage = string.Empty;
                     }
                     else
                     {
-                        AuthWarningMessage = "This site requires login credentials or an updated cookies.txt file. Please select or import a cookie profile.";
-                        StatusMessage = "Authentication Required: Please select or import a valid cookies.txt file.";
+                        AuthWarningMessage = "This site requires login credentials or an updated cookie file. Please select or import a cookie profile.";
+                        StatusMessage = string.Empty;
                     }
                 }
                 else
@@ -419,9 +499,36 @@ public partial class HomeViewModel : ObservableObject
     {
         if (PreviewMetadata == null) return;
 
-        string cookie = !string.IsNullOrWhiteSpace(SelectedCookieOption?.FilePath)
-            ? SelectedCookieOption.FilePath
-            : (_settingsService.GetSettings().UseCookies ? (_cookieService.GetActiveCookiePath() ?? string.Empty) : string.Empty);
+        string cookie = string.Empty;
+        if (SelectedCookieOption != null)
+        {
+            if (SelectedCookieOption.Type == "browser" && !string.IsNullOrWhiteSpace(SelectedCookieOption.Spec))
+            {
+                cookie = SelectedCookieOption.Spec;
+            }
+            else if (SelectedCookieOption.Type == "file" && !string.IsNullOrWhiteSpace(SelectedCookieOption.FilePath))
+            {
+                cookie = SelectedCookieOption.FilePath;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(cookie) && _settingsService.GetSettings().UseCookies)
+        {
+            var s = _settingsService.GetSettings();
+            string method = s.GetEffectiveCookieMethod();
+            if (method == "browser")
+            {
+                string spec = _cookieService.BuildBrowserSpec(s.BrowserName, s.BrowserProfile, s.BrowserKeyring);
+                if (!string.IsNullOrWhiteSpace(spec))
+                {
+                    cookie = $"browser:{spec}";
+                }
+            }
+            else if (method == "file")
+            {
+                cookie = _cookieService.GetActiveCookiePath() ?? string.Empty;
+            }
+        }
 
         string formatSpec = _metadataService.GetFormatSpec(PreviewMetadata, SelectedQuality, SelectedMode);
 

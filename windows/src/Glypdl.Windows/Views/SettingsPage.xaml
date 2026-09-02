@@ -12,7 +12,10 @@
 
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolConverter" />
-        <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolConverter" />
+        <converters:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisConverter" />
+        <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+        <converters:BoolToInfoBarSeverityConverter x:Key="BoolToInfoBarSeverityConverter" />
+        <converters:BoolToTestTitleConverter x:Key="BoolToTestTitleConverter" />
     </Page.Resources>
 
     <ScrollViewer
@@ -91,97 +94,309 @@
                 <!-- Cookies & Authentication Section -->
                 <StackPanel Spacing="10">
                     <StackPanel Spacing="2">
-                        <TextBlock Text="Authentication Cookies" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" FontSize="15" />
-                        <TextBlock Text="Use a Netscape cookies.txt file for sites requiring login" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                        <TextBlock Text="Authentication &amp; Cookies" Style="{ThemeResource SubtitleTextBlockStyle}" FontWeight="SemiBold" FontSize="15" />
+                        <TextBlock Text="Configure authentication for media requiring user account login" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
                     </StackPanel>
 
-                    <!-- Enable Cookies Toggle Card -->
+                    <!-- Active Authentication Method Selector Card -->
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
                         <Grid>
-                            <StackPanel Spacing="3" VerticalAlignment="Center">
-                                <TextBlock Text="Enable Cookies" FontWeight="SemiBold" />
-                                <TextBlock Text="Pass authentication cookies to yt-dlp for media downloads" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                            <StackPanel Spacing="3" VerticalAlignment="Center" Margin="0,0,16,0">
+                                <TextBlock Text="Active Authentication Method" FontWeight="SemiBold" />
+                                <TextBlock Text="Select how Glypdl authenticates on sites requiring login" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
                             </StackPanel>
-                            <ToggleSwitch IsOn="{x:Bind ViewModel.UseCookies, Mode=TwoWay}" HorizontalAlignment="Right" VerticalAlignment="Center" OffContent="" OnContent="" />
+                            <ComboBox
+                                SelectedIndex="{x:Bind ViewModel.CookieMethodIndex, Mode=TwoWay}"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                MinWidth="220">
+                                <ComboBoxItem Content="None (Disabled)" />
+                                <ComboBoxItem Content="Browser Cookies (Direct)" />
+                                <ComboBoxItem Content="Cookie File (cookies.txt)" />
+                            </ComboBox>
                         </Grid>
                     </Border>
 
-                    <!-- Active Cookie File Card -->
-                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
+                    <!-- 1. Browser Configuration Group (Visible when Method == Browser) -->
+                    <StackPanel Spacing="10" Visibility="{x:Bind ViewModel.IsCookieMethodBrowser, Converter={StaticResource BoolConverter}, Mode=OneWay}">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Browser Configuration" FontWeight="SemiBold" FontSize="14" />
+                            <TextBlock Text="yt-dlp will extract session cookies directly from your installed browser" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                        </StackPanel>
 
-                            <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center" Margin="0,0,16,0">
-                                <TextBlock Text="Active Cookie File" FontWeight="SemiBold" />
-                                <TextBlock Text="{x:Bind ViewModel.ActiveCookieFile, Mode=OneWay, TargetNullValue='None selected', FallbackValue='None selected'}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" />
-                            </StackPanel>
-
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                <Button Content="Choose File..." Click="ChooseCookieFile_Click" Padding="14,6" />
-                                <Button ToolTipService.ToolTip="Clear Active Cookie File" Click="ClearCookieFile_Click" Padding="8,6">
-                                    <FontIcon Glyph="&#xE74D;" FontSize="14" />
-                                </Button>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-
-                    <!-- Saved Cookie Profiles Group -->
-                    <StackPanel Spacing="8" Margin="0,8,0,0">
-                        <Grid>
-                            <StackPanel Spacing="2" VerticalAlignment="Center">
-                                <TextBlock Text="Saved Cookie Profiles" FontWeight="SemiBold" FontSize="14" />
-                                <TextBlock Text="Save cookies.txt files for different websites and click 'Use Profile' to switch" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
-                            </StackPanel>
-                            <Button Content="Add Profile..." HorizontalAlignment="Right" VerticalAlignment="Center" Click="AddProfile_Click" Style="{ThemeResource AccentButtonStyle}" Padding="16,6" />
-                        </Grid>
-
-                        <!-- Empty State when no profiles -->
-                        <Border Visibility="{x:Bind ViewModel.HasNoCookieProfiles, Converter={StaticResource BoolConverter}, Mode=OneWay}" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="20">
-                            <StackPanel Spacing="8" HorizontalAlignment="Center" Margin="0,8">
-                                <FontIcon Glyph="&#xE72D;" FontSize="24" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
-                                <TextBlock Text="No Saved Profiles" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" />
-                                <TextBlock Text="Save cookie profiles for different websites to quickly authenticate" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" HorizontalAlignment="Center" />
-                            </StackPanel>
+                        <!-- Web Browser Selector Card -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                            <Grid>
+                                <StackPanel Spacing="3" VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Text="Web Browser" FontWeight="SemiBold" />
+                                    <TextBlock Text="Choose which browser to extract authentication cookies from" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                </StackPanel>
+                                <ComboBox
+                                    ItemsSource="{x:Bind ViewModel.DiscoveredBrowsers, Mode=OneWay}"
+                                    SelectedItem="{x:Bind ViewModel.SelectedBrowser, Mode=TwoWay}"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    MinWidth="200" />
+                            </Grid>
                         </Border>
 
-                        <!-- Profiles List -->
-                        <ItemsControl ItemsSource="{x:Bind ViewModel.CookieProfiles, Mode=OneWay}" Visibility="{x:Bind ViewModel.HasCookieProfiles, Converter={StaticResource BoolConverter}, Mode=OneWay}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="models:CookieProfile">
-                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,8">
-                                        <Grid>
+                        <!-- Browser Profile Selector Card -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                            <Grid>
+                                <StackPanel Spacing="3" VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Text="Browser Profile" FontWeight="SemiBold" />
+                                    <TextBlock Text="Select user profile directory containing login cookies" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                </StackPanel>
+                                <ComboBox
+                                    ItemsSource="{x:Bind ViewModel.BrowserProfiles, Mode=OneWay}"
+                                    SelectedItem="{x:Bind ViewModel.SelectedBrowserProfile, Mode=TwoWay}"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Center"
+                                    MinWidth="200" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Test Connection Card -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                            <Grid>
+                                <StackPanel Spacing="3" VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Text="Test Connection" FontWeight="SemiBold" />
+                                    <TextBlock Text="Verify that yt-dlp can access and decrypt cookies from this browser" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <Button ToolTipService.ToolTip="Refresh installed browsers" Command="{x:Bind ViewModel.RefreshBrowsersCommand}" Padding="8,6">
+                                        <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                                    </Button>
+                                    <Button
+                                        Content="Test Browser Cookies"
+                                        Style="{ThemeResource AccentButtonStyle}"
+                                        Command="{x:Bind ViewModel.TestBrowserCookiesCommand}"
+                                        IsEnabled="{x:Bind ViewModel.IsTestingBrowser, Converter={StaticResource InverseBoolConverter}, Mode=OneWay}"
+                                        Padding="14,6" />
+                                    <ProgressRing IsActive="{x:Bind ViewModel.IsTestingBrowser, Mode=OneWay}" Width="16" Height="16" Margin="4,0,0,0" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Test Result InfoBar -->
+                        <InfoBar
+                            IsOpen="{x:Bind ViewModel.ShowBrowserTestResult, Mode=OneWay}"
+                            Severity="{x:Bind ViewModel.BrowserTestSuccess, Converter={StaticResource BoolToInfoBarSeverityConverter}, Mode=OneWay}"
+                            Title="{x:Bind ViewModel.BrowserTestSuccess, Converter={StaticResource BoolToTestTitleConverter}, Mode=OneWay}"
+                            Message="{x:Bind ViewModel.BrowserTestStatus, Mode=OneWay}"
+                            IsClosable="True" />
+
+                        <!-- Advanced Chromium Direct Extraction Guide (Visible when a Chromium browser is selected) -->
+                        <Border
+                            Visibility="{x:Bind ViewModel.IsChromiumBrowserSelected, Converter={StaticResource BoolConverter}, Mode=OneWay}"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="16">
+                            <StackPanel Spacing="10">
+                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE7BA;" FontSize="16" Foreground="{ThemeResource SystemAccentColor}" />
+                                    <TextBlock Text="Advanced: Enable Direct Browser Extraction in Windows" FontWeight="SemiBold" FontSize="13" />
+                                    <Border Background="{ThemeResource SystemFillColorCautionBackgroundBrush}" CornerRadius="4" Padding="6,2" Margin="6,0,0,0">
+                                        <TextBlock Text="For Technical Users" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                                    </Border>
+                                </StackPanel>
+
+                                <TextBlock
+                                    Text="By default on Windows, Chromium browsers protect cookie keys with App-Bound Encryption, blocking direct CLI extraction by yt-dlp. You can either use Firefox / a cookies.txt file, or enable standard encryption via the Enterprise Policy below:"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    FontSize="12"
+                                    TextWrapping="Wrap" />
+
+                                <Border Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="6" Padding="12,10" Margin="0,2,0,0">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="1. Open Command Prompt (CMD) as Administrator" FontSize="12" FontWeight="SemiBold" />
+                                        <TextBlock Text="2. Run this command to enable standard DPAPI cookie access:" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        
+                                        <Grid ColumnSpacing="8">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-
-                                            <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center" Margin="0,0,16,0">
-                                                <TextBlock Text="{x:Bind Name, Mode=OneWay}" FontWeight="SemiBold" FontSize="13" />
-                                                <TextBlock Text="{x:Bind FilePath, Mode=OneWay}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" TextWrapping="Wrap" />
-                                            </StackPanel>
-
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                                <!-- Active Badge -->
-                                                <Border Visibility="{x:Bind IsActive, Converter={StaticResource BoolConverter}, Mode=OneWay}" Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}" BorderBrush="{ThemeResource SystemFillColorSuccessBrush}" BorderThickness="1" CornerRadius="12" Padding="10,4" VerticalAlignment="Center">
-                                                    <TextBlock Text="Active" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
-                                                </Border>
-
-                                                <!-- Use Profile Button (shown if not active) -->
-                                                <Button Content="Use Profile" Visibility="{x:Bind IsActive, Converter={StaticResource InverseBoolConverter}, Mode=OneWay}" Click="UseProfile_Click" Tag="{x:Bind}" Padding="12,5" />
-
-                                                <!-- Delete Button -->
-                                                <Button Click="DeleteProfile_Click" Tag="{x:Bind}" ToolTipService.ToolTip="Delete Profile" Padding="8,5">
-                                                    <FontIcon Glyph="&#xE74D;" FontSize="13" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
-                                                </Button>
-                                            </StackPanel>
+                                            <TextBox
+                                                Grid.Column="0"
+                                                Text="{x:Bind ViewModel.ChromiumEnablePolicyCommand, Mode=OneWay}"
+                                                IsReadOnly="True"
+                                                FontFamily="Consolas, Segoe UI"
+                                                FontSize="11" />
+                                            <Button
+                                                Grid.Column="1"
+                                                Command="{x:Bind ViewModel.CopyEnableCommand}"
+                                                ToolTipService.ToolTip="Copy command"
+                                                Padding="10,6">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <FontIcon Glyph="&#xE8C8;" FontSize="13" />
+                                                    <TextBlock Text="Copy" FontSize="12" />
+                                                </StackPanel>
+                                            </Button>
                                         </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+
+                                        <!-- Step 3: Clear Cookies -->
+                                        <TextBlock Text="3. Clear previous cookies in your browser:" FontSize="12" FontWeight="SemiBold" />
+                                        <TextBlock
+                                            Text="Previous cookies are stored in the old App-Bound encryption format. In your browser, go to Settings ➔ Privacy &amp; Security ➔ Clear browsing data and clear 'Cookies and other site data' (this will sign you out of active websites)."
+                                            FontSize="11"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            TextWrapping="Wrap" />
+
+                                        <!-- Step 4: Freshly Re-login -->
+                                        <TextBlock Text="4. Freshly log into your accounts:" FontSize="12" FontWeight="SemiBold" />
+                                        <TextBlock
+                                            Text="Open your browser and log into the websites you want to download from (e.g. Instagram, YouTube). The browser will save the newly created session cookies using standard DPAPI encryption."
+                                            FontSize="11"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            TextWrapping="Wrap" />
+
+                                        <!-- Step 5: Close Browser & Background Tasks -->
+                                        <TextBlock Text="5. Completely close your browser (including Task Manager):" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource SystemAccentColor}" />
+                                        <TextBlock
+                                            Text="Make sure your browser is completely closed before fetching or downloading in Glypdl. If background processes (such as Startup Boost) remain running, Windows locks the database file and blocks cookie access. End any remaining browser tasks in Task Manager."
+                                            FontSize="11"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            TextWrapping="Wrap" />
+
+                                        <!-- Restore command -->
+                                        <Expander Header="How to restore original App-Bound Encryption" HorizontalAlignment="Stretch" Margin="0,4,0,0">
+                                            <StackPanel Spacing="6" Padding="0,4">
+                                                <TextBlock Text="To revert back to strict App-Bound Encryption at any time, run in Admin CMD:" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox
+                                                        Grid.Column="0"
+                                                        Text="{x:Bind ViewModel.ChromiumRestorePolicyCommand, Mode=OneWay}"
+                                                        IsReadOnly="True"
+                                                        FontFamily="Consolas, Segoe UI"
+                                                        FontSize="11" />
+                                                    <Button
+                                                        Grid.Column="1"
+                                                        Command="{x:Bind ViewModel.CopyRestoreCommand}"
+                                                        ToolTipService.ToolTip="Copy restore command"
+                                                        Padding="10,6">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <FontIcon Glyph="&#xE8C8;" FontSize="13" />
+                                                            <TextBlock Text="Copy" FontSize="12" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Expander>
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock
+                                    Text="{x:Bind ViewModel.CopyStatusMessage, Mode=OneWay}"
+                                    Visibility="{x:Bind StringToVisibility(ViewModel.CopyStatusMessage), Mode=OneWay}"
+                                    Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                                    FontSize="12"
+                                    FontWeight="SemiBold" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Local Privacy Guarantee Card -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                            <StackPanel Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="🔒 Local Privacy Guarantee" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBlock Text="Glypdl never reads, stores, or transmits your cookies. Extraction and decryption are handled entirely by yt-dlp on your local system." Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- 2. Cookie File Group (Visible when Method == File) -->
+                    <StackPanel Spacing="10" Visibility="{x:Bind ViewModel.IsCookieMethodFile, Converter={StaticResource BoolConverter}, Mode=OneWay}">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Cookie File (cookies.txt)" FontWeight="SemiBold" FontSize="14" />
+                            <TextBlock Text="Use a Netscape cookies.txt file exported from a browser extension" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                        </StackPanel>
+
+                        <!-- Active Cookie File Card -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center" Margin="0,0,16,0">
+                                    <TextBlock Text="Active Cookie File" FontWeight="SemiBold" />
+                                    <TextBlock Text="{x:Bind ViewModel.ActiveCookieFile, Mode=OneWay, TargetNullValue='None selected', FallbackValue='None selected'}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <Button Content="Choose File..." Click="ChooseCookieFile_Click" Padding="14,6" />
+                                    <Button ToolTipService.ToolTip="Clear Active Cookie File" Click="ClearCookieFile_Click" Padding="8,6">
+                                        <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Saved Cookie Profiles Group -->
+                        <StackPanel Spacing="8" Margin="0,8,0,0">
+                            <Grid>
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Text="Saved Cookie Profiles" FontWeight="SemiBold" FontSize="14" />
+                                    <TextBlock Text="Save cookies.txt files for different websites and click 'Use Profile' to switch" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" />
+                                </StackPanel>
+                                <Button Content="Add Profile..." HorizontalAlignment="Right" VerticalAlignment="Center" Click="AddProfile_Click" Style="{ThemeResource AccentButtonStyle}" Padding="16,6" />
+                            </Grid>
+
+                            <!-- Empty State when no profiles -->
+                            <Border Visibility="{x:Bind ViewModel.HasNoCookieProfiles, Converter={StaticResource BoolConverter}, Mode=OneWay}" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="20">
+                                <StackPanel Spacing="8" HorizontalAlignment="Center" Margin="0,8">
+                                    <FontIcon Glyph="&#xE72D;" FontSize="24" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                                    <TextBlock Text="No Saved Profiles" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Save cookie profiles for different websites to quickly authenticate" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Profiles List -->
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.CookieProfiles, Mode=OneWay}" Visibility="{x:Bind ViewModel.HasCookieProfiles, Converter={StaticResource BoolConverter}, Mode=OneWay}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:CookieProfile">
+                                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,8">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                    <TextBlock Text="{x:Bind Name, Mode=OneWay}" FontWeight="SemiBold" FontSize="13" />
+                                                    <TextBlock Text="{x:Bind FilePath, Mode=OneWay}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" TextWrapping="Wrap" />
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                    <!-- Active Badge -->
+                                                    <Border Visibility="{x:Bind IsActive, Converter={StaticResource BoolConverter}, Mode=OneWay}" Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}" BorderBrush="{ThemeResource SystemFillColorSuccessBrush}" BorderThickness="1" CornerRadius="12" Padding="10,4" VerticalAlignment="Center">
+                                                        <TextBlock Text="Active" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                                                    </Border>
+
+                                                    <!-- Use Profile Button (shown if not active) -->
+                                                    <Button Content="Use Profile" Visibility="{x:Bind IsActive, Converter={StaticResource InverseBoolToVisConverter}, Mode=OneWay}" Click="UseProfile_Click" Tag="{x:Bind}" Padding="12,5" />
+
+                                                    <!-- Delete Button -->
+                                                    <Button Click="DeleteProfile_Click" Tag="{x:Bind}" ToolTipService.ToolTip="Delete Profile" Padding="8,5">
+                                                        <FontIcon Glyph="&#xE74D;" FontSize="13" Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
 

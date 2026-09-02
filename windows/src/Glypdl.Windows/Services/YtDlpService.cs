@@ -286,11 +286,7 @@ public class YtDlpService : IYtDlpService
     public List<string> BuildMetadataArguments(string url, string? cookieFile = null)
     {
         var args = new List<string> { "-J", "--no-warnings", "--no-playlist" };
-        if (!string.IsNullOrWhiteSpace(cookieFile) && File.Exists(cookieFile))
-        {
-            args.Add("--cookies");
-            args.Add(cookieFile);
-        }
+        AppendCookieArgument(args, cookieFile);
         args.Add(url);
         return args;
     }
@@ -298,11 +294,7 @@ public class YtDlpService : IYtDlpService
     public List<string> BuildPlaylistArguments(string url, string? cookieFile = null)
     {
         var args = new List<string> { "-J", "--flat-playlist", "--no-warnings" };
-        if (!string.IsNullOrWhiteSpace(cookieFile) && File.Exists(cookieFile))
-        {
-            args.Add("--cookies");
-            args.Add(cookieFile);
-        }
+        AppendCookieArgument(args, cookieFile);
         args.Add(url);
         return args;
     }
@@ -383,11 +375,7 @@ public class YtDlpService : IYtDlpService
             args.Add(downloadDir);
         }
 
-        if (!string.IsNullOrWhiteSpace(cookieFile) && File.Exists(cookieFile))
-        {
-            args.Add("--cookies");
-            args.Add(cookieFile);
-        }
+        AppendCookieArgument(args, cookieFile);
 
         if (!string.IsNullOrWhiteSpace(extraArgs))
         {
@@ -399,6 +387,27 @@ public class YtDlpService : IYtDlpService
 
         args.Add(url);
         return args;
+    }
+
+    private static void AppendCookieArgument(List<string> args, string? cookieSource)
+    {
+        if (string.IsNullOrWhiteSpace(cookieSource)) return;
+
+        string trimmed = cookieSource.Trim();
+        if (trimmed.StartsWith("browser:", StringComparison.OrdinalIgnoreCase))
+        {
+            string spec = trimmed.Substring(8).Trim();
+            if (!string.IsNullOrWhiteSpace(spec))
+            {
+                args.Add("--cookies-from-browser");
+                args.Add(spec);
+            }
+        }
+        else if (File.Exists(trimmed))
+        {
+            args.Add("--cookies");
+            args.Add(trimmed);
+        }
     }
 
     private static string? FindOnPath(string exeName)

@@ -39,7 +39,7 @@ public partial class App : Application
         // Simple DI container setup
         var settingsService = new SettingsService();
         var ytdlpService = new YtDlpService(settingsService);
-        var cookieService = new CookieService(settingsService);
+        var cookieService = new CookieService(settingsService, ytdlpService);
         var historyService = new HistoryService();
         var notificationService = new NotificationService(settingsService);
         var updateService = new UpdateService();

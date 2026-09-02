@@ -14,6 +14,17 @@ public class AppSettings
     public string ExtraArguments { get; set; } = string.Empty;
     public bool EnableDebugLogging { get; set; } = false;
     public bool UseCookies { get; set; } = false;
+    public string CookieMethod { get; set; } = "none"; // "none", "browser", "file"
     public string ActiveCookieProfileId { get; set; } = string.Empty;
     public string ActiveCookieFile { get; set; } = string.Empty;
+    public string BrowserName { get; set; } = "edge";
+    public string BrowserProfile { get; set; } = string.Empty;
+    public string BrowserKeyring { get; set; } = "auto";
+
+    public string GetEffectiveCookieMethod()
+    {
+        if (CookieMethod == "browser" || CookieMethod == "file") return CookieMethod;
+        if (UseCookies) return !string.IsNullOrWhiteSpace(ActiveCookieFile) || !string.IsNullOrWhiteSpace(ActiveCookieProfileId) ? "file" : "none";
+        return "none";
+    }
 }
