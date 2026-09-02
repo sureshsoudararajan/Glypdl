@@ -4,8 +4,8 @@
   "description": "Firefox companion extension for Glypdl media downloader",
   "type": "module",
   "scripts": {
-    "dev": "vite build --watch --mode development",
-    "build": "vite build && node scripts/package.js",
+    "dev": "node scripts/build.js",
+    "build": "node scripts/build.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
