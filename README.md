@@ -251,11 +251,11 @@ Glypdl/
 ## 📁 File & Configuration Paths
 
 ### Windows
-* **Configuration**: `%LOCALAPPDATA%\Glypdl\settings.json`
-* **Cookie Profiles**: `%LOCALAPPDATA%\Glypdl\cookies\profiles.json`
-* **History Database**: `%LOCALAPPDATA%\Glypdl\glypdl.db`
+* **Configuration**: `%LOCALAPPDATA%\Glypdl\config.json`
+* **Cookie Profiles**: `%LOCALAPPDATA%\Glypdl\profiles.json`
+* **History Database**: `%LOCALAPPDATA%\Glypdl\history.db`
 * **Bundled Binaries**: `%LOCALAPPDATA%\Glypdl\bin\` (`yt-dlp.exe`, `ffmpeg.exe`, `ffprobe.exe`)
-* **Thumbnail Cache**: `%LOCALAPPDATA%\Glypdl\thumbnails\`
+* **Thumbnail Cache**: `%LOCALAPPDATA%\Glypdl\Cache\Thumbnails\`
 
 ### Linux (XDG Base Directory)
 * **Configuration**: `~/.config/glypdl/config.ini`

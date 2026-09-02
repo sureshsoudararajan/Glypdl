@@ -98,9 +98,9 @@ The Flatpak manifest is located at `packaging/flatpak/io.github.sureshsoudararaj
 # On Fedora: sudo dnf install flatpak flatpak-builder
 # On Ubuntu: sudo apt install flatpak flatpak-builder
 
-# Install the GNOME 46 runtime and SDK:
+# Install the GNOME 50 runtime and SDK:
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak install flathub org.gnome.Platform//46 org.gnome.Sdk//46
+flatpak install flathub org.gnome.Platform//50 org.gnome.Sdk//50
 ```
 
 ### Build & Install Locally:
