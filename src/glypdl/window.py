@@ -288,6 +288,7 @@ class GlypdlWindow(Adw.ApplicationWindow):
         self.set_visible(True)
         self.unminimize()
         self.present()
+        self._external_job_context = job_dict or {}
         self.view_stack.set_visible_child_name("downloads")
         self.url_input.entry.set_text(url)
         self._on_url_submitted(self.url_input, url)
@@ -324,6 +325,21 @@ class GlypdlWindow(Adw.ApplicationWindow):
 
         if not metadata:
             return
+
+        # Merge rich metadata sent from browser extension if available
+        if hasattr(self, '_external_job_context') and self._external_job_context:
+            ext_thumb = self._external_job_context.get('thumbnailUrl') or (self._external_job_context.get('source') or {}).get('thumbnailUrl')
+            if ext_thumb and (not metadata.get('thumbnail') or not metadata.get('thumbnail_path')):
+                metadata['thumbnail'] = ext_thumb
+
+            ext_title = self._external_job_context.get('title') or (self._external_job_context.get('source') or {}).get('title')
+            curr_title = metadata.get('title', '')
+            if ext_title and (not curr_title or curr_title.lower() in ['master', 'index', 'playlist', 'stream', 'video', 'untitled media']):
+                metadata['title'] = ext_title
+
+            ext_dur = self._external_job_context.get('duration') or (self._external_job_context.get('source') or {}).get('duration')
+            if ext_dur and (not metadata.get('duration') or metadata.get('duration') == 0):
+                metadata['duration'] = ext_dur
 
         used_cookie_file = metadata.get('used_cookie_file', '')
         used_browser_spec = metadata.get('used_cookies_from_browser', '')

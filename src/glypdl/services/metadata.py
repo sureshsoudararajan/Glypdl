@@ -159,6 +159,22 @@ class MetadataService:
                 thumb_url = metadata_dict.get('thumbnail')
                 if thumb_url:
                     load_thumbnail_async(thumb_url, lambda cached_path: metadata_dict.__setitem__('thumbnail_path', cached_path))
+                elif self.ytdlp_service.ffmpeg_available() and (url.endswith('.m3u8') or '.m3u8' in url or url.endswith('.mp4') or '.mp4?' in url):
+                    # Generate video frame snapshot using FFmpeg for HLS / direct streams without thumbnail
+                    try:
+                        import os
+                        from glypdl.utils.thumbnails import get_cached_thumbnail_path
+                        ffmpeg_bin = self.ytdlp_service.detect_ffmpeg() or 'ffmpeg'
+                        cache_path = str(get_cached_thumbnail_path(url))
+                        subprocess.run([
+                            ffmpeg_bin, '-y', '-ss', '00:00:01', '-i', url,
+                            '-vframes', '1', '-q:v', '2', cache_path
+                        ], capture_output=True, timeout=8)
+                        if os.path.isfile(cache_path) and os.path.getsize(cache_path) > 0:
+                            metadata_dict['thumbnail'] = cache_path
+                            metadata_dict['thumbnail_path'] = cache_path
+                    except Exception:
+                        pass
 
                 GLib.idle_add(callback, metadata_dict)
 

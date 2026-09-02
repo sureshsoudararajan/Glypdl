@@ -1,5 +1,6 @@
 """Thumbnail caching and loading utility for Glypdl."""
 
+import base64
 import hashlib
 import os
 import urllib.request
@@ -54,11 +55,32 @@ def load_scaled_texture(file_path: str, max_width: int, max_height: int):
 
 
 def load_thumbnail_async(url: str, callback, error_callback=None):
-    """Download thumbnail if not cached, and invoke callback(local_path_str) on GTK main thread."""
+    """Download or decode thumbnail if not cached, and invoke callback(local_path_str) on GTK main thread."""
     if not url:
         if callback:
             GLib.idle_add(callback, None)
         return
+
+    # Handle local file path
+    if url.startswith('file://') or (os.path.isabs(url) and os.path.isfile(url)):
+        local_path = url.replace('file://', '')
+        if callback:
+            GLib.idle_add(callback, local_path)
+        return
+
+    # Handle data:image base64 URI (e.g. from canvas frame capture)
+    if url.startswith('data:'):
+        try:
+            cached_path = get_cached_thumbnail_path(url[:100] + str(len(url)))
+            if not cached_path.exists() or cached_path.stat().st_size == 0:
+                header, encoded = url.split(',', 1)
+                data = base64.b64decode(encoded)
+                cached_path.write_bytes(data)
+            if callback:
+                GLib.idle_add(callback, str(cached_path))
+            return
+        except Exception:
+            pass
 
     cached_path = get_cached_thumbnail_path(url)
     if cached_path.exists() and cached_path.stat().st_size > 0:
