@@ -52,30 +52,45 @@ export class YouTubeStrategy {
     // Extract title from multiple DOM selectors and metadata
     let title = '';
     const titleSelectors = [
+      'ytd-watch-metadata h1 yt-formatted-string',
       'h1.ytd-watch-metadata yt-formatted-string',
+      'ytd-watch-metadata #title yt-formatted-string',
+      '#title h1 yt-formatted-string',
       'h1.title yt-formatted-string',
-      '#title h1',
-      'yt-formatted-string.ytd-watch-metadata',
+      '#title.ytd-watch-metadata',
+      'h1.ytd-watch-metadata',
+      'ytd-video-primary-info-renderer h1',
       'h1.watch-title-container',
       'meta[property="og:title"]',
-      'meta[name="twitter:title"]',
-      'meta[name="title"]'
+      'meta[name="twitter:title"]'
     ];
 
     for (const sel of titleSelectors) {
       const el = doc.querySelector(sel);
       if (el) {
+        let candidate = '';
         if (el instanceof HTMLMetaElement) {
-          title = el.getAttribute('content') || '';
+          candidate = el.getAttribute('content') || '';
         } else if (el.textContent) {
-          title = el.textContent.trim();
+          candidate = el.textContent.trim();
         }
-        if (title && title !== 'YouTube') break;
+        if (candidate && candidate.toLowerCase() !== 'youtube' && candidate.length > 2) {
+          title = candidate;
+          break;
+        }
       }
     }
 
-    if (!title) {
-      title = doc.title.replace(/ - YouTube$/, '').trim() || `YouTube Video (${videoId})`;
+    if (!title || title.toLowerCase() === 'youtube') {
+      // Clean document.title: strip leading notification count like (606) and trailing " - YouTube"
+      title = (doc.title || '')
+        .replace(/^\(\d+\)\s*/, '')
+        .replace(/\s*[-–—]\s*YouTube$/i, '')
+        .trim();
+    }
+
+    if (!title || title.toLowerCase() === 'youtube') {
+      title = `YouTube Video (${videoId})`;
     }
 
     // Extract duration & quality from video element
