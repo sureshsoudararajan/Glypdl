@@ -59,6 +59,8 @@ class FormatSelector(Gtk.Box):
 
     __gtype_name__ = 'GlypdlFormatSelector'
 
+    STANDARD_QUALITIES = ['2160p', '1440p', '1080p', '720p', '480p', '360p']
+
     def __init__(self):
         super().__init__(orientation=Gtk.Orientation.VERTICAL, spacing=12)
 
