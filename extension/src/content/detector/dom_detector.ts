@@ -1,4 +1,5 @@
 import { Html5Strategy } from '../../detection/strategies/html5';
+import { YouTubeStrategy } from '../../detection/strategies/youtube';
 import { ExtensionSettings, MediaItem } from '../../shared/types';
 
 export class DomMediaObserver {
@@ -45,7 +46,7 @@ export class DomMediaObserver {
     }
   }
 
-  private scanAndBindMedia(root: ParentNode): void {
+  scanAndBindMedia(root: ParentNode = document): void {
     const elements = root.querySelectorAll<HTMLMediaElement>('video, audio');
     elements.forEach((el) => this.bindElement(el));
   }
@@ -55,19 +56,24 @@ export class DomMediaObserver {
     this.boundElements.add(element);
 
     const handleEvent = () => {
-      const item = Html5Strategy.detectFromElement(element, location.href, document);
+      let item: MediaItem | null = null;
+      if (YouTubeStrategy.isYouTubePage(location.href)) {
+        item = YouTubeStrategy.detectFromPage(location.href, document);
+      } else {
+        item = Html5Strategy.detectFromElement(element, location.href, document);
+      }
       if (item) {
         this.onMediaDetected(item);
       }
     };
 
     element.addEventListener('loadedmetadata', handleEvent, { passive: true });
+    element.addEventListener('loadeddata', handleEvent, { passive: true });
     element.addEventListener('canplay', handleEvent, { passive: true });
     element.addEventListener('play', handleEvent, { passive: true });
+    element.addEventListener('playing', handleEvent, { passive: true });
 
-    // Initial check if already loaded
-    if (element.readyState >= 1 || element.currentSrc || element.src) {
-      handleEvent();
-    }
+    // Initial check
+    handleEvent();
   }
 }

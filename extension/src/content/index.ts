@@ -38,10 +38,13 @@ class ContentController {
       }
     );
 
-    // Initial DOM scan
+    // Initial DOM scans with staggered retries for late-loading players (e.g. YouTube, Pexels)
     this.runScan();
+    setTimeout(() => this.runScan(), 600);
+    setTimeout(() => this.runScan(), 1800);
+    setTimeout(() => this.runScan(), 3500);
 
-    // DOM Observer for newly inserted video/audio tags
+    // DOM Observer for dynamically inserted media nodes
     this.domObserver = new DomMediaObserver(this.settings, (item) => {
       this.handleNewMedia(item);
     });
@@ -52,8 +55,19 @@ class ContentController {
       this.isDismissed = false;
       this.detector.clear();
       this.runScan();
+      setTimeout(() => this.runScan(), 800);
     });
     this.spaObserver.start();
+
+    // Listen for scan requests from popup or background
+    browserApi?.runtime?.onMessage?.addListener((message: any, _sender: any, sendResponse: any) => {
+      if (message?.action === 'scan_now') {
+        this.runScan();
+        sendResponse({ items: this.detector.getItems() });
+        return true;
+      }
+      return false;
+    });
   }
 
   private runScan(): void {
@@ -70,9 +84,10 @@ class ContentController {
   private handleNewMedia(item: MediaItem): void {
     if (!this.settings) return;
     const isNew = this.detector.addItem(item, this.settings);
-    if (isNew) {
-      const allItems = this.detector.getItems();
-      this.syncWithBackground(allItems);
+    const allItems = this.detector.getItems();
+    this.syncWithBackground(allItems);
+
+    if (isNew || allItems.length > 0) {
       this.attachPlayerUi(item);
     }
   }
@@ -82,7 +97,7 @@ class ContentController {
 
     // Attach overlay button to video players
     if (this.settings.showPlayerButton) {
-      const videoElem = document.querySelector('video');
+      const videoElem = document.querySelector('video') as HTMLVideoElement | null;
       if (videoElem && this.playerButton) {
         this.playerButton.attachToElement(videoElem, item);
       }

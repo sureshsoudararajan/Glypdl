@@ -614,18 +614,38 @@ class PreferencesDialog(Adw.PreferencesDialog):
 
         self.native_host_row = Adw.ActionRow(
             title="Firefox Native Messaging Host",
-            subtitle="Registers Glypdl host manifest with Firefox & LibreWolf"
+            subtitle="Registers Glypdl host manifest with Firefox &amp; LibreWolf"
         )
-        register_btn = Gtk.Button(label="Register Host", valign=Gtk.Align.CENTER)
-        register_btn.connect('clicked', self._on_register_native_host)
-        self.native_host_row.add_suffix(register_btn)
+        self.register_btn = Gtk.Button(label="Register Host", valign=Gtk.Align.CENTER)
+        self.register_btn.connect('clicked', self._on_register_native_host)
+        self.native_host_row.add_suffix(self.register_btn)
         ext_group.add(self.native_host_row)
+
+        # Check if already registered
+        self._check_host_registration()
+
+    def _check_host_registration(self):
+        """Check if native messaging manifests are already installed and update UI."""
+        from glypdl.services.native_host import get_target_manifest_paths
+        import json
+        registered = []
+        for target in get_target_manifest_paths():
+            if target.exists():
+                try:
+                    data = json.loads(target.read_text())
+                    if data.get("path") and os.path.isfile(data["path"]):
+                        registered.append(str(target))
+                except Exception:
+                    pass
+        if registered:
+            self.native_host_row.set_subtitle(f"Registered in {len(registered)} browser location(s)")
+            self.register_btn.set_label("Re-register")
 
     def _on_register_native_host(self, button):
         from glypdl.services.native_host import install_manifests
         installed = install_manifests()
         if installed:
-            self.native_host_row.set_subtitle(f"Registered in {len(installed)} browser locations.")
+            self.native_host_row.set_subtitle(f"Registered in {len(installed)} browser location(s)")
             button.set_label("Registered ✓")
             button.set_sensitive(False)
         else:

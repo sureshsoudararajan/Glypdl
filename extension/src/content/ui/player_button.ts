@@ -15,10 +15,29 @@ export class PlayerOverlayButton {
       return;
     }
 
-    const container = videoElement.parentElement;
+    // Determine the best player container
+    let container: HTMLElement | null = null;
+
+    // 1. YouTube specific player container
+    if (location.hostname.includes('youtube.com')) {
+      container = document.querySelector('#movie_player, .html5-video-player, ytd-player') as HTMLElement | null;
+    }
+
+    // 2. Generic player container lookup
+    if (!container) {
+      container = videoElement.closest(
+        '[class*="player"], [id*="player"], [class*="video-container"], .media-container, [data-testid*="video"]'
+      ) as HTMLElement | null;
+    }
+
+    // 3. Fallback to parent element
+    if (!container) {
+      container = videoElement.parentElement;
+    }
+
     if (!container) return;
 
-    // Ensure parent container has relative positioning
+    // Ensure container has relative/absolute positioning so absolute button aligns properly
     const computed = window.getComputedStyle(container);
     if (computed.position === 'static') {
       container.style.position = 'relative';

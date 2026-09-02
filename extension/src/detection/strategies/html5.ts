@@ -1,6 +1,7 @@
 import { MediaFormat, MediaItem, MediaQuality, MediaType } from '../../shared/types';
 import { extractDomain, formatDuration, generateMediaId, inferFormatFromMime, inferFormatFromUrl } from '../../shared/utils';
 import { DrmDetector } from '../drm';
+import { YouTubeStrategy } from './youtube';
 
 export class Html5Strategy {
   /**
@@ -9,21 +10,41 @@ export class Html5Strategy {
   static detectFromElement(element: HTMLMediaElement, pageUrl: string, doc: Document = document): MediaItem | null {
     if (!element) return null;
 
-    const isVideo = element.tagName.toLowerCase() === 'video';
-    const rawSrc = element.currentSrc || element.src;
+    // If on YouTube, delegate to YouTubeStrategy
+    if (YouTubeStrategy.isYouTubePage(pageUrl)) {
+      return YouTubeStrategy.detectFromPage(pageUrl, doc);
+    }
 
-    if (!rawSrc || rawSrc.startsWith('blob:') || rawSrc.startsWith('mediasource:')) {
-      // If src is empty or blob, check child <source> elements
+    const isVideo = element.tagName.toLowerCase() === 'video';
+    let targetSrc = element.currentSrc || element.src || '';
+
+    // Check data-src or data-video-src attributes
+    if (!targetSrc || targetSrc.startsWith('blob:') || targetSrc.startsWith('mediasource:')) {
+      const dataSrc = element.getAttribute('data-src') || element.getAttribute('data-video-src') || element.getAttribute('data-url');
+      if (dataSrc && !dataSrc.startsWith('blob:')) {
+        targetSrc = dataSrc;
+      }
+    }
+
+    // If still blob or empty, check child <source> elements
+    if (!targetSrc || targetSrc.startsWith('blob:') || targetSrc.startsWith('mediasource:')) {
       const sources = Array.from(element.querySelectorAll('source'));
       for (const s of sources) {
-        if (s.src && !s.src.startsWith('blob:')) {
-          return this.createMediaItem(s.src, isVideo ? 'video' : 'audio', element, pageUrl, doc, s.type);
+        const sSrc = s.src || s.getAttribute('data-src') || '';
+        if (sSrc && !sSrc.startsWith('blob:') && !sSrc.startsWith('mediasource:')) {
+          return this.createMediaItem(sSrc, isVideo ? 'video' : 'audio', element, pageUrl, doc, s.type);
         }
       }
+
+      // If playing a video via blob/MSE (common on Pexels, Vimeo, etc.), capture the webpage as video source for yt-dlp
+      if (isVideo && (element.readyState >= 1 || !element.paused || element.duration > 0)) {
+        return this.createMediaItem(pageUrl, 'video', element, pageUrl, doc);
+      }
+
       return null;
     }
 
-    return this.createMediaItem(rawSrc, isVideo ? 'video' : 'audio', element, pageUrl, doc);
+    return this.createMediaItem(targetSrc, isVideo ? 'video' : 'audio', element, pageUrl, doc);
   }
 
   private static createMediaItem(
@@ -69,6 +90,14 @@ export class Html5Strategy {
     // Extract title from page or element attributes
     let title = element.getAttribute('title') || element.getAttribute('aria-label') || '';
     if (!title) {
+      const ogTitle = doc.querySelector('meta[property="og:title"]')?.getAttribute('content');
+      if (ogTitle) title = ogTitle.trim();
+    }
+    if (!title) {
+      const h1 = doc.querySelector('h1');
+      if (h1 && h1.textContent) title = h1.textContent.trim();
+    }
+    if (!title) {
       title = doc.title || `Media from ${extractDomain(pageUrl)}`;
     }
 
@@ -76,6 +105,10 @@ export class Html5Strategy {
     let thumbnailUrl: string | undefined;
     if (element instanceof HTMLVideoElement && element.poster) {
       thumbnailUrl = element.poster;
+    }
+    if (!thumbnailUrl) {
+      const ogImg = doc.querySelector('meta[property="og:image"]')?.getAttribute('content');
+      if (ogImg) thumbnailUrl = ogImg;
     }
 
     const duration = element.duration && !isNaN(element.duration) && element.duration > 0 ? element.duration : undefined;

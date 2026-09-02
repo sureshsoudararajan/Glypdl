@@ -199,14 +199,27 @@ def run_native_host_loop():
 def get_manifest_content(host_binary_path: Optional[str] = None) -> Dict[str, Any]:
     """Generate the Native Messaging Host manifest for Firefox."""
     if not host_binary_path:
-        host_binary_path = str(Path(sys.prefix) / "bin" / "glypdl-host")
-        if not os.path.exists(host_binary_path):
-            # Fallback to shutil / local bin path
-            host_binary_path = "/usr/bin/glypdl-host"
+        import shutil
+        candidates = [
+            # 1. Project source layout: bin/glypdl-host next to src/
+            str(Path(__file__).resolve().parents[3] / "bin" / "glypdl-host"),
+            # 2. Installed via package manager (PKGBUILD / pip)
+            str(Path(sys.prefix) / "bin" / "glypdl-host"),
+            # 3. System PATH lookup
+            shutil.which("glypdl-host") or "",
+            # 4. Common system paths
+            "/usr/bin/glypdl-host",
+            "/usr/local/bin/glypdl-host",
+        ]
+        host_binary_path = "/usr/bin/glypdl-host"  # final fallback
+        for c in candidates:
+            if c and os.path.isfile(c) and os.access(c, os.X_OK):
+                host_binary_path = str(Path(c).resolve())
+                break
 
     return {
         "name": HOST_NAME,
-        "description": "Glypdl Native Messaging Host for Firefox & LibreWolf",
+        "description": "Glypdl Native Messaging Host for Firefox and LibreWolf",
         "path": host_binary_path,
         "type": "stdio",
         "allowed_extensions": [

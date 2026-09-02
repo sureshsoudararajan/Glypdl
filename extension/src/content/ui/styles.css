@@ -1,74 +1,82 @@
 /* Scoped CSS for Glypdl in-page widgets */
 
 .glypdl-player-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 999999;
-  background: rgba(30, 30, 30, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-  transition: all 0.2s ease;
-  user-select: none;
+  position: absolute !important;
+  top: 14px !important;
+  right: 14px !important;
+  z-index: 2147483647 !important;
+  pointer-events: auto !important;
+  background: rgba(28, 28, 30, 0.92) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 8px !important;
+  padding: 8px 14px !important;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45) !important;
+  transition: all 0.2s ease !important;
+  user-select: none !important;
+  line-height: 1 !important;
+  text-decoration: none !important;
 }
 
 .glypdl-player-btn:hover {
-  background: #3584e4;
-  border-color: #3584e4;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(53, 132, 228, 0.4);
+  background: #3584e4 !important;
+  border-color: #3584e4 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(53, 132, 228, 0.5) !important;
 }
 
 .glypdl-player-btn:active {
-  transform: translateY(0);
+  transform: translateY(0) !important;
 }
 
 .glypdl-floating-panel {
-  position: fixed;
-  z-index: 999998;
-  width: 320px;
-  background: #242424;
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  overflow: hidden;
-  animation: glypdl-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  display: flex;
-  flex-direction: column;
+  position: fixed !important;
+  z-index: 2147483646 !important;
+  width: 320px !important;
+  background: #242424 !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.6) !important;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  overflow: hidden !important;
+  animation: glypdl-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+}
+
+.glypdl-floating-panel * {
+  box-sizing: border-box !important;
 }
 
 .glypdl-floating-panel.bottom-right {
-  bottom: 20px;
-  right: 20px;
+  bottom: 20px !important;
+  right: 20px !important;
 }
 
 .glypdl-floating-panel.top-right {
-  top: 20px;
-  right: 20px;
+  top: 20px !important;
+  right: 20px !important;
 }
 
 .glypdl-floating-panel.bottom-left {
-  bottom: 20px;
-  left: 20px;
+  bottom: 20px !important;
+  left: 20px !important;
 }
 
 .glypdl-floating-panel.top-left {
-  top: 20px;
-  left: 20px;
+  top: 20px !important;
+  left: 20px !important;
 }
 
 @keyframes glypdl-slide-in {
@@ -83,130 +91,131 @@
 }
 
 .glypdl-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 10px 14px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 .glypdl-panel-brand {
-  font-size: 13px;
-  font-weight: 700;
-  color: #3584e4;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #3584e4 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
 }
 
 .glypdl-panel-close {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.6);
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-  padding: 2px 6px;
-  border-radius: 4px;
+  background: transparent !important;
+  border: none !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  cursor: pointer !important;
+  font-size: 16px !important;
+  line-height: 1 !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
 }
 
 .glypdl-panel-close:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
 }
 
 .glypdl-panel-body {
-  padding: 12px 14px;
-  display: flex;
-  gap: 12px;
+  padding: 12px 14px !important;
+  display: flex !important;
+  gap: 12px !important;
 }
 
 .glypdl-panel-thumb {
-  width: 72px;
-  height: 48px;
-  border-radius: 6px;
-  object-fit: cover;
-  background: #181818;
-  flex-shrink: 0;
+  width: 72px !important;
+  height: 48px !important;
+  border-radius: 6px !important;
+  object-fit: cover !important;
+  background: #181818 !important;
+  flex-shrink: 0 !important;
 }
 
 .glypdl-panel-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  flex: 1 !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
 }
 
 .glypdl-panel-title {
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 4px;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  margin-bottom: 4px !important;
+  color: #ffffff !important;
 }
 
 .glypdl-panel-meta {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.65);
-  display: flex;
-  gap: 6px;
-  align-items: center;
+  font-size: 11px !important;
+  color: rgba(255, 255, 255, 0.65) !important;
+  display: flex !important;
+  gap: 6px !important;
+  align-items: center !important;
 }
 
 .glypdl-badge {
-  background: rgba(53, 132, 228, 0.2);
-  color: #78aeed;
-  border-radius: 4px;
-  padding: 2px 5px;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
+  background: rgba(53, 132, 228, 0.25) !important;
+  color: #78aeed !important;
+  border-radius: 4px !important;
+  padding: 2px 6px !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
 }
 
 .glypdl-badge.protected {
-  background: rgba(230, 97, 0, 0.25);
-  color: #ffbe6f;
+  background: rgba(230, 97, 0, 0.25) !important;
+  color: #ffbe6f !important;
 }
 
 .glypdl-panel-actions {
-  padding: 8px 14px 12px;
-  display: flex;
-  gap: 8px;
+  padding: 8px 14px 12px !important;
+  display: flex !important;
+  gap: 8px !important;
 }
 
 .glypdl-btn {
-  flex: 1;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: all 0.15s ease;
+  flex: 1 !important;
+  padding: 8px 12px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  transition: all 0.15s ease !important;
 }
 
 .glypdl-btn-primary {
-  background: #3584e4;
-  color: #ffffff;
+  background: #3584e4 !important;
+  color: #ffffff !important;
 }
 
 .glypdl-btn-primary:hover {
-  background: #1c71d8;
+  background: #1c71d8 !important;
 }
 
 .glypdl-btn-secondary {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.8) !important;
 }
 
 .glypdl-btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
 }

@@ -27,7 +27,7 @@ function copyDir(src, dest) {
 }
 
 copyDir(path.resolve(rootDir, 'icons'), path.resolve(distDir, 'icons'));
-copyDir(path.resolve(rootDir, 'locales'), path.resolve(distDir, 'locales'));
+copyDir(path.resolve(rootDir, '_locales'), path.resolve(distDir, '_locales'));
 
 // Duplicate popup/options to root level in dist if nested under src
 if (fs.existsSync(path.resolve(distDir, 'src/popup/index.html'))) {
