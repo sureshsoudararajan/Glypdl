@@ -1,8 +1,10 @@
+import { MediaDeduplicator } from '../detection/deduplicator';
 import { MediaItem } from '../shared/types';
 import { setupCommands } from './commands';
 import { ConnectionManager } from './connection/ConnectionManager';
 import { setupContextMenus } from './context_menu';
 import { NotificationService } from './notifications';
+import { NetworkMediaSniffer } from './sniffer/network_sniffer';
 
 // @ts-expect-error browser runtime
 const browserApi = typeof browser !== 'undefined' ? browser : typeof chrome !== 'undefined' ? chrome : null;
@@ -10,16 +12,34 @@ const browserApi = typeof browser !== 'undefined' ? browser : typeof chrome !== 
 class BackgroundController {
   private conn = new ConnectionManager();
   private tabMediaMap = new Map<number, MediaItem[]>();
+  private tabDedupMap = new Map<number, MediaDeduplicator>();
+  private networkSniffer: NetworkMediaSniffer;
+
+  constructor() {
+    this.networkSniffer = new NetworkMediaSniffer((tabId, item) => {
+      this.addTabMedia(tabId, [item]);
+    });
+  }
 
   init(): void {
     if (!browserApi) return;
 
     setupContextMenus(this.conn);
     setupCommands(this.conn, (tabId) => this.tabMediaMap.get(tabId) || []);
+    this.networkSniffer.start();
 
-    // Listen for tab closure to clean up memory
+    // Listen for tab updates & closures to manage state
     browserApi.tabs?.onRemoved?.addListener((tabId: number) => {
       this.tabMediaMap.delete(tabId);
+      this.tabDedupMap.delete(tabId);
+    });
+
+    browserApi.tabs?.onUpdated?.addListener((tabId: number, changeInfo: any) => {
+      if (changeInfo.url) {
+        this.tabMediaMap.delete(tabId);
+        this.tabDedupMap.delete(tabId);
+        this.updateBadge(tabId, 0);
+      }
     });
 
     // Handle messages from content scripts and popup UI
@@ -30,8 +50,7 @@ class BackgroundController {
       if (action === 'media_detected') {
         const items = message.items as MediaItem[];
         if (tabId && Array.isArray(items)) {
-          this.tabMediaMap.set(tabId, items);
-          this.updateBadge(tabId, items.length);
+          this.addTabMedia(tabId, items);
         }
         sendResponse({ success: true });
         return true;
@@ -45,7 +64,7 @@ class BackgroundController {
 
       if (action === 'get_connection_status') {
         this.conn.getStatus().then((status) => sendResponse(status));
-        return true; // Keep message channel open for async response
+        return true;
       }
 
       if (action === 'test_connection') {
@@ -88,13 +107,33 @@ class BackgroundController {
     });
   }
 
+  private addTabMedia(tabId: number, items: MediaItem[]): void {
+    let dedup = this.tabDedupMap.get(tabId);
+    if (!dedup) {
+      dedup = new MediaDeduplicator();
+      this.tabDedupMap.set(tabId, dedup);
+    }
+
+    let changed = false;
+    for (const it of items) {
+      if (dedup.add(it)) {
+        changed = true;
+      }
+    }
+
+    const allItems = dedup.getAll();
+    this.tabMediaMap.set(tabId, allItems);
+    this.updateBadge(tabId, allItems.length);
+  }
+
   private updateBadge(tabId: number, count: number): void {
-    if (!browserApi?.action) return;
+    const actionApi = browserApi?.action || browserApi?.browserAction;
+    if (!actionApi) return;
 
     try {
       const text = count > 0 ? String(count) : '';
-      browserApi.action.setBadgeText({ text, tabId });
-      browserApi.action.setBadgeBackgroundColor({ color: '#3584e4', tabId });
+      actionApi.setBadgeText({ text, tabId });
+      actionApi.setBadgeBackgroundColor({ color: '#3584e4', tabId });
     } catch {
       // Ignored
     }
