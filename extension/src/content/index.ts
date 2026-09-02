@@ -4,7 +4,6 @@ import { ExtensionSettings, MediaItem } from '../shared/types';
 import { extractDomain } from '../shared/utils';
 import { DomMediaObserver } from './detector/dom_detector';
 import { SpaObserver } from './observers/spa_observer';
-import { FloatingMediaPanel } from './ui/floating_panel';
 import { PlayerOverlayButton } from './ui/player_button';
 import './ui/styles.css';
 
@@ -17,8 +16,6 @@ class ContentController {
   private domObserver: DomMediaObserver | null = null;
   private spaObserver: SpaObserver | null = null;
   private playerButton: PlayerOverlayButton | null = null;
-  private floatingPanel: FloatingMediaPanel | null = null;
-  private isDismissed = false;
 
   async init(): Promise<void> {
     this.settings = await StorageService.getSettings();
@@ -30,13 +27,6 @@ class ContentController {
     if (siteRule === 'never') return;
 
     this.playerButton = new PlayerOverlayButton((item) => this.sendDownload(item));
-    this.floatingPanel = new FloatingMediaPanel(
-      this.settings,
-      (item) => this.sendDownload(item),
-      () => {
-        this.isDismissed = true;
-      }
-    );
 
     // Initial DOM scans with staggered retries for late-loading players (e.g. YouTube, Pexels)
     this.runScan();
@@ -52,7 +42,6 @@ class ContentController {
 
     // SPA Observer for dynamic route changes
     this.spaObserver = new SpaObserver(() => {
-      this.isDismissed = false;
       this.detector.clear();
       this.runScan();
       setTimeout(() => this.runScan(), 800);
@@ -101,11 +90,6 @@ class ContentController {
       if (videoElem && this.playerButton) {
         this.playerButton.attachToElement(videoElem, item);
       }
-    }
-
-    // Show floating detection panel
-    if (!this.isDismissed && this.floatingPanel) {
-      this.floatingPanel.show(item);
     }
   }
 
