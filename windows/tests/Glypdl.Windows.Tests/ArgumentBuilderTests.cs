@@ -144,4 +144,47 @@ public class ArgumentBuilderTests
         Assert.Contains(browsers, b => b.Id == "edge");
         Assert.Contains(browsers, b => b.Id == "chrome");
     }
+
+    [Theory]
+    [InlineData("https://www.instagram.com/stories/nithya.___.04/3977692917933874797/", "3977692917933874797")]
+    [InlineData("https://www.instagram.com/stories/nithya.___.04/3977682576785494088/", "3977682576785494088")]
+    [InlineData("https://instagram.com/stories/user.name/1234567890?igsh=xyz", "1234567890")]
+    [InlineData("https://www.instagram.com/stories/highlights/17900000000000000/9876543210/", "9876543210")]
+    [InlineData("https://www.instagram.com/stories/nithya.___.04/", null)]
+    [InlineData("https://www.instagram.com/p/C-abc123/", null)]
+    public void ExtractInstagramStoryId_ShouldExtractCorrectStoryId(string url, string? expectedId)
+    {
+        string? result = YtDlpService.ExtractInstagramStoryId(url);
+        Assert.Equal(expectedId, result);
+    }
+
+    [Fact]
+    public void BuildDownloadArguments_WithInstagramStoryUrl_ShouldIncludeMatchFilter()
+    {
+        var settingsService = new MockSettingsService();
+        var ytdlpService = new YtDlpService(settingsService);
+
+        var args = ytdlpService.BuildDownloadArguments(
+            url: "https://www.instagram.com/stories/nithya.___.04/3977692917933874797/"
+        );
+
+        Assert.Contains("--match-filter", args);
+        int idx = args.IndexOf("--match-filter");
+        Assert.True(idx >= 0 && idx < args.Count - 1);
+        Assert.Contains("3977692917933874797", args[idx + 1]);
+    }
+
+    [Fact]
+    public void BuildMetadataArguments_WithInstagramStoryUrl_ShouldIncludeMatchFilter()
+    {
+        var settingsService = new MockSettingsService();
+        var ytdlpService = new YtDlpService(settingsService);
+
+        var args = ytdlpService.BuildMetadataArguments("https://www.instagram.com/stories/nithya.___.04/3977682576785494088/");
+
+        Assert.Contains("--match-filter", args);
+        int idx = args.IndexOf("--match-filter");
+        Assert.True(idx >= 0 && idx < args.Count - 1);
+        Assert.Contains("3977682576785494088", args[idx + 1]);
+    }
 }

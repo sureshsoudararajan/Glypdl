@@ -60,6 +60,9 @@ public class MetadataService : IMetadataService
                 }
             }
 
+            string? targetStoryId = YtDlpService.ExtractInstagramStoryId(url);
+            bool hasTargetStory = !string.IsNullOrWhiteSpace(targetStoryId);
+
             var meta = new MediaMetadata
             {
                 Url = url,
@@ -70,82 +73,130 @@ public class MetadataService : IMetadataService
                 ThumbnailUrl = thumb,
                 Extractor = GetStringSafe(root, "extractor"),
                 Description = GetStringSafe(root, "description"),
-                IsPlaylist = isPlaylist,
+                IsPlaylist = isPlaylist && !hasTargetStory,
                 UsedCookieFile = cookieFile ?? string.Empty
             };
 
-            if (isPlaylist && root.TryGetProperty("entries", out var entriesEl) && entriesEl.ValueKind == JsonValueKind.Array)
+            if (root.TryGetProperty("entries", out var entriesEl) && entriesEl.ValueKind == JsonValueKind.Array)
             {
-                meta.PlaylistCount = entriesEl.GetArrayLength();
-                int idx = 1;
-                foreach (var entry in entriesEl.EnumerateArray())
+                // If a specific story ID was requested in the URL, look for that specific entry
+                if (hasTargetStory)
                 {
-                    string entryThumb = GetStringSafe(entry, "thumbnail");
-                    if (string.IsNullOrWhiteSpace(entryThumb) && entry.TryGetProperty("thumbnails", out var entryThumbs) && entryThumbs.ValueKind == JsonValueKind.Array)
+                    JsonElement? matchedEntry = null;
+                    foreach (var entry in entriesEl.EnumerateArray())
                     {
-                        foreach (var et in entryThumbs.EnumerateArray())
+                        if (GetStringSafe(entry, "id") == targetStoryId)
                         {
-                            var u = GetStringSafe(et, "url");
-                            if (!string.IsNullOrWhiteSpace(u))
-                            {
-                                entryThumb = u;
-                            }
+                            matchedEntry = entry;
+                            break;
                         }
                     }
 
-                    string entryId = GetStringSafe(entry, "id");
-                    if (string.IsNullOrWhiteSpace(entryThumb) && !string.IsNullOrWhiteSpace(entryId) && entryId.Length == 11)
+                    // If not found by exact ID, take the first entry if only one or first
+                    var selectedEntry = matchedEntry ?? (entriesEl.GetArrayLength() > 0 ? entriesEl[0] : (JsonElement?)null);
+                    if (selectedEntry.HasValue)
                     {
-                        entryThumb = $"https://i.ytimg.com/vi/{entryId}/mqdefault.jpg";
-                    }
+                        var se = selectedEntry.Value;
+                        meta.Id = targetStoryId ?? GetStringSafe(se, "id", meta.Id);
+                        meta.Title = GetStringSafe(se, "title", meta.Title);
+                        meta.Uploader = GetStringSafe(se, "uploader", meta.Uploader);
+                        meta.Duration = GetIntSafe(se, "duration") ?? meta.Duration;
+                        meta.IsPlaylist = false;
 
-                    string entryUrl = GetStringSafe(entry, "url", GetStringSafe(entry, "webpage_url"));
-                    if (!string.IsNullOrWhiteSpace(entryId) && (string.IsNullOrWhiteSpace(entryUrl) || !entryUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        entryUrl = $"https://www.youtube.com/watch?v={entryId}";
-                    }
+                        string seThumb = GetStringSafe(se, "thumbnail");
+                        if (string.IsNullOrWhiteSpace(seThumb) && se.TryGetProperty("thumbnails", out var seThumbs) && seThumbs.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var et in seThumbs.EnumerateArray())
+                            {
+                                var u = GetStringSafe(et, "url");
+                                if (!string.IsNullOrWhiteSpace(u)) seThumb = u;
+                            }
+                        }
+                        if (!string.IsNullOrWhiteSpace(seThumb))
+                        {
+                            meta.ThumbnailUrl = seThumb;
+                        }
 
-                    meta.PlaylistEntries.Add(new PlaylistItem
+                        if (se.TryGetProperty("formats", out var seFormatsEl) && seFormatsEl.ValueKind == JsonValueKind.Array)
+                        {
+                            ExtractFormats(seFormatsEl, meta.Formats);
+                        }
+                    }
+                }
+                else if (isPlaylist)
+                {
+                    meta.PlaylistCount = entriesEl.GetArrayLength();
+                    int idx = 1;
+                    foreach (var entry in entriesEl.EnumerateArray())
                     {
-                        Index = idx++,
-                        Url = entryUrl,
-                        Id = entryId,
-                        Title = GetStringSafe(entry, "title", $"Track {idx - 1}"),
-                        Uploader = GetStringSafe(entry, "uploader", meta.Uploader),
-                        Duration = GetIntSafe(entry, "duration") ?? 0,
-                        ThumbnailUrl = entryThumb,
-                        IsSelected = true
-                    });
+                        string entryThumb = GetStringSafe(entry, "thumbnail");
+                        if (string.IsNullOrWhiteSpace(entryThumb) && entry.TryGetProperty("thumbnails", out var entryThumbs) && entryThumbs.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var et in entryThumbs.EnumerateArray())
+                            {
+                                var u = GetStringSafe(et, "url");
+                                if (!string.IsNullOrWhiteSpace(u))
+                                {
+                                    entryThumb = u;
+                                }
+                            }
+                        }
+
+                        string entryId = GetStringSafe(entry, "id");
+                        if (string.IsNullOrWhiteSpace(entryThumb) && !string.IsNullOrWhiteSpace(entryId) && entryId.Length == 11)
+                        {
+                            entryThumb = $"https://i.ytimg.com/vi/{entryId}/mqdefault.jpg";
+                        }
+
+                        string entryUrl = GetStringSafe(entry, "url", GetStringSafe(entry, "webpage_url"));
+                        string uploader = GetStringSafe(entry, "uploader", meta.Uploader);
+                        string extractor = GetStringSafe(entry, "extractor", meta.Extractor).ToLowerInvariant();
+
+                        if (string.IsNullOrWhiteSpace(entryUrl) || !entryUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (!string.IsNullOrWhiteSpace(entryId))
+                            {
+                                if (extractor.Contains("instagram") || url.Contains("instagram.com", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    entryUrl = !string.IsNullOrWhiteSpace(uploader)
+                                        ? $"https://www.instagram.com/stories/{uploader}/{entryId}/"
+                                        : $"https://www.instagram.com/p/{entryId}/";
+                                }
+                                else if (extractor.Contains("tiktok") || url.Contains("tiktok.com", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    entryUrl = !string.IsNullOrWhiteSpace(uploader)
+                                        ? $"https://www.tiktok.com/@{uploader}/video/{entryId}"
+                                        : url;
+                                }
+                                else
+                                {
+                                    entryUrl = $"https://www.youtube.com/watch?v={entryId}";
+                                }
+                            }
+                            else
+                            {
+                                entryUrl = url;
+                            }
+                        }
+
+                        meta.PlaylistEntries.Add(new PlaylistItem
+                        {
+                            Index = idx++,
+                            Url = entryUrl,
+                            Id = entryId,
+                            Title = GetStringSafe(entry, "title", $"Track {idx - 1}"),
+                            Uploader = uploader,
+                            Duration = GetIntSafe(entry, "duration") ?? 0,
+                            ThumbnailUrl = entryThumb,
+                            IsSelected = true
+                        });
+                    }
                 }
             }
-            else if (root.TryGetProperty("formats", out var formatsEl) && formatsEl.ValueKind == JsonValueKind.Array)
+
+            if (meta.Formats.Count == 0 && root.TryGetProperty("formats", out var formatsEl) && formatsEl.ValueKind == JsonValueKind.Array)
             {
-                foreach (var f in formatsEl.EnumerateArray())
-                {
-                    string vcodec = GetStringSafe(f, "vcodec", "none");
-                    string acodec = GetStringSafe(f, "acodec", "none");
-                    bool hasVideo = vcodec != "none" && !string.IsNullOrWhiteSpace(vcodec);
-                    bool hasAudio = acodec != "none" && !string.IsNullOrWhiteSpace(acodec);
-
-                    int? height = GetIntSafe(f, "height");
-                    string res = height.HasValue ? $"{height.Value}p" : GetStringSafe(f, "resolution");
-
-                    meta.Formats.Add(new MediaFormat
-                    {
-                        FormatId = GetStringSafe(f, "format_id"),
-                        Extension = GetStringSafe(f, "ext"),
-                        Resolution = res,
-                        Fps = GetIntSafe(f, "fps"),
-                        VideoCodec = vcodec,
-                        AudioCodec = acodec,
-                        FileSize = GetLongSafe(f, "filesize") ?? GetLongSafe(f, "filesize_approx"),
-                        TotalBitrate = GetDoubleSafe(f, "tbr"),
-                        AudioBitrate = GetDoubleSafe(f, "abr"),
-                        FormatNote = GetStringSafe(f, "format_note"),
-                        HasVideo = hasVideo,
-                        HasAudio = hasAudio
-                    });
-                }
+                ExtractFormats(formatsEl, meta.Formats);
             }
 
             return meta;
@@ -153,6 +204,36 @@ public class MetadataService : IMetadataService
         catch (Exception ex)
         {
             throw new Exception($"Failed to parse metadata JSON: {ex.Message}");
+        }
+    }
+
+    private static void ExtractFormats(JsonElement formatsEl, List<MediaFormat> targetList)
+    {
+        foreach (var f in formatsEl.EnumerateArray())
+        {
+            string vcodec = GetStringSafe(f, "vcodec", "none");
+            string acodec = GetStringSafe(f, "acodec", "none");
+            bool hasVideo = vcodec != "none" && !string.IsNullOrWhiteSpace(vcodec);
+            bool hasAudio = acodec != "none" && !string.IsNullOrWhiteSpace(acodec);
+
+            int? height = GetIntSafe(f, "height");
+            string res = height.HasValue ? $"{height.Value}p" : GetStringSafe(f, "resolution");
+
+            targetList.Add(new MediaFormat
+            {
+                FormatId = GetStringSafe(f, "format_id"),
+                Extension = GetStringSafe(f, "ext"),
+                Resolution = res,
+                Fps = GetIntSafe(f, "fps"),
+                VideoCodec = vcodec,
+                AudioCodec = acodec,
+                FileSize = GetLongSafe(f, "filesize") ?? GetLongSafe(f, "filesize_approx"),
+                TotalBitrate = GetDoubleSafe(f, "tbr"),
+                AudioBitrate = GetDoubleSafe(f, "abr"),
+                FormatNote = GetStringSafe(f, "format_note"),
+                HasVideo = hasVideo,
+                HasAudio = hasAudio
+            });
         }
     }
 

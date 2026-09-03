@@ -283,9 +283,39 @@ public class YtDlpService : IYtDlpService
         }
     }
 
+    public static string? ExtractInstagramStoryId(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+
+        var match = System.Text.RegularExpressions.Regex.Match(
+            url,
+            @"instagram\.com/stories/(?:highlights/[^/?#]+/|[^/?#]+/)(?<id>\d+)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase
+        );
+
+        if (match.Success && match.Groups["id"].Success)
+        {
+            return match.Groups["id"].Value;
+        }
+
+        return null;
+    }
+
     public List<string> BuildMetadataArguments(string url, string? cookieFile = null)
     {
-        var args = new List<string> { "-J", "--no-warnings", "--no-playlist" };
+        var args = new List<string> { "-J", "--no-warnings" };
+
+        string? storyId = ExtractInstagramStoryId(url);
+        if (!string.IsNullOrWhiteSpace(storyId))
+        {
+            args.Add("--match-filter");
+            args.Add($"id = '{storyId}' | id = {storyId}");
+        }
+        else
+        {
+            args.Add("--no-playlist");
+        }
+
         AppendCookieArgument(args, cookieFile);
         args.Add(url);
         return args;
@@ -311,6 +341,13 @@ public class YtDlpService : IYtDlpService
         string? extraArgs = null)
     {
         var args = new List<string> { "--newline", "--progress", "--no-warnings", "--no-overwrites" };
+
+        string? storyId = ExtractInstagramStoryId(url);
+        if (!string.IsNullOrWhiteSpace(storyId))
+        {
+            args.Add("--match-filter");
+            args.Add($"id = '{storyId}' | id = {storyId}");
+        }
 
         string? ffmpeg = DetectFFmpeg();
         if (ffmpeg != null)
