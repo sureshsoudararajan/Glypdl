@@ -303,19 +303,7 @@ public class YtDlpService : IYtDlpService
 
     public List<string> BuildMetadataArguments(string url, string? cookieFile = null)
     {
-        var args = new List<string> { "-J", "--no-warnings" };
-
-        string? storyId = ExtractInstagramStoryId(url);
-        if (!string.IsNullOrWhiteSpace(storyId))
-        {
-            args.Add("--match-filter");
-            args.Add($"id = '{storyId}' | id = {storyId}");
-        }
-        else
-        {
-            args.Add("--no-playlist");
-        }
-
+        var args = new List<string> { "-J", "--no-warnings", "--no-playlist" };
         AppendCookieArgument(args, cookieFile);
         args.Add(url);
         return args;
@@ -346,7 +334,7 @@ public class YtDlpService : IYtDlpService
         if (!string.IsNullOrWhiteSpace(storyId))
         {
             args.Add("--match-filter");
-            args.Add($"id = '{storyId}' | id = {storyId}");
+            args.Add($"id ~= {storyId} | webpage_url ~= {storyId} | original_url ~= {storyId}");
         }
 
         string? ffmpeg = DetectFFmpeg();

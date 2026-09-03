@@ -83,12 +83,18 @@ public class MetadataService : IMetadataService
                 if (hasTargetStory)
                 {
                     JsonElement? matchedEntry = null;
-                    foreach (var entry in entriesEl.EnumerateArray())
+                    if (!string.IsNullOrWhiteSpace(targetStoryId))
                     {
-                        if (GetStringSafe(entry, "id") == targetStoryId)
+                        foreach (var entry in entriesEl.EnumerateArray())
                         {
-                            matchedEntry = entry;
-                            break;
+                            string entryId = GetStringSafe(entry, "id");
+                            string entryUrl = GetStringSafe(entry, "url", GetStringSafe(entry, "webpage_url"));
+                            if ((!string.IsNullOrWhiteSpace(entryId) && entryId.Contains(targetStoryId)) ||
+                                (!string.IsNullOrWhiteSpace(entryUrl) && entryUrl.Contains(targetStoryId)))
+                            {
+                                matchedEntry = entry;
+                                break;
+                            }
                         }
                     }
 
@@ -97,7 +103,8 @@ public class MetadataService : IMetadataService
                     if (selectedEntry.HasValue)
                     {
                         var se = selectedEntry.Value;
-                        meta.Id = targetStoryId ?? GetStringSafe(se, "id", meta.Id);
+                        string seId = GetStringSafe(se, "id");
+                        meta.Id = !string.IsNullOrWhiteSpace(seId) ? seId : (targetStoryId ?? meta.Id);
                         meta.Title = GetStringSafe(se, "title", meta.Title);
                         meta.Uploader = GetStringSafe(se, "uploader", meta.Uploader);
                         meta.Duration = GetIntSafe(se, "duration") ?? meta.Duration;
@@ -158,9 +165,10 @@ public class MetadataService : IMetadataService
                             {
                                 if (extractor.Contains("instagram") || url.Contains("instagram.com", StringComparison.OrdinalIgnoreCase))
                                 {
+                                    string cleanStoryId = entryId.Split('_')[0];
                                     entryUrl = !string.IsNullOrWhiteSpace(uploader)
-                                        ? $"https://www.instagram.com/stories/{uploader}/{entryId}/"
-                                        : $"https://www.instagram.com/p/{entryId}/";
+                                        ? $"https://www.instagram.com/stories/{uploader}/{cleanStoryId}/"
+                                        : $"https://www.instagram.com/p/{cleanStoryId}/";
                                 }
                                 else if (extractor.Contains("tiktok") || url.Contains("tiktok.com", StringComparison.OrdinalIgnoreCase))
                                 {

@@ -175,16 +175,14 @@ public class ArgumentBuilderTests
     }
 
     [Fact]
-    public void BuildMetadataArguments_WithInstagramStoryUrl_ShouldIncludeMatchFilter()
+    public void BuildMetadataArguments_ShouldIncludeNoPlaylistFlag()
     {
         var settingsService = new MockSettingsService();
         var ytdlpService = new YtDlpService(settingsService);
 
         var args = ytdlpService.BuildMetadataArguments("https://www.instagram.com/stories/nithya.___.04/3977682576785494088/");
 
-        Assert.Contains("--match-filter", args);
-        int idx = args.IndexOf("--match-filter");
-        Assert.True(idx >= 0 && idx < args.Count - 1);
-        Assert.Contains("3977682576785494088", args[idx + 1]);
+        Assert.Contains("-J", args);
+        Assert.Contains("--no-playlist", args);
     }
 }
