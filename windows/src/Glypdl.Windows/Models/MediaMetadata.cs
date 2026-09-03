@@ -35,6 +35,7 @@ public partial class MediaMetadata : ObservableObject
     public string Description { get; set; } = string.Empty;
     public bool IsPlaylist { get; set; }
     public int PlaylistCount { get; set; }
+    public int? PlaylistIndex { get; set; }
     public string UsedCookieFile { get; set; } = string.Empty;
     public List<MediaFormat> Formats { get; set; } = new();
     public ObservableCollection<PlaylistItem> PlaylistEntries { get; set; } = new();

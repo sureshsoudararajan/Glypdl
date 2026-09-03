@@ -554,7 +554,8 @@ public partial class HomeViewModel : ObservableObject
                     Quality = SelectedMode == DownloadMode.AudioOnly ? SelectedAudioBitrate : SelectedQuality,
                     AudioFormat = SelectedAudioFormat,
                     FormatId = formatSpec,
-                    CookieFilePath = cookie ?? string.Empty
+                    CookieFilePath = cookie ?? string.Empty,
+                    PlaylistIndex = entry.Index
                 };
                 _queueService.Enqueue(item);
             }
@@ -572,7 +573,8 @@ public partial class HomeViewModel : ObservableObject
                 Quality = SelectedMode == DownloadMode.AudioOnly ? SelectedAudioBitrate : SelectedQuality,
                 AudioFormat = SelectedAudioFormat,
                 FormatId = formatSpec,
-                CookieFilePath = cookie ?? string.Empty
+                CookieFilePath = cookie ?? string.Empty,
+                PlaylistIndex = PreviewMetadata.PlaylistIndex
             };
             _queueService.Enqueue(item);
         }

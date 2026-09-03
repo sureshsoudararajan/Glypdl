@@ -49,6 +49,9 @@ public partial class DownloadItem : ObservableObject
     private string _cookieFilePath = string.Empty;
 
     [ObservableProperty]
+    private int? _playlistIndex;
+
+    [ObservableProperty]
     private double _progress;
 
     [ObservableProperty]

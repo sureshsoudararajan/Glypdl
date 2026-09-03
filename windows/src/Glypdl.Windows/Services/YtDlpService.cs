@@ -326,15 +326,19 @@ public class YtDlpService : IYtDlpService
         bool extractAudio = false,
         string? audioFormat = null,
         string? audioQuality = null,
-        string? extraArgs = null)
+        string? extraArgs = null,
+        int? playlistIndex = null)
     {
         var args = new List<string> { "--newline", "--progress", "--no-warnings", "--no-overwrites" };
 
-        string? storyId = ExtractInstagramStoryId(url);
-        if (!string.IsNullOrWhiteSpace(storyId))
+        if (playlistIndex.HasValue && playlistIndex.Value > 0)
         {
-            args.Add("--match-filter");
-            args.Add($"id ~= {storyId} | webpage_url ~= {storyId} | original_url ~= {storyId}");
+            args.Add("--playlist-items");
+            args.Add(playlistIndex.Value.ToString());
+        }
+        else
+        {
+            args.Add("--no-playlist");
         }
 
         string? ffmpeg = DetectFFmpeg();

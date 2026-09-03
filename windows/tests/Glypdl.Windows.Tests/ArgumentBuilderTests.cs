@@ -159,19 +159,20 @@ public class ArgumentBuilderTests
     }
 
     [Fact]
-    public void BuildDownloadArguments_WithInstagramStoryUrl_ShouldIncludeMatchFilter()
+    public void BuildDownloadArguments_WithPlaylistIndex_ShouldIncludePlaylistItemsFlag()
     {
         var settingsService = new MockSettingsService();
         var ytdlpService = new YtDlpService(settingsService);
 
         var args = ytdlpService.BuildDownloadArguments(
-            url: "https://www.instagram.com/stories/nithya.___.04/3977692917933874797/"
+            url: "https://www.instagram.com/stories/nithya.___.04/3977692917933874797/",
+            playlistIndex: 3
         );
 
-        Assert.Contains("--match-filter", args);
-        int idx = args.IndexOf("--match-filter");
+        Assert.Contains("--playlist-items", args);
+        int idx = args.IndexOf("--playlist-items");
         Assert.True(idx >= 0 && idx < args.Count - 1);
-        Assert.Contains("3977692917933874797", args[idx + 1]);
+        Assert.Equal("3", args[idx + 1]);
     }
 
     [Fact]

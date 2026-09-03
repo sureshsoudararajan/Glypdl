@@ -54,7 +54,8 @@ public class DownloadService : IDownloadService
             extractAudio: item.Mode == DownloadMode.AudioOnly,
             audioFormat: item.AudioFormat,
             audioQuality: item.Quality,
-            extraArgs: settings.ExtraArguments
+            extraArgs: settings.ExtraArguments,
+            playlistIndex: item.PlaylistIndex
         );
 
         DispatcherHelper.ExecuteOnUIThread(() =>

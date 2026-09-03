@@ -27,5 +27,6 @@ public interface IYtDlpService
         bool extractAudio = false,
         string? audioFormat = null,
         string? audioQuality = null,
-        string? extraArgs = null);
+        string? extraArgs = null,
+        int? playlistIndex = null);
 }

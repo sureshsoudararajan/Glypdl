@@ -83,8 +83,10 @@ public class MetadataService : IMetadataService
                 if (hasTargetStory)
                 {
                     JsonElement? matchedEntry = null;
+                    int? matchedIndex = null;
                     if (!string.IsNullOrWhiteSpace(targetStoryId))
                     {
+                        int currentIdx = 1;
                         foreach (var entry in entriesEl.EnumerateArray())
                         {
                             string entryId = GetStringSafe(entry, "id");
@@ -93,8 +95,10 @@ public class MetadataService : IMetadataService
                                 (!string.IsNullOrWhiteSpace(entryUrl) && entryUrl.Contains(targetStoryId)))
                             {
                                 matchedEntry = entry;
+                                matchedIndex = currentIdx;
                                 break;
                             }
+                            currentIdx++;
                         }
                     }
 
@@ -109,6 +113,7 @@ public class MetadataService : IMetadataService
                         meta.Uploader = GetStringSafe(se, "uploader", meta.Uploader);
                         meta.Duration = GetIntSafe(se, "duration") ?? meta.Duration;
                         meta.IsPlaylist = false;
+                        meta.PlaylistIndex = matchedIndex ?? 1;
 
                         string seThumb = GetStringSafe(se, "thumbnail");
                         if (string.IsNullOrWhiteSpace(seThumb) && se.TryGetProperty("thumbnails", out var seThumbs) && seThumbs.ValueKind == JsonValueKind.Array)
