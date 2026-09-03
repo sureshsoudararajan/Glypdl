@@ -65,12 +65,59 @@ public class DownloadService : IDownloadService
         });
 
         var tcs = new TaskCompletionSource<int>();
+        string? capturedDestination = null;
 
         var process = ProcessRunner.StartStreaming(
             executable: binary,
             arguments: args,
             onLine: line =>
             {
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    string trimmed = line.Trim();
+                    if (trimmed.StartsWith("[download] Destination:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        capturedDestination = trimmed.Substring("[download] Destination:".Length).Trim().Trim('"').Trim('\'');
+                    }
+                    else if (trimmed.Contains("Merging formats into", StringComparison.OrdinalIgnoreCase))
+                    {
+                        int idx = trimmed.IndexOf("into", StringComparison.OrdinalIgnoreCase);
+                        if (idx >= 0)
+                        {
+                            capturedDestination = trimmed.Substring(idx + 4).Trim().Trim('"').Trim('\'');
+                        }
+                    }
+                    else if (trimmed.StartsWith("[ExtractAudio] Destination:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        capturedDestination = trimmed.Substring("[ExtractAudio] Destination:".Length).Trim().Trim('"').Trim('\'');
+                    }
+                    else if (trimmed.Contains(" in ", StringComparison.OrdinalIgnoreCase) && (trimmed.StartsWith("[Fixup", StringComparison.OrdinalIgnoreCase) || trimmed.StartsWith("[VideoConvertor", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        int idx = trimmed.IndexOf(" in ", StringComparison.OrdinalIgnoreCase);
+                        if (idx >= 0)
+                        {
+                            capturedDestination = trimmed.Substring(idx + 4).Trim().Trim('"').Trim('\'');
+                        }
+                    }
+                    else if (trimmed.StartsWith("[MoveFiles] Moving file", StringComparison.OrdinalIgnoreCase) && trimmed.Contains(" to "))
+                    {
+                        int idx = trimmed.LastIndexOf(" to ", StringComparison.OrdinalIgnoreCase);
+                        if (idx >= 0)
+                        {
+                            capturedDestination = trimmed.Substring(idx + 4).Trim().Trim('"').Trim('\'');
+                        }
+                    }
+                    else if (trimmed.StartsWith("[download] ", StringComparison.OrdinalIgnoreCase) && trimmed.Contains(" has already been downloaded", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string part = trimmed.Substring("[download] ".Length);
+                        int idx = part.IndexOf(" has already been downloaded", StringComparison.OrdinalIgnoreCase);
+                        if (idx > 0)
+                        {
+                            capturedDestination = part.Substring(0, idx).Trim().Trim('"').Trim('\'');
+                        }
+                    }
+                }
+
                 var progress = FormattingUtils.ParseProgressLine(line);
                 if (progress != null)
                 {
@@ -135,15 +182,31 @@ public class DownloadService : IDownloadService
 
             try
             {
-                if (Directory.Exists(downloadDir))
+                if (!string.IsNullOrWhiteSpace(capturedDestination))
+                {
+                    if (!Path.IsPathRooted(capturedDestination))
+                    {
+                        capturedDestination = Path.Combine(downloadDir, capturedDestination);
+                    }
+                    if (File.Exists(capturedDestination))
+                    {
+                        destinationFile = capturedDestination;
+                        actualFileSize = new FileInfo(capturedDestination).Length;
+                    }
+                }
+
+                if ((actualFileSize <= 0 || destinationFile == downloadDir) && Directory.Exists(downloadDir))
                 {
                     var files = Directory.GetFiles(downloadDir);
                     var cleanTitle = string.Concat(item.Title.Where(c => !Path.GetInvalidFileNameChars().Contains(c))).Trim();
                     if (!string.IsNullOrWhiteSpace(cleanTitle))
                     {
-                        var matched = files.FirstOrDefault(f =>
+                        var matched = files.Where(f =>
                             Path.GetFileNameWithoutExtension(f).Contains(cleanTitle, StringComparison.OrdinalIgnoreCase) ||
-                            cleanTitle.Contains(Path.GetFileNameWithoutExtension(f), StringComparison.OrdinalIgnoreCase));
+                            cleanTitle.Contains(Path.GetFileNameWithoutExtension(f), StringComparison.OrdinalIgnoreCase))
+                            .OrderByDescending(f => File.GetLastWriteTimeUtc(f))
+                            .FirstOrDefault();
+
                         if (matched != null && File.Exists(matched))
                         {
                             actualFileSize = new FileInfo(matched).Length;

@@ -27,8 +27,11 @@ public class ArgumentBuilderTests
 
         Assert.Contains("--newline", args);
         Assert.Contains("--progress", args);
+        Assert.DoesNotContain("--no-overwrites", args);
         Assert.Contains("-f", args);
         Assert.Contains("1080p", args);
+        Assert.Contains("-o", args);
+        Assert.Contains("%(title)s [%(id)s].%(ext)s", args);
         Assert.Contains("-P", args);
         Assert.Contains(@"C:\Downloads", args);
         Assert.Contains("https://example.com/video", args);

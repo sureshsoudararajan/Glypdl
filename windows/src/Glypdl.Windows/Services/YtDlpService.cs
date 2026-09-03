@@ -329,7 +329,7 @@ public class YtDlpService : IYtDlpService
         string? extraArgs = null,
         int? playlistIndex = null)
     {
-        var args = new List<string> { "--newline", "--progress", "--no-warnings", "--no-overwrites" };
+        var args = new List<string> { "--newline", "--progress", "--no-warnings" };
 
         if (playlistIndex.HasValue && playlistIndex.Value > 0)
         {
@@ -394,8 +394,28 @@ public class YtDlpService : IYtDlpService
 
         if (!string.IsNullOrWhiteSpace(outputTemplate))
         {
+            string templateToUse = outputTemplate;
+            // Ensure the template produces unique filenames by including %(id)s
+            // This prevents stories/reels from the same user or identically-titled videos overwriting each other
+            if (!templateToUse.Contains("%(id)") && !templateToUse.Contains("%(playlist_index)"))
+            {
+                string extMarker = ".%(ext)s";
+                int extIdx = templateToUse.LastIndexOf(extMarker, StringComparison.OrdinalIgnoreCase);
+                if (extIdx >= 0)
+                {
+                    templateToUse = templateToUse.Substring(0, extIdx) + " [%(id)s]" + extMarker;
+                }
+                else if (templateToUse.Contains("%(ext)s", StringComparison.OrdinalIgnoreCase))
+                {
+                    templateToUse = templateToUse.Replace("%(ext)s", "[%(id)s].%(ext)s", StringComparison.OrdinalIgnoreCase);
+                }
+                else
+                {
+                    templateToUse += " [%(id)s]";
+                }
+            }
             args.Add("-o");
-            args.Add(outputTemplate);
+            args.Add(templateToUse);
         }
 
         if (!string.IsNullOrWhiteSpace(downloadDir))
