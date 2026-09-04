@@ -32,7 +32,7 @@ class UrlInput(Gtk.Box):
         self.entry.connect('activate', self._on_submit)
         hbox.append(self.entry)
 
-        self.add_button = Gtk.Button(icon_name='list-add-symbolic')
+        self.add_button = Gtk.Button(icon_name='list-add-symbolic', valign=Gtk.Align.CENTER)
         self.add_button.set_tooltip_text('Fetch Media Information')
         self.add_button.add_css_class('suggested-action')
         self.add_button.connect('clicked', self._on_submit)

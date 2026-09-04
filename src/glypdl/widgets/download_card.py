@@ -133,27 +133,27 @@ class DownloadCard(Gtk.Box):
         self.btn_box.set_valign(Gtk.Align.CENTER)
         hbox.append(self.btn_box)
 
-        self.open_file_btn = Gtk.Button(label='Play')
+        self.open_file_btn = Gtk.Button(label='Play', valign=Gtk.Align.CENTER)
         self.open_file_btn.set_tooltip_text('Play / Open Video')
         self.open_file_btn.connect('clicked', lambda _: self.emit('open-file-requested', self.download_id))
         self.btn_box.append(self.open_file_btn)
 
-        self.open_folder_btn = Gtk.Button(icon_name='folder-open-symbolic')
+        self.open_folder_btn = Gtk.Button(icon_name='folder-open-symbolic', valign=Gtk.Align.CENTER)
         self.open_folder_btn.set_tooltip_text('Open Containing Folder')
         self.open_folder_btn.connect('clicked', lambda _: self.emit('open-folder-requested', self.download_id))
         self.btn_box.append(self.open_folder_btn)
 
-        self.retry_btn = Gtk.Button(icon_name='view-refresh-symbolic')
+        self.retry_btn = Gtk.Button(icon_name='view-refresh-symbolic', valign=Gtk.Align.CENTER)
         self.retry_btn.set_tooltip_text('Retry Download')
         self.retry_btn.connect('clicked', lambda _: self.emit('retry-requested', self.download_id))
         self.btn_box.append(self.retry_btn)
 
-        self.cancel_btn = Gtk.Button(icon_name='process-stop-symbolic')
+        self.cancel_btn = Gtk.Button(icon_name='process-stop-symbolic', valign=Gtk.Align.CENTER)
         self.cancel_btn.set_tooltip_text('Cancel Download')
         self.cancel_btn.connect('clicked', lambda _: self.emit('cancel-requested', self.download_id))
         self.btn_box.append(self.cancel_btn)
 
-        self.dismiss_btn = Gtk.Button(icon_name='window-close-symbolic')
+        self.dismiss_btn = Gtk.Button(icon_name='window-close-symbolic', valign=Gtk.Align.CENTER)
         self.dismiss_btn.set_tooltip_text('Dismiss')
         self.dismiss_btn.connect('clicked', lambda _: self.emit('remove-requested', self.download_id))
         self.btn_box.append(self.dismiss_btn)

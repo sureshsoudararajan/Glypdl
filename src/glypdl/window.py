@@ -1038,23 +1038,23 @@ class GlypdlWindow(Adw.ApplicationWindow):
 
         if out_path and os.path.exists(out_path):
             # Play / Open Media button with standard play icon
-            play_btn = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text="Play / Open Media")
+            play_btn = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text="Play / Open Media", valign=Gtk.Align.CENTER)
             play_btn.connect('clicked', lambda _, p=out_path: self._open_file(p))
             btn_box.append(play_btn)
 
-            folder_btn = Gtk.Button(icon_name="folder-open-symbolic", tooltip_text="Open Containing Folder")
+            folder_btn = Gtk.Button(icon_name="folder-open-symbolic", tooltip_text="Open Containing Folder", valign=Gtk.Align.CENTER)
             folder_btn.connect('clicked', lambda _, p=out_path: self._open_folder(p))
             btn_box.append(folder_btn)
 
-        copy_btn = Gtk.Button(icon_name="edit-copy-symbolic", tooltip_text="Copy URL")
+        copy_btn = Gtk.Button(icon_name="edit-copy-symbolic", tooltip_text="Copy URL", valign=Gtk.Align.CENTER)
         copy_btn.connect('clicked', lambda _, u=entry.get('url', ''): self._copy_to_clipboard(u))
         btn_box.append(copy_btn)
 
-        redownload_btn = Gtk.Button(icon_name="folder-download-symbolic", tooltip_text="Download Again")
+        redownload_btn = Gtk.Button(icon_name="folder-download-symbolic", tooltip_text="Download Again", valign=Gtk.Align.CENTER)
         redownload_btn.connect('clicked', lambda _, u=entry.get('url', ''): self._redownload_url(u))
         btn_box.append(redownload_btn)
 
-        del_btn = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Remove Record")
+        del_btn = Gtk.Button(icon_name="user-trash-symbolic", tooltip_text="Remove Record", valign=Gtk.Align.CENTER)
         del_btn.add_css_class("destructive-action")
         del_btn.connect('clicked', lambda _, e_id=entry.get('id'): self._delete_history_entry(e_id, row))
         btn_box.append(del_btn)
