@@ -1,5 +1,5 @@
 Name:           glypdl
-Version:        1.0.0
+Version:        1.1.0
 Release:        1%{?dist}
 Summary:        A lightweight native Linux graphical frontend for yt-dlp
 
@@ -40,6 +40,7 @@ Includes the latest bundled standalone yt-dlp engine.
 install -d %{buildroot}%{_datadir}/glypdl
 cp -r src/glypdl %{buildroot}%{_datadir}/glypdl/
 install -Dm755 bin/glypdl %{buildroot}%{_bindir}/glypdl
+install -Dm755 bin/glypdl-host %{buildroot}%{_bindir}/glypdl-host
 install -Dm755 %{SOURCE1} %{buildroot}%{_datadir}/glypdl/bin/yt-dlp
 install -Dm644 data/desktop/io.github.sureshsoudararajan.Glypdl.desktop %{buildroot}%{_datadir}/applications/io.github.sureshsoudararajan.Glypdl.desktop
 install -Dm644 data/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml %{buildroot}%{_datadir}/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml
@@ -50,6 +51,7 @@ install -Dm644 data/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glyp
 %license LICENSE
 %doc README.md
 %{_bindir}/glypdl
+%{_bindir}/glypdl-host
 %{_datadir}/glypdl
 %{python3_sitelib}/glypdl*
 %{_datadir}/applications/io.github.sureshsoudararajan.Glypdl.desktop

@@ -616,9 +616,19 @@ class PreferencesDialog(Adw.PreferencesDialog):
             title="Firefox Native Messaging Host",
             subtitle="Registers Glypdl host manifest with Firefox &amp; LibreWolf"
         )
+
+        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6, valign=Gtk.Align.CENTER)
+
+        self.unregister_btn = Gtk.Button(label="Unregister", valign=Gtk.Align.CENTER)
+        self.unregister_btn.add_css_class("destructive-action")
+        self.unregister_btn.connect('clicked', self._on_unregister_native_host)
+        btn_box.append(self.unregister_btn)
+
         self.register_btn = Gtk.Button(label="Register Host", valign=Gtk.Align.CENTER)
         self.register_btn.connect('clicked', self._on_register_native_host)
-        self.native_host_row.add_suffix(self.register_btn)
+        btn_box.append(self.register_btn)
+
+        self.native_host_row.add_suffix(btn_box)
         ext_group.add(self.native_host_row)
 
         # Check if already registered
@@ -640,14 +650,32 @@ class PreferencesDialog(Adw.PreferencesDialog):
         if registered:
             self.native_host_row.set_subtitle(f"Registered in {len(registered)} browser location(s)")
             self.register_btn.set_label("Re-register")
+            self.register_btn.set_sensitive(True)
+            self.unregister_btn.set_visible(True)
+        else:
+            self.native_host_row.set_subtitle("Not registered with any browser")
+            self.register_btn.set_label("Register Host")
+            self.register_btn.set_sensitive(True)
+            self.unregister_btn.set_visible(False)
 
     def _on_register_native_host(self, button):
         from glypdl.services.native_host import install_manifests
         installed = install_manifests()
         if installed:
             self.native_host_row.set_subtitle(f"Registered in {len(installed)} browser location(s)")
-            button.set_label("Registered ✓")
-            button.set_sensitive(False)
+            self.register_btn.set_label("Registered ✓")
+            self.unregister_btn.set_visible(True)
         else:
             self.native_host_row.set_subtitle("Registration failed. Check file permissions.")
+
+    def _on_unregister_native_host(self, button):
+        from glypdl.services.native_host import uninstall_manifests
+        removed = uninstall_manifests()
+        if removed:
+            self.native_host_row.set_subtitle(f"Unregistered from {len(removed)} browser location(s)")
+        else:
+            self.native_host_row.set_subtitle("Not registered with any browser")
+        self.register_btn.set_label("Register Host")
+        self.register_btn.set_sensitive(True)
+        self.unregister_btn.set_visible(False)
 

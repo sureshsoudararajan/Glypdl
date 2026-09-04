@@ -283,26 +283,70 @@ def run_native_host_loop():
             pass
 
 
+def ensure_host_binary() -> str:
+    """Ensure a working, executable glypdl-host binary exists on the system.
+    
+    Checks standard executable locations first (/usr/bin, /usr/local/bin, PATH, local project).
+    If no system binary exists (e.g. running an older package before glypdl-host was packaged),
+    it generates a self-contained wrapper script in ~/.local/bin/glypdl-host so the native
+    host always has an existing, executable binary.
+    """
+    import shutil
+    user_local_bin = Path.home() / ".local" / "bin" / "glypdl-host"
+
+    candidates = [
+        shutil.which("glypdl-host") or "",
+        "/usr/bin/glypdl-host",
+        "/usr/local/bin/glypdl-host",
+        str(user_local_bin),
+        str(Path(__file__).resolve().parents[3] / "bin" / "glypdl-host"),
+        str(Path(sys.prefix) / "bin" / "glypdl-host"),
+    ]
+
+    for c in candidates:
+        if c and os.path.isfile(c) and os.access(c, os.X_OK):
+            return str(Path(c).resolve())
+
+    # Fallback: create ~/.local/bin/glypdl-host launcher
+    try:
+        user_local_bin.parent.mkdir(parents=True, exist_ok=True)
+        project_bin = Path(__file__).resolve().parents[3] / "bin" / "glypdl-host"
+        if project_bin.is_file():
+            shutil.copy2(project_bin, user_local_bin)
+        else:
+            wrapper_code = """#!/usr/bin/env python3
+import os, sys, glob
+from pathlib import Path
+
+search_paths = [
+    str(Path.home() / ".local" / "share" / "glypdl"),
+    "/usr/share/glypdl",
+    "/usr/share/glypdl/glypdl",
+    "/usr/local/share/glypdl",
+    "/app/share/glypdl",
+]
+for pattern in ["/usr/lib/python3*/site-packages", "/usr/lib64/python3*/site-packages"]:
+    search_paths.extend(glob.glob(pattern))
+for p in search_paths:
+    if os.path.isdir(p) and p not in sys.path:
+        sys.path.insert(0, p)
+
+from glypdl.services.native_host import run_native_host_loop
+
+if __name__ == '__main__':
+    run_native_host_loop()
+"""
+            user_local_bin.write_text(wrapper_code, encoding="utf-8")
+        user_local_bin.chmod(0o755)
+        return str(user_local_bin.resolve())
+    except Exception:
+        return "/usr/bin/glypdl-host"
+
+
 def get_manifest_content(host_binary_path: Optional[str] = None) -> Dict[str, Any]:
     """Generate the Native Messaging Host manifest for Firefox."""
     if not host_binary_path:
-        import shutil
-        candidates = [
-            # 1. Project source layout: bin/glypdl-host next to src/
-            str(Path(__file__).resolve().parents[3] / "bin" / "glypdl-host"),
-            # 2. Installed via package manager (PKGBUILD / pip)
-            str(Path(sys.prefix) / "bin" / "glypdl-host"),
-            # 3. System PATH lookup
-            shutil.which("glypdl-host") or "",
-            # 4. Common system paths
-            "/usr/bin/glypdl-host",
-            "/usr/local/bin/glypdl-host",
-        ]
-        host_binary_path = "/usr/bin/glypdl-host"  # final fallback
-        for c in candidates:
-            if c and os.path.isfile(c) and os.access(c, os.X_OK):
-                host_binary_path = str(Path(c).resolve())
-                break
+        host_binary_path = ensure_host_binary()
 
     return {
         "name": HOST_NAME,
@@ -347,3 +391,16 @@ def install_manifests(host_binary_path: Optional[str] = None) -> List[str]:
             pass
 
     return installed_to
+
+
+def uninstall_manifests() -> List[str]:
+    """Remove the Native Messaging Manifest from all discovered browser host directories."""
+    removed = []
+    for target in get_target_manifest_paths():
+        try:
+            if target.exists():
+                target.unlink()
+                removed.append(str(target))
+        except Exception:
+            pass
+    return removed

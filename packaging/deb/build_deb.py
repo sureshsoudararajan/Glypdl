@@ -8,7 +8,7 @@ import tarfile
 import tempfile
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 PACKAGE = "glypdl"
 DEB_NAME = f"{PACKAGE}_{VERSION}_all.deb"
 
@@ -43,11 +43,16 @@ def create_deb():
             else:
                 shutil.copy2(item, target)
 
-        # 2. Copy launcher & bundle latest yt-dlp binary
+        # 2. Copy launcher, native host & bundle latest yt-dlp binary
         launcher_src = root_dir / "bin" / "glypdl"
         launcher_dest = pkg_root / "usr/bin/glypdl"
         shutil.copy2(launcher_src, launcher_dest)
         launcher_dest.chmod(0o755)
+
+        host_src = root_dir / "bin" / "glypdl-host"
+        host_dest = pkg_root / "usr/bin/glypdl-host"
+        shutil.copy2(host_src, host_dest)
+        host_dest.chmod(0o755)
 
         import urllib.request
         ytdlp_dest = pkg_root / "usr/share/glypdl/bin/yt-dlp"

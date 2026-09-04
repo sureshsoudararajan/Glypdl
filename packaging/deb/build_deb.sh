@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 PKG_DIR="glypdl_${VERSION}_all"
 rm -rf "$PKG_DIR" "$PKG_DIR.deb"
 
@@ -24,9 +24,11 @@ echo "Downloading latest official yt-dlp binary into private bundle..."
 curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o "$PKG_DIR/usr/share/glypdl/bin/yt-dlp"
 chmod +x "$PKG_DIR/usr/share/glypdl/bin/yt-dlp"
 
-# Universal Launcher
+# Universal Launcher and Native Host
 cp bin/glypdl "$PKG_DIR/usr/bin/glypdl"
 chmod +x "$PKG_DIR/usr/bin/glypdl"
+cp bin/glypdl-host "$PKG_DIR/usr/bin/glypdl-host"
+chmod +x "$PKG_DIR/usr/bin/glypdl-host"
 
 # Desktop, Metainfo, Icons
 cp data/desktop/io.github.sureshsoudararajan.Glypdl.desktop "$PKG_DIR/usr/share/applications/"
