@@ -1,6 +1,6 @@
 pkgbase = glypdl
 	pkgdesc = A lightweight native Linux graphical frontend for yt-dlp
-	pkgver = 1.0.0
+	pkgver = 1.1.0
 	pkgrel = 1
 	url = https://github.com/sureshsoudararajan/Glypdl
 	arch = any
@@ -15,7 +15,7 @@ pkgbase = glypdl
 	depends = libadwaita
 	depends = yt-dlp
 	depends = ffmpeg
-	source = glypdl-1.0.0.tar.gz::https://github.com/sureshsoudararajan/Glypdl/archive/v1.0.0.tar.gz
+	source = glypdl-1.1.0.tar.gz::https://github.com/sureshsoudararajan/Glypdl/archive/v1.1.0.tar.gz
 	sha256sums = SKIP
 
 pkgname = glypdl

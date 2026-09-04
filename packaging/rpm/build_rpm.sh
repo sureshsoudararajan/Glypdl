@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
-VERSION="1.0.0"
+SPEC_FILE="packaging/rpm/glypdl.spec"
+VERSION="$(grep -i '^Version:' "$SPEC_FILE" | awk '{print $2}')"
+VERSION="${VERSION:-1.1.0}"
 PKGNAME="glypdl"
 BUILD_DIR="$(pwd)/build-rpm"
 
