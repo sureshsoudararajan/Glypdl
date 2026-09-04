@@ -67,9 +67,11 @@ Implementation_plan.md
 *.sln.docstates
 
 # .NET / Windows Build Artifacts & Binaries
-[Bb]in/
-[Oo]bj/
-[Pp]ublish/
+windows/**/[Bb]in/
+windows/**/[Oo]bj/
+windows/**/[Pp]ublish/
+!/bin/
+!/bin/*
 bin_bundle/
 windows/publish/
 windows/dist/
