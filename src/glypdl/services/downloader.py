@@ -47,6 +47,14 @@ class DownloadManager:
                 except Exception:
                     pass
             else:
+                for item in self.download_queue:
+                    if item.id == download_id and getattr(item, 'is_temp_cookie', False) and item.cookie_file:
+                        try:
+                            if os.path.isfile(item.cookie_file):
+                                os.unlink(item.cookie_file)
+                        except Exception:
+                            pass
+                        item.cookie_file = ''
                 self.download_queue = [
                     item for item in self.download_queue
                     if item.id != download_id
@@ -262,6 +270,16 @@ class DownloadManager:
             with self._queue_lock:
                 self.active_downloads.pop(download_id, None)
             download_item.process = None
+
+            # Securely discard temporary cookie file if used
+            if getattr(download_item, 'is_temp_cookie', False) and download_item.cookie_file:
+                try:
+                    if os.path.isfile(download_item.cookie_file):
+                        os.unlink(download_item.cookie_file)
+                except Exception:
+                    pass
+                download_item.cookie_file = ''
+
             self._process_queue()
 
     def _build_format_spec(self, download_item):

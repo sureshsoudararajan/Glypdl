@@ -1,3 +1,4 @@
+import { extractTargetCookies } from '../shared/cookies';
 import { MediaDeduplicator } from '../detection/deduplicator';
 import { MediaItem } from '../shared/types';
 import { setupCommands } from './commands';
@@ -82,6 +83,29 @@ class BackgroundController {
           }
           sendResponse(resp);
         });
+        return true;
+      }
+
+      if (action === 'download_with_cookies') {
+        const item = message.item as MediaItem;
+        const targetUrl = item.pageUrl || item.url;
+        extractTargetCookies(targetUrl)
+          .then((cookiesTxt) => {
+            return this.conn.sendDownload(item, message.autoDownload, cookiesTxt, true);
+          })
+          .then((resp) => {
+            if (resp.success) {
+              NotificationService.showDownloadQueued(`${item.title} (with Cookies)`);
+            } else {
+              NotificationService.showError(resp.error || 'Cookie download failed');
+            }
+            sendResponse(resp);
+          })
+          .catch((err: any) => {
+            const errStr = err?.message || String(err);
+            NotificationService.showError(`Cookie extraction failed: ${errStr}`);
+            sendResponse({ success: false, error: errStr });
+          });
         return true;
       }
 

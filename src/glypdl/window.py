@@ -289,9 +289,32 @@ class GlypdlWindow(Adw.ApplicationWindow):
         self.unminimize()
         self.present()
         self._external_job_context = job_dict or {}
+
+        # Handle temporary site cookies if sent via "Using Cookie Download"
+        cookie_override = None
+        browser_override = None
+        if job_dict and (job_dict.get('is_temp_cookie') or job_dict.get('cookies_txt')):
+            cookies_txt = job_dict.get('cookies_txt', '')
+            if cookies_txt:
+                try:
+                    import tempfile
+                    fd, temp_path = tempfile.mkstemp(prefix='glypdl_cookie_', suffix='.txt')
+                    with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                        f.write(cookies_txt)
+                    cookie_override = temp_path
+                    browser_override = ""  # Explicitly override and bypass saved browser cookie settings
+                    self._current_temp_cookie = temp_path
+                except Exception:
+                    cookie_override = None
+
         self.view_stack.set_visible_child_name("downloads")
         self.url_input.entry.set_text(url)
-        self._on_url_submitted(self.url_input, url)
+        self._on_url_submitted(
+            self.url_input,
+            url,
+            cookie_override=cookie_override,
+            browser_override=browser_override
+        )
 
     def _on_url_submitted(self, widget, url: str, cookie_override: str = None, browser_override: str = None):
         self._dismiss_preview()
@@ -390,6 +413,15 @@ class GlypdlWindow(Adw.ApplicationWindow):
     def _on_metadata_error(self, error_msg: str, url: str = ""):
         self.fetch_spinner.stop()
         self.fetch_spinner_box.set_visible(False)
+
+        # Discard any temporary cookie file if metadata fetching failed
+        if hasattr(self, '_current_temp_cookie') and self._current_temp_cookie:
+            try:
+                if os.path.isfile(self._current_temp_cookie):
+                    os.unlink(self._current_temp_cookie)
+            except Exception:
+                pass
+            self._current_temp_cookie = None
 
         # Check if authentication / cookies are likely required
         auth_keywords = ['sign in', 'login', 'cookie', 'bot', 'confirm', 'private', 'members', '403', 'forbidden', 'authenticate', 'permission', 'unauthorized', 'account', 'secretstorage', 'unreachable']
@@ -568,6 +600,15 @@ class GlypdlWindow(Adw.ApplicationWindow):
             self.preview_container.remove(sibling)
             sibling = next_s
 
+        # Discard temporary cookie file if preview was closed without starting download
+        if hasattr(self, '_current_temp_cookie') and self._current_temp_cookie:
+            try:
+                if os.path.isfile(self._current_temp_cookie):
+                    os.unlink(self._current_temp_cookie)
+            except Exception:
+                pass
+            self._current_temp_cookie = None
+
     def _on_download_requested(self, widget, url: str, mode: DownloadMode, quality: str, audio_format: str):
         # 1. Check if selected video quality is available in metadata
         if mode != DownloadMode.AUDIO and quality not in ('Best', ''):
@@ -626,37 +667,57 @@ class GlypdlWindow(Adw.ApplicationWindow):
         self._start_download_item(widget, url, mode, quality, audio_format)
 
     def _on_download_playlist_requested(self, widget, selected_entries: list, mode: DownloadMode, quality: str, audio_format: str):
+        temp_cookie_to_transfer = getattr(self, '_current_temp_cookie', None)
+        self._current_temp_cookie = None
         self._dismiss_preview()
 
         cookie_file = None
         cookies_from_browser = None
 
-        method = self.app.settings.get_cookie_method()
-        if method == 'browser':
-            b_name = self.app.settings.get_browser_name()
-            b_prof = self.app.settings.get_browser_profile()
-            b_key = self.app.settings.get_browser_keyring()
-            cookies_from_browser = self.app.cookie_service.build_browser_spec(b_name, profile=b_prof, keyring=b_key)
-        elif method == 'file':
-            cookie_file = self.app.settings.get('cookie_file', '')
+        if temp_cookie_to_transfer and os.path.isfile(temp_cookie_to_transfer):
+            cookie_file = temp_cookie_to_transfer
+            cookies_from_browser = ""  # Override and bypass any saved browser cookies
+        else:
+            method = self.app.settings.get_cookie_method()
+            if method == 'browser':
+                b_name = self.app.settings.get_browser_name()
+                b_prof = self.app.settings.get_browser_profile()
+                b_key = self.app.settings.get_browser_keyring()
+                cookies_from_browser = self.app.cookie_service.build_browser_spec(b_name, profile=b_prof, keyring=b_key)
+            elif method == 'file':
+                cookie_file = self.app.settings.get('cookie_file', '')
 
-        if hasattr(widget, 'format_selector'):
-            sel_file, sel_browser = widget.format_selector.get_selected_cookie_config()
-            if sel_browser:
-                cookies_from_browser = sel_browser
-                cookie_file = None
-            elif sel_file:
-                cookie_file = sel_file
-                cookies_from_browser = None
+            if hasattr(widget, 'format_selector'):
+                sel_file, sel_browser = widget.format_selector.get_selected_cookie_config()
+                if sel_browser:
+                    cookies_from_browser = sel_browser
+                    cookie_file = None
+                elif sel_file:
+                    cookie_file = sel_file
+                    cookies_from_browser = None
 
         dl_dir = self.app.settings.get('download_dir') or str(get_default_download_dir())
         fallback_url = getattr(widget, 'playlist_data', {}).get('original_url') or getattr(widget, 'playlist_data', {}).get('webpage_url') or ''
         queued_count = 0
 
-        for entry in selected_entries:
+        for i, entry in enumerate(selected_entries):
             target_url = entry.get('url') or entry.get('webpage_url') or entry.get('original_url') or fallback_url
             if not target_url:
                 continue
+
+            entry_cookie_file = cookie_file
+            if temp_cookie_to_transfer and cookie_file:
+                # If multiple items, make independent copy for each so they clean up independently
+                if i > 0:
+                    try:
+                        import tempfile
+                        import shutil
+                        fd, c_path = tempfile.mkstemp(prefix='glypdl_cookie_', suffix='.txt')
+                        os.close(fd)
+                        shutil.copyfile(cookie_file, c_path)
+                        entry_cookie_file = c_path
+                    except Exception:
+                        entry_cookie_file = cookie_file
 
             item = DownloadItem(
                 url=target_url,
@@ -670,8 +731,9 @@ class GlypdlWindow(Adw.ApplicationWindow):
                 audio_format=audio_format,
                 download_dir=dl_dir,
                 filename_template=self.app.settings.get('filename_template', '%(title)s.%(ext)s'),
-                cookie_file=cookie_file or '',
-                cookies_from_browser=cookies_from_browser or ''
+                cookie_file=entry_cookie_file or '',
+                cookies_from_browser=cookies_from_browser or '',
+                is_temp_cookie=bool(temp_cookie_to_transfer)
             )
 
             self.downloads.append(item)
@@ -703,28 +765,34 @@ class GlypdlWindow(Adw.ApplicationWindow):
         return ""
 
     def _start_download_item(self, widget, url: str, mode: DownloadMode, quality: str, audio_format: str):
+        temp_cookie_to_transfer = getattr(self, '_current_temp_cookie', None)
+        self._current_temp_cookie = None
         self._dismiss_preview()
 
         cookie_file = None
         cookies_from_browser = None
 
-        method = self.app.settings.get_cookie_method()
-        if method == 'browser':
-            b_name = self.app.settings.get_browser_name()
-            b_prof = self.app.settings.get_browser_profile()
-            b_key = self.app.settings.get_browser_keyring()
-            cookies_from_browser = self.app.cookie_service.build_browser_spec(b_name, profile=b_prof, keyring=b_key)
-        elif method == 'file':
-            cookie_file = self.app.settings.get('cookie_file', '')
+        if temp_cookie_to_transfer and os.path.isfile(temp_cookie_to_transfer):
+            cookie_file = temp_cookie_to_transfer
+            cookies_from_browser = ""  # Override and bypass any saved browser cookies
+        else:
+            method = self.app.settings.get_cookie_method()
+            if method == 'browser':
+                b_name = self.app.settings.get_browser_name()
+                b_prof = self.app.settings.get_browser_profile()
+                b_key = self.app.settings.get_browser_keyring()
+                cookies_from_browser = self.app.cookie_service.build_browser_spec(b_name, profile=b_prof, keyring=b_key)
+            elif method == 'file':
+                cookie_file = self.app.settings.get('cookie_file', '')
 
-        if hasattr(widget, 'format_selector'):
-            sel_file, sel_browser = widget.format_selector.get_selected_cookie_config()
-            if sel_browser:
-                cookies_from_browser = sel_browser
-                cookie_file = None
-            elif sel_file:
-                cookie_file = sel_file
-                cookies_from_browser = None
+            if hasattr(widget, 'format_selector'):
+                sel_file, sel_browser = widget.format_selector.get_selected_cookie_config()
+                if sel_browser:
+                    cookies_from_browser = sel_browser
+                    cookie_file = None
+                elif sel_file:
+                    cookie_file = sel_file
+                    cookies_from_browser = None
 
         dl_dir = self.app.settings.get('download_dir') or str(get_default_download_dir())
         target_url = url or getattr(widget, 'metadata', {}).get('webpage_url') or getattr(widget, 'metadata', {}).get('original_url') or ''
@@ -744,7 +812,8 @@ class GlypdlWindow(Adw.ApplicationWindow):
             download_dir=dl_dir,
             filename_template=self.app.settings.get('filename_template', '%(title)s.%(ext)s'),
             cookie_file=cookie_file or '',
-            cookies_from_browser=cookies_from_browser or ''
+            cookies_from_browser=cookies_from_browser or '',
+            is_temp_cookie=bool(temp_cookie_to_transfer)
         )
 
         self.downloads.append(item)

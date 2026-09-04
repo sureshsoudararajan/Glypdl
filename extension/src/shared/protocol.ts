@@ -16,9 +16,14 @@ export function createStatusMessage(): ProtocolMessage {
   };
 }
 
-export function createDownloadMessage(item: MediaItem, autoDownload = false): ProtocolMessage {
+export function createDownloadMessage(
+  item: MediaItem,
+  autoDownload = false,
+  cookiesTxt?: string,
+  isTempCookie?: boolean
+): ProtocolMessage {
   const targetUrl = item.sourceStrategy === 'youtube' ? item.pageUrl : item.url;
-  return {
+  const msg: ProtocolMessage = {
     protocolVersion: PROTOCOL_VERSION,
     action: 'download',
     url: targetUrl,
@@ -34,6 +39,14 @@ export function createDownloadMessage(item: MediaItem, autoDownload = false): Pr
     },
     autoDownload
   };
+
+  if (cookiesTxt) {
+    msg.cookies_txt = cookiesTxt;
+    msg.is_temp_cookie = isTempCookie ?? true;
+    msg.use_cookies = true;
+  }
+
+  return msg;
 }
 
 export function createBatchDownloadMessage(items: MediaItem[]): ProtocolMessage {

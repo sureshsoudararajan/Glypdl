@@ -28,8 +28,13 @@ export class ConnectionManager {
     return this.activeConnection.getStatus();
   }
 
-  async sendDownload(item: MediaItem, autoDownload = false): Promise<ProtocolResponse> {
-    const msg = createDownloadMessage(item, autoDownload);
+  async sendDownload(
+    item: MediaItem,
+    autoDownload = false,
+    cookiesTxt?: string,
+    isTempCookie?: boolean
+  ): Promise<ProtocolResponse> {
+    const msg = createDownloadMessage(item, autoDownload, cookiesTxt, isTempCookie);
     return this.activeConnection.sendMessage(msg);
   }
 

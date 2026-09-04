@@ -121,15 +121,32 @@ class PopupController {
             ${item.formattedSize ? `<span>${item.formattedSize}</span>` : ''}
           </div>
         </div>
-        <button class="download-btn" ${item.isProtected ? 'disabled' : ''}>Download</button>
+        <div class="media-actions">
+          <button class="download-btn btn-normal" ${item.isProtected ? 'disabled' : ''}>Download</button>
+          <button class="download-btn btn-cookie" ${item.isProtected ? 'disabled' : ''} title="Extract site cookies and download with authentication">🍪 Using Cookie</button>
+        </div>
       `;
 
-      card.querySelector('.download-btn')?.addEventListener('click', () => {
+      card.querySelector('.btn-normal')?.addEventListener('click', () => {
         browserApi?.runtime?.sendMessage({
           action: 'download_item',
           item
         });
         window.close();
+      });
+
+      card.querySelector('.btn-cookie')?.addEventListener('click', () => {
+        const btn = card.querySelector('.btn-cookie') as HTMLButtonElement | null;
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = 'Extracting…';
+        }
+        browserApi?.runtime?.sendMessage({
+          action: 'download_with_cookies',
+          item
+        }, () => {
+          window.close();
+        });
       });
 
       container.appendChild(card);

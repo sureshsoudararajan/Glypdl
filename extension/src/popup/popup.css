@@ -11,7 +11,7 @@
 }
 
 body {
-  width: 360px;
+  width: 400px;
   max-height: 520px;
   margin: 0;
   padding: 0;
@@ -146,8 +146,15 @@ header {
   font-weight: 600;
 }
 
+.media-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .download-btn {
-  padding: 6px 10px;
+  padding: 6px 9px;
   font-size: 11px;
   font-weight: 600;
   background: var(--accent-color);
@@ -155,17 +162,30 @@ header {
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.15s ease;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.download-btn:hover {
+.download-btn:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
+.download-btn.btn-cookie {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.download-btn.btn-cookie:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+}
+
 .download-btn:disabled {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.35);
+  border-color: transparent;
   cursor: not-allowed;
 }
 

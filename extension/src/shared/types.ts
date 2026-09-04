@@ -63,6 +63,8 @@ export interface DownloadJob {
   quality?: string;
   autoDownload?: boolean;
   timestamp: number;
+  cookiesTxt?: string;
+  isTempCookie?: boolean;
 }
 
 export interface ConnectionStatus {
@@ -106,6 +108,9 @@ export interface ProtocolMessage {
     format: string;
     quality: string;
   };
+  cookies_txt?: string;
+  is_temp_cookie?: boolean;
+  use_cookies?: boolean;
   jobs?: ProtocolMessage[];
   [key: string]: unknown;
 }

@@ -56,6 +56,52 @@ class TestDownloadManager(unittest.TestCase):
             DownloadState.DOWNLOADING
         )
 
+    def test_temp_cookie_cleanup_on_cancel(self):
+        import tempfile
+        import os
+        fd, temp_path = tempfile.mkstemp(prefix="test_cookie_", suffix=".txt")
+        os.close(fd)
+        self.assertTrue(os.path.exists(temp_path))
+
+        item = DownloadItem(
+            url="https://example.com/watch?v=1",
+            cookie_file=temp_path,
+            is_temp_cookie=True
+        )
+        self.manager.download_queue.append(item)
+        self.manager.cancel_download(item.id)
+
+        self.assertFalse(os.path.exists(temp_path))
+        self.assertEqual(item.cookie_file, "")
+
+    def test_temp_cookie_cleanup_after_run(self):
+        import tempfile
+        import os
+        from unittest.mock import patch
+
+        fd, temp_path = tempfile.mkstemp(prefix="test_cookie_", suffix=".txt")
+        os.close(fd)
+        self.assertTrue(os.path.exists(temp_path))
+
+        item = DownloadItem(
+            url="https://example.com/watch?v=2",
+            cookie_file=temp_path,
+            is_temp_cookie=True
+        )
+
+        with patch('subprocess.Popen') as mock_popen:
+            mock_proc = MagicMock()
+            mock_proc.stdout.readline.return_value = ""
+            mock_proc.poll.return_value = 0
+            mock_proc.wait.return_value = 0
+            mock_popen.return_value = mock_proc
+
+            self.manager._run_download(item)
+
+        self.assertFalse(os.path.exists(temp_path))
+        self.assertEqual(item.cookie_file, "")
+
 
 if __name__ == '__main__':
     unittest.main()
+

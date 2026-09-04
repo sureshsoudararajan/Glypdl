@@ -53,7 +53,8 @@
     "storage",
     "contextMenus",
     "notifications",
-    "webRequest"
+    "webRequest",
+    "cookies"
   ],
   "commands": {
     "send-media-to-glypdl": {
