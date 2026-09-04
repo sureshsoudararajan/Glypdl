@@ -9,8 +9,10 @@ from pathlib import Path
 # Dynamically resolve relative to binary location (handles /app in Flatpak, /usr, /usr/local, etc.)
 bin_dir = Path(__file__).resolve().parent
 prefix_share = bin_dir.parent / "share" / "glypdl"
+src_dir = bin_dir.parent / "src"
 
 search_paths = [
+    str(src_dir),
     str(prefix_share),
     "/usr/share/glypdl",
     "/usr/share/glypdl/glypdl",

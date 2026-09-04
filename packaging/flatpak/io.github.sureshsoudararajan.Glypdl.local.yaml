@@ -36,6 +36,7 @@ modules:
       - install -d ${FLATPAK_DEST}/share/glypdl
       - cp -r src/glypdl ${FLATPAK_DEST}/share/glypdl/
       - install -Dm755 bin/glypdl ${FLATPAK_DEST}/bin/glypdl
+      - install -Dm755 bin/glypdl-host ${FLATPAK_DEST}/bin/glypdl-host
       - install -Dm644 data/desktop/io.github.sureshsoudararajan.Glypdl.desktop ${FLATPAK_DEST}/share/applications/io.github.sureshsoudararajan.Glypdl.desktop
       - install -Dm644 data/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml ${FLATPAK_DEST}/share/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml
       - install -Dm644 data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg

@@ -19,9 +19,11 @@ mkdir -p "$APP_DIR/usr/share/icons/hicolor/512x512/apps"
 cp -r src/glypdl/* "$APP_DIR/usr/share/glypdl/glypdl/"
 cp -r src/glypdl/* "$APP_DIR/usr/lib/python3/dist-packages/glypdl/"
 
-# Copy launcher binary
+# Copy launcher and host binary
 cp bin/glypdl "$APP_DIR/usr/bin/glypdl"
 chmod +x "$APP_DIR/usr/bin/glypdl"
+cp bin/glypdl-host "$APP_DIR/usr/bin/glypdl-host"
+chmod +x "$APP_DIR/usr/bin/glypdl-host"
 
 # Download latest standalone official yt-dlp binary into private bundle
 echo "Downloading latest official yt-dlp binary into private bundle..."
