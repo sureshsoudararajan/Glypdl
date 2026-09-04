@@ -212,6 +212,9 @@ class DownloadManager:
                     elif '[Merger] Merging formats into' in line:
                         dest = line.split('into', 1)[-1].strip().strip('"').strip("'")
                         GLib.idle_add(self._set_output_path, download_item, dest)
+                    elif 'has already been downloaded' in line and '[download]' in line:
+                        dest = line.split('[download]', 1)[-1].replace('has already been downloaded', '').strip().strip('"').strip("'")
+                        GLib.idle_add(self._set_output_path, download_item, dest)
 
             proc.wait()
 

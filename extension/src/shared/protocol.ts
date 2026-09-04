@@ -16,13 +16,51 @@ export function createStatusMessage(): ProtocolMessage {
   };
 }
 
+export function isSupportedPlatformPage(url?: string): boolean {
+  if (!url) return false;
+  return (
+    url.includes('youtube.com/') ||
+    url.includes('youtu.be/') ||
+    url.includes('instagram.com/') ||
+    url.includes('tiktok.com/') ||
+    url.includes('twitter.com/') ||
+    url.includes('x.com/') ||
+    url.includes('facebook.com/') ||
+    url.includes('fb.watch/') ||
+    url.includes('reddit.com/')
+  );
+}
+
+export function isRawMediaChunkUrl(url?: string): boolean {
+  if (!url) return false;
+  return (
+    url.includes('.fbcdn.net/') ||
+    url.includes('.cdninstagram.com/') ||
+    url.includes('.googlevideo.com/') ||
+    url.includes('.tiktokcdn.com/') ||
+    url.includes('.byteoversea.com/') ||
+    url.includes('.ibytedtos.com/') ||
+    url.includes('v.redd.it/')
+  );
+}
+
 export function createDownloadMessage(
   item: MediaItem,
   autoDownload = false,
   cookiesTxt?: string,
   isTempCookie?: boolean
 ): ProtocolMessage {
-  const targetUrl = item.sourceStrategy === 'youtube' ? item.pageUrl : item.url;
+  let targetUrl = item.url;
+  if (
+    item.sourceStrategy === 'youtube' ||
+    item.sourceStrategy === 'instagram' ||
+    isSupportedPlatformPage(item.pageUrl) ||
+    isRawMediaChunkUrl(item.url)
+  ) {
+    if (item.pageUrl && item.pageUrl.startsWith('http')) {
+      targetUrl = item.pageUrl;
+    }
+  }
   const msg: ProtocolMessage = {
     protocolVersion: PROTOCOL_VERSION,
     action: 'download',

@@ -50,7 +50,12 @@ export async function extractTargetCookies(targetUrl: string): Promise<string> {
     throw new Error('Browser cookies API is not available or permission was denied.');
   }
 
-  const domain = extractDomain(targetUrl);
+  let domain = extractDomain(targetUrl);
+  if (domain.includes('fbcdn.net') || domain.includes('cdninstagram.com')) {
+    domain = 'instagram.com';
+  } else if (domain.includes('googlevideo.com')) {
+    domain = 'youtube.com';
+  }
   const cookies: CookieLike[] = [];
 
   try {

@@ -85,15 +85,29 @@ export class NetworkMediaSniffer {
         // Ignored
       }
 
-      if (!title) {
+      let finalUrl = url;
+      let strategy: any = 'network';
+
+      if (pageUrl.includes('instagram.com/')) {
+        finalUrl = pageUrl;
+        strategy = 'instagram';
+        if (pageUrl.includes('/stories/')) {
+          const match = pageUrl.match(/\/stories\/([^/?#]+)/);
+          title = match ? `Instagram Story - ${match[1]}` : 'Instagram Story';
+        } else if (pageUrl.includes('/reel/') || pageUrl.includes('/reels/')) {
+          title = 'Instagram Reel';
+        } else if (pageUrl.includes('/p/')) {
+          title = 'Instagram Post';
+        }
+      } else if (!title) {
         title = `${inferred.type.toUpperCase()} stream from ${extractDomain(pageUrl)}`;
       }
 
       const quality = inferred.type === 'video' ? inferMediaQuality(url) : 'audio';
 
       const item: MediaItem = {
-        id: generateMediaId(url, pageUrl),
-        url,
+        id: generateMediaId(finalUrl, pageUrl),
+        url: finalUrl,
         pageUrl,
         title,
         type: inferred.type,
@@ -103,7 +117,7 @@ export class NetworkMediaSniffer {
         mimeType: contentType,
         site: extractDomain(pageUrl),
         timestamp: Date.now(),
-        sourceStrategy: 'network'
+        sourceStrategy: strategy
       };
 
       this.onMediaDetected(tabId, item);

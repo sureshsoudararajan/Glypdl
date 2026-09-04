@@ -30,7 +30,7 @@ export type MediaQuality =
   | 'audio'
   | 'auto';
 
-export type DetectionStrategyType = 'youtube' | 'html5' | 'hls' | 'dash' | 'direct' | 'context';
+export type DetectionStrategyType = 'youtube' | 'instagram' | 'html5' | 'hls' | 'dash' | 'direct' | 'context';
 
 export interface MediaItem {
   id: string;

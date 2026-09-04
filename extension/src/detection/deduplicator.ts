@@ -55,9 +55,14 @@ export class MediaDeduplicator {
         return existing;
       }
 
-      // 2. YouTube canonical video match
+      // 2. YouTube & Instagram canonical video match
       if (item.sourceStrategy === 'youtube' || existing.sourceStrategy === 'youtube') {
         if (existNormPage === itemNormPage || (itemDomain === 'youtube.com' && existDomain === 'youtube.com')) {
+          return existing;
+        }
+      }
+      if (item.sourceStrategy === 'instagram' || existing.sourceStrategy === 'instagram' || itemDomain === 'instagram.com' || existDomain === 'instagram.com') {
+        if (existNormPage === itemNormPage || (itemDomain === 'instagram.com' && existDomain === 'instagram.com')) {
           return existing;
         }
       }
@@ -112,8 +117,14 @@ export class MediaDeduplicator {
     const existingIsMaster = HlsDashStrategy.isMasterPlaylist(existing.url);
     const incomingIsSubVariant = HlsDashStrategy.isSubVariantPlaylist(incoming.url);
 
-    // 1. Upgrade URL to real downloadable master stream
-    if (existingIsFallback && !incomingIsFallback) {
+    // 1. Upgrade URL to real downloadable master stream or preserve canonical platform URL
+    if (existing.sourceStrategy === 'youtube' || incoming.sourceStrategy === 'youtube') {
+      existing.url = existing.pageUrl;
+      existing.sourceStrategy = 'youtube';
+    } else if (existing.sourceStrategy === 'instagram' || incoming.sourceStrategy === 'instagram') {
+      existing.url = existing.pageUrl;
+      existing.sourceStrategy = 'instagram';
+    } else if (existingIsFallback && !incomingIsFallback) {
       existing.url = incoming.url;
       existing.format = incoming.format;
       existing.type = incoming.type;
@@ -187,12 +198,19 @@ export class MediaDeduplicator {
   private isGenericTitle(title?: string): boolean {
     if (!title) return true;
     const lower = title.toLowerCase();
-    return (
+    if (
       lower.startsWith('media from') ||
       lower.startsWith('video from') ||
       lower.startsWith('hls stream from') ||
       lower.startsWith('dash stream from') ||
       lower.startsWith('audio stream from')
-    );
+    ) {
+      return true;
+    }
+    // Long cryptic hashes without spaces (e.g. fbcdn chunk names)
+    if (!title.includes(' ') && title.length > 25 && /^[A-Za-z0-9_-]+$/.test(title)) {
+      return true;
+    }
+    return false;
   }
 }

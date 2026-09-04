@@ -4,6 +4,7 @@ import { MediaFilter } from './filter';
 import { DirectMediaStrategy } from './strategies/direct_media';
 import { HlsDashStrategy } from './strategies/hls_dash';
 import { Html5Strategy } from './strategies/html5';
+import { InstagramStrategy } from './strategies/instagram';
 import { YouTubeStrategy } from './strategies/youtube';
 
 export class MediaDetector {
@@ -18,6 +19,14 @@ export class MediaDetector {
       const ytItem = YouTubeStrategy.detectFromPage(pageUrl, doc);
       if (ytItem && MediaFilter.isValidMedia(ytItem, settings)) {
         this.deduplicator.add(ytItem);
+      }
+    }
+
+    // 2. Instagram specific strategy (Stories, Reels, Posts)
+    if (InstagramStrategy.isInstagramPage(pageUrl)) {
+      const igItem = InstagramStrategy.detectFromPage(pageUrl, doc);
+      if (igItem && MediaFilter.isValidMedia(igItem, settings)) {
+        this.deduplicator.add(igItem);
       }
     }
 
