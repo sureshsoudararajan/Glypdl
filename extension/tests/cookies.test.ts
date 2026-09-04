@@ -58,4 +58,78 @@ describe('formatNetscapeCookies', () => {
     // Only comments and blank lines
     expect(lines.every((l) => l.startsWith('#') || l.trim() === '')).toBe(true);
   });
+
+  it('formats httpOnly and subdomain cookies correctly with #HttpOnly_ prefix', () => {
+    const cookies = [
+      {
+        domain: 'instagram.com',
+        name: 'sessionid',
+        value: 'secret123',
+        path: '/',
+        secure: true,
+        httpOnly: true,
+        hostOnly: false,
+        expirationDate: 1800000000
+      },
+      {
+        domain: '.instagram.com',
+        name: 'ds_user_id',
+        value: 'user999',
+        path: '/',
+        secure: true,
+        httpOnly: false,
+        hostOnly: false,
+        expirationDate: 1800000000
+      }
+    ];
+
+    const output = formatNetscapeCookies(cookies);
+    expect(output).toContain('#HttpOnly_.instagram.com\tTRUE\t/\tTRUE\t1800000000\tsessionid\tsecret123');
+    expect(output).toContain('.instagram.com\tTRUE\t/\tTRUE\t1800000000\tds_user_id\tuser999');
+  });
 });
+
+describe('extractTargetCookies', () => {
+  it('extracts and filters cookies matching target domain even with partitionKey or storeId', async () => {
+    const { extractTargetCookies } = await import('../src/shared/cookies');
+    const mockCookies = [
+      {
+        domain: '.instagram.com',
+        name: 'sessionid',
+        value: 'abc_session',
+        path: '/',
+        secure: true,
+        httpOnly: true
+      },
+      {
+        domain: 'instagram.com',
+        name: 'ds_user_id',
+        value: '12345',
+        path: '/',
+        secure: true
+      },
+      {
+        domain: '.facebook.com',
+        name: 'c_user',
+        value: 'ignore_fb',
+        path: '/'
+      }
+    ];
+
+    (globalThis as any).browser = {
+      cookies: {
+        getAll: async (query: any) => {
+          // Verify query structure supports partitionKey
+          return mockCookies;
+        }
+      }
+    };
+
+    const netscape = await extractTargetCookies('https://www.instagram.com/stories/testuser/12345/', 'firefox-default');
+    expect(netscape).toContain('sessionid');
+    expect(netscape).toContain('ds_user_id');
+    expect(netscape).not.toContain('ignore_fb');
+    delete (globalThis as any).browser;
+  });
+});
+

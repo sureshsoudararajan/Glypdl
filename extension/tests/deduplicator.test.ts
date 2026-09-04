@@ -80,6 +80,44 @@ describe('MediaDeduplicator', () => {
     expect(dedup.getAll()[0].thumbnailUrl).toBe('https://i.ytimg.com/vi/abc/maxresdefault.jpg');
   });
 
+  it('keeps distinct Instagram stories separate when URLs differ', () => {
+    const dedup = new MediaDeduplicator();
+    const story1: MediaItem = {
+      id: 'ig-1',
+      url: 'https://www.instagram.com/stories/userA/1111/',
+      pageUrl: 'https://www.instagram.com/stories/userA/1111/',
+      title: 'Instagram Story - userA',
+      thumbnailUrl: 'https://cdn.instagram.com/thumbA.jpg',
+      type: 'video',
+      format: 'mp4',
+      quality: '1080p',
+      site: 'instagram.com',
+      timestamp: 1000,
+      sourceStrategy: 'instagram'
+    };
+    const story2: MediaItem = {
+      id: 'ig-2',
+      url: 'https://www.instagram.com/stories/userB/2222/',
+      pageUrl: 'https://www.instagram.com/stories/userB/2222/',
+      title: 'Instagram Story - userB',
+      thumbnailUrl: 'https://cdn.instagram.com/thumbB.jpg',
+      type: 'video',
+      format: 'mp4',
+      quality: '1080p',
+      site: 'instagram.com',
+      timestamp: 2000,
+      sourceStrategy: 'instagram'
+    };
+
+    dedup.add(story1);
+    dedup.add(story2);
+
+    const all = dedup.getAll();
+    expect(all.length).toBe(2);
+    expect(all.some((it) => it.url.includes('userA'))).toBe(true);
+    expect(all.some((it) => it.url.includes('userB'))).toBe(true);
+  });
+
   it('clusters HLS master and variant streams on same page into a single enriched item', () => {
     const dedup = new MediaDeduplicator();
 

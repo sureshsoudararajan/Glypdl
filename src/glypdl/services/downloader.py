@@ -100,6 +100,25 @@ class DownloadManager:
         output_template = download_item.filename_template or self.settings.get(
             'filename_template', '%(title)s.%(ext)s'
         )
+
+        # If the title is generic or identical across platform items (e.g. Instagram stories/reels),
+        # ensure yt-dlp appends the unique video id so files don't collide or get skipped
+        title_lower = (download_item.title or '').lower()
+        url_lower = (download_item.url or '').lower()
+        is_generic_title = (
+            title_lower.startswith('video by ') or 
+            title_lower.startswith('story by ') or 
+            'instagram story' in title_lower or 
+            'instagram reel' in title_lower or 
+            'instagram post' in title_lower or 
+            '/stories/' in url_lower or
+            title_lower in ('master', 'index', 'playlist', 'stream', 'video', 'untitled media', '')
+        )
+        if is_generic_title and '%(id)s' not in output_template:
+            if '%(title)s' in output_template:
+                output_template = output_template.replace('%(title)s', '%(title)s [%(id)s]')
+            else:
+                output_template = '%(title)s [%(id)s].%(ext)s'
         final_download_dir = download_item.download_dir or self.settings.get(
             'download_dir', ''
         )

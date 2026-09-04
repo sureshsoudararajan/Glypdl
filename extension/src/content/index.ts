@@ -41,16 +41,24 @@ class ContentController {
     this.domObserver.start();
 
     // SPA Observer for dynamic route changes
-    this.spaObserver = new SpaObserver(() => {
+    this.spaObserver = new SpaObserver((newUrl) => {
       this.detector.clear();
+      try {
+        browserApi?.runtime?.sendMessage({
+          action: 'tab_navigated',
+          url: newUrl
+        });
+      } catch {}
       this.runScan();
-      setTimeout(() => this.runScan(), 800);
+      setTimeout(() => this.runScan(), 400);
+      setTimeout(() => this.runScan(), 1000);
     });
     this.spaObserver.start();
 
     // Listen for scan requests from popup or background
     browserApi?.runtime?.onMessage?.addListener((message: any, _sender: any, sendResponse: any) => {
       if (message?.action === 'scan_now') {
+        this.detector.clear();
         this.runScan();
         sendResponse({ items: this.detector.getItems() });
         return true;

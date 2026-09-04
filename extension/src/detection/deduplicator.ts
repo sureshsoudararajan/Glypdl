@@ -55,14 +55,14 @@ export class MediaDeduplicator {
         return existing;
       }
 
-      // 2. YouTube & Instagram canonical video match
+      // 2. YouTube & Instagram canonical video match (only when on the same video/story page)
       if (item.sourceStrategy === 'youtube' || existing.sourceStrategy === 'youtube') {
-        if (existNormPage === itemNormPage || (itemDomain === 'youtube.com' && existDomain === 'youtube.com')) {
+        if (existNormPage === itemNormPage) {
           return existing;
         }
       }
-      if (item.sourceStrategy === 'instagram' || existing.sourceStrategy === 'instagram' || itemDomain === 'instagram.com' || existDomain === 'instagram.com') {
-        if (existNormPage === itemNormPage || (itemDomain === 'instagram.com' && existDomain === 'instagram.com')) {
+      if (item.sourceStrategy === 'instagram' || existing.sourceStrategy === 'instagram') {
+        if (existNormPage === itemNormPage) {
           return existing;
         }
       }

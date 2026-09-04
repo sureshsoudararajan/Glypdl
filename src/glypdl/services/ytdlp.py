@@ -160,10 +160,13 @@ class YtDlpService:
                             cookies_from_browser: Optional[str] = None,
                             extract_audio: bool = False,
                             audio_format: Optional[str] = None,
-                            extra_args: Optional[List[str]] = None) -> List[str]:
+                            extra_args: Optional[List[str]] = None,
+                            no_playlist: bool = True) -> List[str]:
         """Build safe argument list for yt-dlp download execution."""
         path = self.get_path()
         args = [path, '--newline', '--progress', '--no-warnings']
+        if no_playlist:
+            args.append('--no-playlist')
         
         # If ffmpeg is available and custom path exists, specify it
         ffmpeg_bin = self.detect_ffmpeg()

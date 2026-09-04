@@ -5,6 +5,7 @@ const browserApi = typeof browser !== 'undefined' ? browser : typeof chrome !== 
 
 class PopupController {
   private mediaItems: MediaItem[] = [];
+  private activeTabStoreId?: string;
 
   async init(): Promise<void> {
     this.bindStaticListeners();
@@ -56,6 +57,7 @@ class PopupController {
     const tabs = await browserApi.tabs.query({ active: true, currentWindow: true });
     const activeTab = tabs[0];
     if (!activeTab || !activeTab.id) return;
+    this.activeTabStoreId = (activeTab as any).cookieStoreId;
 
     const fetchUnifiedList = () => {
       browserApi.runtime.sendMessage({ action: 'get_tab_media', tabId: activeTab.id }, (response: any) => {
@@ -71,8 +73,13 @@ class PopupController {
 
     // 2. Trigger active tab content script scan for immediate detection and sync
     try {
-      browserApi.tabs.sendMessage(activeTab.id, { action: 'scan_now' }, () => {
-        fetchUnifiedList();
+      browserApi.tabs.sendMessage(activeTab.id, { action: 'scan_now' }, (response: any) => {
+        if (response?.items && response.items.length > 0) {
+          this.mediaItems = response.items;
+          this.renderMediaList();
+        } else {
+          fetchUnifiedList();
+        }
       });
     } catch {
       // Content script may not be loaded on internal pages
@@ -128,11 +135,29 @@ class PopupController {
       `;
 
       card.querySelector('.btn-normal')?.addEventListener('click', () => {
-        browserApi?.runtime?.sendMessage({
-          action: 'download_item',
-          item
-        });
-        window.close();
+        const btn = card.querySelector('.btn-normal') as HTMLButtonElement | null;
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = 'Sending…';
+        }
+        browserApi?.runtime?.sendMessage(
+          {
+            action: 'download_item',
+            item
+          },
+          (resp: any) => {
+            if (resp && resp.success) {
+              if (btn) btn.textContent = '✓ Sent';
+              setTimeout(() => window.close(), 500);
+            } else {
+              if (btn) {
+                btn.disabled = false;
+                btn.textContent = 'Download';
+              }
+              window.close();
+            }
+          }
+        );
       });
 
       card.querySelector('.btn-cookie')?.addEventListener('click', () => {
@@ -141,12 +166,26 @@ class PopupController {
           btn.disabled = true;
           btn.textContent = 'Extracting…';
         }
-        browserApi?.runtime?.sendMessage({
-          action: 'download_with_cookies',
-          item
-        }, () => {
-          window.close();
-        });
+        browserApi?.runtime?.sendMessage(
+          {
+            action: 'download_with_cookies',
+            item,
+            storeId: this.activeTabStoreId
+          },
+          (resp: any) => {
+            if (resp && resp.success) {
+              if (btn) btn.textContent = '✓ Sent to Glypdl';
+              setTimeout(() => window.close(), 600);
+            } else {
+              if (btn) {
+                btn.disabled = false;
+                btn.textContent = '🍪 Using Cookie';
+              }
+              const errMsg = resp?.error || 'Failed to extract active session cookies.';
+              alert(`Cookie Extraction: ${errMsg}`);
+            }
+          }
+        );
       });
 
       container.appendChild(card);

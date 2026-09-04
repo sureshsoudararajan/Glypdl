@@ -6,15 +6,17 @@ to the running Glypdl desktop application via IPC Unix Domain Sockets.
 
 import json
 import os
+import shutil
 import socket
 import struct
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from glypdl import __version__
-from glypdl.utils.paths import get_ipc_socket_path
+from glypdl.utils.paths import get_ipc_socket_path, get_ipc_socket_candidates, get_active_ipc_socket_path
 
 HOST_NAME = "io.github.sureshsoudararajan.glypdl"
 PROTOCOL_VERSION = 1
@@ -47,50 +49,96 @@ def write_message(message: Dict[str, Any], stream=sys.stdout.buffer) -> None:
 
 def forward_to_glypdl_ipc(message: Dict[str, Any], timeout: float = 3.0) -> Dict[str, Any]:
     """Forward a protocol message to the Glypdl desktop application via IPC socket."""
-    sock_path = get_ipc_socket_path()
-    if not sock_path.exists():
-        return {
-            "protocolVersion": PROTOCOL_VERSION,
-            "success": False,
-            "connected": False,
-            "error": "Glypdl desktop application is not currently running."
-        }
+    candidates = get_ipc_socket_candidates()
+    last_error = "Glypdl desktop application is not currently running."
 
-    try:
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.settimeout(timeout)
-        s.connect(str(sock_path))
-        payload = json.dumps(message) + "\n"
-        s.sendall(payload.encode("utf-8"))
+    for sock_path in candidates:
+        if not sock_path.exists():
+            continue
+        try:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.settimeout(timeout)
+            s.connect(str(sock_path))
+            payload = json.dumps(message) + "\n"
+            s.sendall(payload.encode("utf-8"))
 
-        data = b""
-        while True:
-            chunk = s.recv(4096)
-            if not chunk:
-                break
-            data += chunk
-            if b"\n" in data:
-                break
+            data = b""
+            while True:
+                chunk = s.recv(4096)
+                if not chunk:
+                    break
+                data += chunk
+                if b"\n" in data:
+                    break
 
-        s.close()
-        if not data:
-            return {
-                "protocolVersion": PROTOCOL_VERSION,
-                "success": False,
-                "error": "Empty response received from Glypdl IPC."
-            }
+            s.close()
+            if not data:
+                return {
+                    "protocolVersion": PROTOCOL_VERSION,
+                    "success": False,
+                    "error": "Empty response received from Glypdl IPC."
+                }
 
-        response = json.loads(data.decode("utf-8").strip())
-        response["protocolVersion"] = PROTOCOL_VERSION
-        response["connected"] = True
-        return response
-    except Exception as exc:
-        return {
-            "protocolVersion": PROTOCOL_VERSION,
-            "success": False,
-            "connected": False,
-            "error": f"Failed to connect to Glypdl IPC: {exc}"
-        }
+            response = json.loads(data.decode("utf-8").strip())
+            response["protocolVersion"] = PROTOCOL_VERSION
+            response["connected"] = True
+            return response
+        except Exception as exc:
+            last_error = str(exc)
+            continue
+
+    return {
+        "protocolVersion": PROTOCOL_VERSION,
+        "success": False,
+        "connected": False,
+        "error": last_error
+    }
+
+
+def launch_glypdl_app(url: Optional[str] = None) -> bool:
+    """Intelligently launch Glypdl whether installed natively (Arch/Debian package) or via Flatpak."""
+    launch_args = []
+
+    # 1. Native binary in PATH (e.g. /usr/bin/glypdl, ~/.local/bin/glypdl)
+    native_bin = shutil.which("glypdl")
+    if native_bin:
+        launch_args = [native_bin]
+    else:
+        # 2. Flatpak installation
+        flatpak_bin = shutil.which("flatpak")
+        if flatpak_bin:
+            known_app_ids = [
+                "io.github.sureshsoudararajan.Glypdl",
+                "io.github.suresh.Glypdl",
+            ]
+            for app_id in known_app_ids:
+                res = subprocess.run([flatpak_bin, "info", app_id], capture_output=True)
+                if res.returncode == 0:
+                    launch_args = [flatpak_bin, "run", app_id]
+                    break
+
+    # 3. Local development binary
+    if not launch_args:
+        dev_bin = Path(__file__).resolve().parents[3] / "bin" / "glypdl"
+        if dev_bin.is_file() and os.access(dev_bin, os.X_OK):
+            launch_args = [str(dev_bin)]
+
+    # 4. Fallback to gtk-launch
+    if not launch_args:
+        gtk_launch = shutil.which("gtk-launch")
+        if gtk_launch:
+            launch_args = [gtk_launch, "io.github.sureshsoudararajan.Glypdl"]
+
+    if not launch_args:
+        raise FileNotFoundError(
+            "Could not find installed Glypdl (neither native executable 'glypdl' nor Flatpak 'io.github.sureshsoudararajan.Glypdl')."
+        )
+
+    if url:
+        launch_args.append(url)
+
+    subprocess.Popen(launch_args, start_new_session=True)
+    return True
 
 
 def process_host_message(msg: Dict[str, Any]) -> Dict[str, Any]:
@@ -138,14 +186,33 @@ def process_host_message(msg: Dict[str, Any]) -> Dict[str, Any]:
 
         ipc_resp = forward_to_glypdl_ipc(msg)
         if not ipc_resp.get("connected", False):
-            # If Glypdl is not running, attempt to launch Glypdl and re-try
+            # If Glypdl is not running, auto-launch Glypdl cleanly WITHOUT passing url on CLI.
+            # Passing url on CLI causes Glypdl to trigger an unauthenticated fetch before
+            # the IPC message with session cookies arrives.
             try:
-                subprocess.Popen(["glypdl", url], start_new_session=True)
-                return {
-                    "protocolVersion": PROTOCOL_VERSION,
-                    "success": True,
-                    "message": "Glypdl was launched with the requested download."
-                }
+                launch_glypdl_app()
+
+                # Poll for up to 6 seconds for Glypdl's IPC server to come online
+                for _ in range(25):
+                    time.sleep(0.25)
+                    retry_resp = forward_to_glypdl_ipc(msg, timeout=1.0)
+                    if retry_resp.get("connected", False):
+                        return retry_resp
+
+                # If IPC didn't respond in time, fallback to CLI URL only if no cookies were required
+                if not msg.get("cookies_txt"):
+                    launch_glypdl_app(url)
+                    return {
+                        "protocolVersion": PROTOCOL_VERSION,
+                        "success": True,
+                        "message": "Glypdl was launched with the requested download."
+                    }
+                else:
+                    return {
+                        "protocolVersion": PROTOCOL_VERSION,
+                        "success": False,
+                        "error": "Glypdl was launched, but IPC connection timed out while delivering cookies."
+                    }
             except Exception as e:
                 return {
                     "protocolVersion": PROTOCOL_VERSION,
@@ -164,6 +231,26 @@ def process_host_message(msg: Dict[str, Any]) -> Dict[str, Any]:
             }
 
         ipc_resp = forward_to_glypdl_ipc(msg)
+        if not ipc_resp.get("connected", False):
+            try:
+                launch_glypdl_app()
+                for _ in range(25):
+                    time.sleep(0.25)
+                    retry_resp = forward_to_glypdl_ipc(msg, timeout=1.0)
+                    if retry_resp.get("connected", False):
+                        return retry_resp
+
+                return {
+                    "protocolVersion": PROTOCOL_VERSION,
+                    "success": True,
+                    "message": "Glypdl was launched with batch downloads."
+                }
+            except Exception as e:
+                return {
+                    "protocolVersion": PROTOCOL_VERSION,
+                    "success": False,
+                    "error": f"Glypdl is not running and could not be auto-launched: {e}"
+                }
         return ipc_resp
 
     else:

@@ -36,13 +36,46 @@ export class InstagramStrategy {
       title = (doc.title || '').replace(/• Instagram.*$/i, '').trim() || 'Instagram Media';
     }
 
-    // Try to find thumbnail from video poster or meta tags
+    // 1. Detect active video element on page
+    const videos = Array.from(doc.querySelectorAll<HTMLVideoElement>('video'));
+    const activeVideo =
+      videos.find((v) => !v.paused && v.currentTime > 0) ||
+      videos.find((v) => v.offsetHeight > 200) ||
+      videos[0] ||
+      null;
+
     let thumbnailUrl = '';
-    const videoElem = doc.querySelector('video') as HTMLVideoElement | null;
-    if (videoElem?.poster && !videoElem.poster.startsWith('data:')) {
-      thumbnailUrl = videoElem.poster;
+    if (activeVideo?.poster && !activeVideo.poster.startsWith('data:')) {
+      thumbnailUrl = activeVideo.poster;
     }
 
+    // 2. In Instagram Stories, find the active slide image in the DOM (bypasses stale og:image meta)
+    if (!thumbnailUrl && pageUrl.includes('/stories/')) {
+      if (activeVideo) {
+        const container = activeVideo.closest('section') || activeVideo.closest('article') || activeVideo.parentElement?.parentElement;
+        if (container) {
+          const imgs = Array.from(container.querySelectorAll<HTMLImageElement>('img')).filter((img) => {
+            const src = img.currentSrc || img.src || '';
+            return (src.includes('fbcdn.net') || src.includes('cdninstagram.com')) && !src.includes('150x150') && !src.includes('s150x150');
+          });
+          if (imgs.length > 0) {
+            thumbnailUrl = imgs[0].currentSrc || imgs[0].src;
+          }
+        }
+      }
+
+      if (!thumbnailUrl) {
+        const storyImgs = Array.from(doc.querySelectorAll<HTMLImageElement>('section img, article img, main img')).filter((img) => {
+          const src = img.currentSrc || img.src || '';
+          return (src.includes('fbcdn.net') || src.includes('cdninstagram.com')) && img.offsetHeight > 200;
+        });
+        if (storyImgs.length > 0) {
+          thumbnailUrl = storyImgs[0].currentSrc || storyImgs[0].src;
+        }
+      }
+    }
+
+    // 3. Fallback to og:image meta tag for non-story posts or initial loads
     if (!thumbnailUrl) {
       const ogImg = doc.querySelector('meta[property="og:image"]') as HTMLMetaElement | null;
       if (ogImg?.content) {
@@ -51,8 +84,8 @@ export class InstagramStrategy {
     }
 
     let duration: number | undefined;
-    if (videoElem && videoElem.duration && !isNaN(videoElem.duration) && videoElem.duration > 0) {
-      duration = videoElem.duration;
+    if (activeVideo && activeVideo.duration && !isNaN(activeVideo.duration) && activeVideo.duration > 0) {
+      duration = activeVideo.duration;
     }
 
     // Use the canonical Instagram webpage URL so yt-dlp triggers its native extractor

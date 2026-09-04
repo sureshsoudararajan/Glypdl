@@ -36,6 +36,7 @@ class TestYtDlpService(unittest.TestCase):
         self.assertIn("-P", args)
         self.assertIn("/tmp/downloads", args)
         self.assertIn("--no-mtime", args)
+        self.assertIn("--no-playlist", args)
         self.assertEqual("https://www.youtube.com/watch?v=dQw4w9WgXcQ", args[-1])
 
     def test_build_audio_download_args(self):

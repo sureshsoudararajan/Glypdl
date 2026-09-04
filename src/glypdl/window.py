@@ -317,7 +317,8 @@ class GlypdlWindow(Adw.ApplicationWindow):
         )
 
     def _on_url_submitted(self, widget, url: str, cookie_override: str = None, browser_override: str = None):
-        self._dismiss_preview()
+        preserve_temp = bool(cookie_override and cookie_override == getattr(self, '_current_temp_cookie', None))
+        self._dismiss_preview(preserve_temp_cookie=preserve_temp)
         self.fetch_spinner_box.set_visible(True)
         self.fetch_spinner.start()
 
@@ -588,7 +589,7 @@ class GlypdlWindow(Adw.ApplicationWindow):
                 
         file_dlg.open(self, None, _on_file_selected)
 
-    def _dismiss_preview(self):
+    def _dismiss_preview(self, preserve_temp_cookie: bool = False):
         while child := self.preview_container.get_first_child():
             if child == self.fetch_spinner_box:
                 break
@@ -601,13 +602,14 @@ class GlypdlWindow(Adw.ApplicationWindow):
             sibling = next_s
 
         # Discard temporary cookie file if preview was closed without starting download
-        if hasattr(self, '_current_temp_cookie') and self._current_temp_cookie:
-            try:
-                if os.path.isfile(self._current_temp_cookie):
-                    os.unlink(self._current_temp_cookie)
-            except Exception:
-                pass
-            self._current_temp_cookie = None
+        if not preserve_temp_cookie:
+            if hasattr(self, '_current_temp_cookie') and self._current_temp_cookie:
+                try:
+                    if os.path.isfile(self._current_temp_cookie):
+                        os.unlink(self._current_temp_cookie)
+                except Exception:
+                    pass
+                self._current_temp_cookie = None
 
     def _on_download_requested(self, widget, url: str, mode: DownloadMode, quality: str, audio_format: str):
         # 1. Check if selected video quality is available in metadata

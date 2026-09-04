@@ -67,6 +67,44 @@ class TestNativeHost(unittest.TestCase):
         self.assertTrue(any("mozilla" in str(p) for p in paths))
         self.assertTrue(any("librewolf" in str(p) for p in paths))
 
+    def test_socket_candidates_include_flatpak_and_host(self):
+        from glypdl.utils.paths import get_ipc_socket_candidates
+        candidates = get_ipc_socket_candidates()
+        self.assertTrue(len(candidates) >= 2)
+        paths_str = [str(p) for p in candidates]
+        self.assertTrue(any("io.github.sureshsoudararajan.Glypdl" in s for s in paths_str))
+
+    @patch("shutil.which")
+    @patch("subprocess.Popen")
+    @patch("subprocess.run")
+    def test_launch_glypdl_app_flatpak_fallback(self, mock_run, mock_popen, mock_which):
+        from glypdl.services.native_host import launch_glypdl_app
+        # native binary not found, but flatpak found
+        def fake_which(cmd):
+            if cmd == "glypdl":
+                return None
+            if cmd == "flatpak":
+                return "/usr/bin/flatpak"
+            return None
+        mock_which.side_effect = fake_which
+
+        mock_res = unittest.mock.MagicMock()
+        mock_res.returncode = 0
+        mock_run.return_value = mock_res
+
+        # Test without URL (clean startup for IPC delivery)
+        result_no_url = launch_glypdl_app()
+        self.assertTrue(result_no_url)
+        args_no_url = mock_popen.call_args[0][0]
+        self.assertEqual(args_no_url, ["/usr/bin/flatpak", "run", "io.github.sureshsoudararajan.Glypdl"])
+
+        # Test with URL
+        result_with_url = launch_glypdl_app("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        self.assertTrue(result_with_url)
+        args_with_url = mock_popen.call_args[0][0]
+        self.assertEqual(args_with_url, ["/usr/bin/flatpak", "run", "io.github.sureshsoudararajan.Glypdl", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"])
+
 
 if __name__ == "__main__":
     unittest.main()
+

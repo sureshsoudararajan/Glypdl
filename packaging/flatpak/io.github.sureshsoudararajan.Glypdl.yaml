@@ -13,6 +13,8 @@ finish-args:
   - --device=dri
   # File system access to Downloads directory
   - --filesystem=xdg-download
+  # IPC socket sharing with host
+  - --filesystem=xdg-run/glypdl:create
   # Notifications
   - --talk-name=org.freedesktop.Notifications
 

@@ -123,9 +123,29 @@ jobs:
           name: glypdl-windows
           path: windows/dist/*.exe
 
+  build-extension:
+    name: Build Firefox Extension (.xpi)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build Extension
+        run: |
+          cd extension
+          npm ci
+          npm run build
+      - name: Upload Extension XPI
+        uses: actions/upload-artifact@v4
+        with:
+          name: glypdl-firefox-extension
+          path: extension/*.xpi
+
   release:
     name: Create GitHub Release
-    needs: [build-deb, build-appimage, build-arch, build-rpm, build-windows]
+    needs: [build-deb, build-appimage, build-arch, build-rpm, build-windows, build-extension]
     runs-on: ubuntu-latest
     permissions:
       contents: write

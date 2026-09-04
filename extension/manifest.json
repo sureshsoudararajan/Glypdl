@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Glypdl - Media Downloader Companion",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Detects video & audio media streams (YouTube, HTML5, HLS, DASH) and sends downloads directly to the Glypdl desktop application.",
   "default_locale": "en",
   "browser_specific_settings": {

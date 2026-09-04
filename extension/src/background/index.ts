@@ -48,6 +48,16 @@ class BackgroundController {
       const action = message?.action;
       const tabId = sender?.tab?.id || message?.tabId;
 
+      if (action === 'tab_navigated') {
+        if (tabId) {
+          this.tabMediaMap.delete(tabId);
+          this.tabDedupMap.delete(tabId);
+          this.updateBadge(tabId, 0);
+        }
+        sendResponse({ success: true });
+        return true;
+      }
+
       if (action === 'media_detected') {
         const items = message.items as MediaItem[];
         if (tabId && Array.isArray(items)) {
@@ -89,7 +99,7 @@ class BackgroundController {
       if (action === 'download_with_cookies') {
         const item = message.item as MediaItem;
         const targetUrl = item.pageUrl || item.url;
-        extractTargetCookies(targetUrl)
+        extractTargetCookies(targetUrl, message.storeId)
           .then((cookiesTxt) => {
             return this.conn.sendDownload(item, message.autoDownload, cookiesTxt, true);
           })

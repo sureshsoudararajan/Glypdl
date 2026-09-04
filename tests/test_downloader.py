@@ -101,6 +101,23 @@ class TestDownloadManager(unittest.TestCase):
         self.assertFalse(os.path.exists(temp_path))
         self.assertEqual(item.cookie_file, "")
 
+    def test_generic_title_output_template(self):
+        item_story = DownloadItem(
+            url="https://www.instagram.com/stories/user/12345/",
+            title="Video by user"
+        )
+        with unittest.mock.patch('subprocess.Popen') as mock_popen:
+            mock_proc = MagicMock()
+            mock_proc.stdout.readline.return_value = ""
+            mock_proc.poll.return_value = 0
+            mock_proc.wait.return_value = 0
+            mock_popen.return_value = mock_proc
+
+            self.manager._run_download(item_story)
+
+            call_args = self.mock_ytdlp.build_download_args.call_args
+            self.assertIn('%(title)s [%(id)s]', call_args.kwargs.get('output_template', ''))
+
 
 if __name__ == '__main__':
     unittest.main()

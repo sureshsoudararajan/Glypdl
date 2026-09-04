@@ -1,9 +1,41 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.1.0] - 2026-09-04
+
+> **Notice**: The Firefox & LibreWolf Companion Extension currently operates exclusively on **Linux** (communicating with the native desktop application via Native Messaging and Unix domain sockets).
+
+### Added
+
+- **Firefox & LibreWolf Companion Extension (`glypdl-firefox-extension.xpi`)**:
+  - Automatically detects media streams across the web including HTML5 `<video>` / `<audio>`, HLS (`.m3u8`), DASH (`.mpd`), YouTube, Instagram, and TikTok.
+  - Interactive browser popup showing real-time thumbnail preview, title, quality/format badge, and stream duration.
+  - Dual action triggers:
+    - **Download**: Directly queues the URL into Glypdl's native download flow.
+    - **🍪 Using Cookie**: One-click active session cookie extraction sent securely with the download request for authenticated media.
+  - Native Messaging Host (`io.github.sureshsoudararajan.glypdl`) bridging the browser extension with Glypdl desktop over Unix domain sockets.
+  - Zero permanent cookie disk storage: Session cookies sent via the extension are handled strictly in-memory as ephemeral temporary files that automatically self-delete upon completion or dismissal.
+
+### Improved & Fixed
+
+- **Dynamic First-Party Isolation (dFPI) / Total Cookie Protection Support**:
+  - Full compatibility with LibreWolf, hardened Firefox profiles, and Multi-Account Containers by querying both partitioned (`partitionKey: {}`) and unpartitioned cookie storage.
+  - Multi-store discovery with client-side domain matching fallback ensuring login cookies (`sessionid`, `ds_user_id`, `csrftoken`) are captured reliably.
+- **Flatpak Integration**:
+  - Added multi-path IPC discovery probing standard runtime directories, Flatpak sandbox paths (`/run/user/1000/app/...`), and user configuration directories.
+  - Added `--filesystem=xdg-run/glypdl:create` permission to Flatpak manifests for direct IPC sharing.
+  - Added intelligent multi-runtime auto-launcher supporting native `$PATH` binaries, Flatpak packages (`flatpak run io.github.sureshsoudararajan.Glypdl`), local development builds, and `gtk-launch`.
+- **Closed Application State Launching**:
+  - Fixed an issue where downloading with cookies while Glypdl was closed caused yt-dlp to fail with an unauthenticated fetch error. Glypdl is now launched cleanly without bare CLI URL arguments, polling for IPC readiness and delivering the full cookie payload over IPC.
+- **Instagram Stories & Generic Title Handling**:
+  - Enforced `--no-playlist` for story downloads so yt-dlp only downloads the targeted individual story instead of the entire user album from story #1.
+  - Automatic `[%(id)s]` title deduplication preventing filename collisions when downloading multiple stories or reels from the same user.
+- **Single Page Application (SPA) Live Navigation**:
+  - Dynamic content script updates when browsing through consecutive Instagram stories or YouTube videos without requiring a manual page refresh.
 
 ## [1.0.0] - 2026-09-02
 

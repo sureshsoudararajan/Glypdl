@@ -1,7 +1,9 @@
 import { extractDomain } from './utils';
 
-// @ts-expect-error browser runtime
-const browserApi = typeof browser !== 'undefined' ? browser : typeof chrome !== 'undefined' ? chrome : null;
+function getBrowserApi(): any {
+  // @ts-expect-error browser runtime
+  return typeof browser !== 'undefined' ? browser : typeof chrome !== 'undefined' ? chrome : null;
+}
 
 export interface CookieLike {
   domain: string;
@@ -10,6 +12,7 @@ export interface CookieLike {
   path?: string;
   secure?: boolean;
   httpOnly?: boolean;
+  hostOnly?: boolean;
   expirationDate?: number;
 }
 
@@ -28,14 +31,19 @@ export function formatNetscapeCookies(cookies: CookieLike[]): string {
   for (const c of cookies) {
     if (!c || !c.name) continue;
     let domain = c.domain || '';
-    const includeSubdomains = domain.startsWith('.') ? 'TRUE' : 'FALSE';
+    const isSubdomain = domain.startsWith('.') || c.hostOnly === false;
+    if (isSubdomain && !domain.startsWith('.')) {
+      domain = `.${domain}`;
+    }
+    const includeSubdomains = isSubdomain ? 'TRUE' : 'FALSE';
     const path = c.path || '/';
     const secure = c.secure ? 'TRUE' : 'FALSE';
     const expires = c.expirationDate && c.expirationDate > 0 ? Math.round(c.expirationDate) : 0;
+    const prefix = c.httpOnly ? '#HttpOnly_' : '';
     const name = c.name;
     const value = c.value || '';
 
-    lines.push(`${domain}\t${includeSubdomains}\t${path}\t${secure}\t${expires}\t${name}\t${value}`);
+    lines.push(`${prefix}${domain}\t${includeSubdomains}\t${path}\t${secure}\t${expires}\t${name}\t${value}`);
   }
 
   return lines.join('\n') + '\n';
@@ -43,50 +51,134 @@ export function formatNetscapeCookies(cookies: CookieLike[]): string {
 
 /**
  * Extract cookies strictly for the target URL's domain upon explicit user action.
+ * Supports Firefox / LibreWolf Total Cookie Protection (partitionKey), container tabs (storeId),
+ * and client-side domain matching fallback.
  * Returns Netscape cookie file content.
  */
-export async function extractTargetCookies(targetUrl: string): Promise<string> {
+export async function extractTargetCookies(targetUrl: string, storeId?: string): Promise<string> {
+  const browserApi = getBrowserApi();
   if (!browserApi?.cookies?.getAll) {
     throw new Error('Browser cookies API is not available or permission was denied.');
   }
 
   let domain = extractDomain(targetUrl);
-  if (domain.includes('fbcdn.net') || domain.includes('cdninstagram.com')) {
+  if (domain.includes('fbcdn.net') || domain.includes('cdninstagram.com') || domain.includes('instagram.com')) {
     domain = 'instagram.com';
-  } else if (domain.includes('googlevideo.com')) {
+  } else if (domain.includes('googlevideo.com') || domain.includes('youtube.com') || domain.includes('youtu.be')) {
     domain = 'youtube.com';
+  } else if (
+    domain.includes('tiktokcdn.com') ||
+    domain.includes('byteoversea.com') ||
+    domain.includes('ibytedtos.com') ||
+    domain.includes('tiktok.com')
+  ) {
+    domain = 'tiktok.com';
+  } else if (domain.includes('twimg.com') || domain.includes('twitter.com') || domain.includes('x.com')) {
+    domain = 'x.com';
   }
+
+  const cleanDomain = domain ? domain.replace(/^www\./, '').toLowerCase() : '';
   const cookies: CookieLike[] = [];
 
-  try {
-    // 1. Query cookies matching the base domain (e.g. youtube.com or .youtube.com)
-    if (domain) {
-      const cleanDomain = domain.replace(/^www\./, '');
-      const domainCookies = await browserApi.cookies.getAll({ domain: cleanDomain });
-      if (Array.isArray(domainCookies)) {
-        cookies.push(...domainCookies);
+  const addCookies = (newCookies: CookieLike[]) => {
+    if (!Array.isArray(newCookies)) return;
+    for (const nc of newCookies) {
+      if (!nc || !nc.name) continue;
+      const cDomain = (nc.domain || '').replace(/^\./, '').toLowerCase();
+      if (cleanDomain) {
+        const isMatch =
+          cDomain === cleanDomain ||
+          cDomain.endsWith(`.${cleanDomain}`) ||
+          cleanDomain.endsWith(`.${cDomain}`);
+        if (!isMatch) continue;
+      }
+      if (!cookies.some((c) => c.name === nc.name && c.domain === nc.domain && c.path === nc.path)) {
+        cookies.push(nc);
       }
     }
+  };
 
-    // 2. Also query cookies specific to the target URL to capture path-specific or host-only cookies
+  const safeGetAll = async (query: any) => {
     try {
-      const urlCookies = await browserApi.cookies.getAll({ url: targetUrl });
-      if (Array.isArray(urlCookies)) {
-        for (const uc of urlCookies) {
-          if (!cookies.some((c) => c.name === uc.name && c.domain === uc.domain && c.path === uc.path)) {
-            cookies.push(uc);
+      const res = await browserApi.cookies.getAll(query);
+      if (Array.isArray(res)) {
+        addCookies(res);
+      }
+    } catch {
+      // Ignored for unsupported query fields (e.g. partitionKey on older engines)
+    }
+  };
+
+  // Collect candidate store IDs to check
+  const storeCandidates: (string | undefined)[] = [storeId];
+  if (storeId !== undefined) {
+    storeCandidates.push(undefined); // Try without specific storeId as fallback
+  }
+
+  // Also query known cookie stores if available
+  if (browserApi?.cookies?.getAllCookieStores) {
+    try {
+      const stores = await browserApi.cookies.getAllCookieStores();
+      if (Array.isArray(stores)) {
+        for (const s of stores) {
+          if (s && s.id && !storeCandidates.includes(s.id)) {
+            storeCandidates.push(s.id);
           }
         }
       }
     } catch {
-      // Ignored for restricted or special scheme URLs
+      // Ignored
     }
-  } catch (err: any) {
-    throw new Error(`Failed to extract cookies for ${domain || targetUrl}: ${err?.message || err}`);
+  }
+
+  // Iterate candidate stores until we find cookies
+  for (const currentStoreId of storeCandidates) {
+    const baseQueries: any[] = [];
+    const baseObj = currentStoreId ? { storeId: currentStoreId } : {};
+
+    // In Firefox / LibreWolf with dFPI (Dynamic First-Party Isolation / Total Cookie Protection),
+    // partitionKey: {} queries both partitioned and unpartitioned cookies.
+    // Try both with partitionKey: {} and without it.
+    baseQueries.push({ ...baseObj, partitionKey: {} });
+    baseQueries.push({ ...baseObj });
+
+    for (const bq of baseQueries) {
+      // 1. Query by clean domain and domain with leading dot
+      if (cleanDomain) {
+        await safeGetAll({ ...bq, domain: cleanDomain });
+        await safeGetAll({ ...bq, domain: `.${cleanDomain}` });
+      }
+
+      // 2. Query by target URL
+      if (targetUrl && targetUrl.startsWith('http')) {
+        await safeGetAll({ ...bq, url: targetUrl });
+      }
+
+      // 3. Query canonical root and www URLs
+      if (cleanDomain) {
+        await safeGetAll({ ...bq, url: `https://${cleanDomain}/` });
+        await safeGetAll({ ...bq, url: `https://www.${cleanDomain}/` });
+      }
+
+      // 4. Broad store query fallback with client-side domain matching
+      if (cookies.length === 0) {
+        await safeGetAll({ ...bq });
+      }
+
+      if (cookies.length > 0) {
+        break;
+      }
+    }
+
+    if (cookies.length > 0) {
+      break;
+    }
   }
 
   if (!cookies || cookies.length === 0) {
-    throw new Error(`No active cookies found for ${domain || 'this website'}. Please ensure you are logged in.`);
+    throw new Error(
+      `No active cookies found for ${cleanDomain || domain || 'this website'}. Please ensure you are logged in.`
+    );
   }
 
   return formatNetscapeCookies(cookies);

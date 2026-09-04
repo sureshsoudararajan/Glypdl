@@ -110,6 +110,17 @@
 * **Zero System Bloat**: Binaries are installed locally into application data directories without polluting system PATH or modifying global environment variables.
 * **One-Click Engine Updates**: Check and update `yt-dlp` and engine components anytime from Settings or the About page.
 
+### 🦊 10. Firefox & LibreWolf Companion Extension *(Linux Only)*
+* **Real-Time Media Detection**: Automatically detects streaming media across websites including HTML5 `<video>` / `<audio>`, HLS (`.m3u8`), DASH (`.mpd`), YouTube, Instagram Stories & Reels, and TikTok.
+* **Dual Action Triggers**:
+  - **Download**: Enqueues media directly into Glypdl's native download queue.
+  - **🍪 Using Cookie**: One-click extraction of your active browser session cookies sent securely with the download request for authenticated, private, or age-gated media.
+* **LibreWolf & Multi-Account Container Compatibility**: Full support for Total Cookie Protection / Dynamic First-Party Isolation (dFPI) and isolated container tabs.
+* **Native Linux IPC**: Communicates directly with Glypdl desktop over secure local Unix domain sockets via Native Messaging (`io.github.sureshsoudararajan.glypdl`). Supports both native package installs and Flatpak sandboxes (`io.github.sureshsoudararajan.Glypdl`).
+* **Zero Disk Cookie Exposure**: Extracted cookies are handled as in-memory ephemeral temporary files that automatically self-delete upon download completion or dismissal.
+
+> **Note**: The browser companion extension currently requires the Linux desktop client and is not supported on Windows.
+
 ---
 
 ## 📥 Installation
@@ -161,6 +172,13 @@ flatpak install -y flathub org.gnome.Platform//50 org.gnome.Sdk//50
 flatpak-builder --user --install --force-clean build-dir packaging/flatpak/io.github.sureshsoudararajan.Glypdl.local.yaml
 flatpak run io.github.sureshsoudararajan.Glypdl
 ```
+
+### 🦊 Firefox / LibreWolf Companion Extension (`.xpi`) *(Linux)*
+1. Download **`glypdl-firefox-extension.xpi`** from the [Latest Release](https://github.com/sureshsoudararajan/Glypdl/releases).
+2. In Firefox or LibreWolf, navigate to `about:addons`.
+3. Click the gear icon (`⚙️`) in the top right and select **Install Add-on From File...**.
+4. Select the downloaded `glypdl-firefox-extension.xpi` file and confirm installation.
+5. The extension will automatically connect to your installed Glypdl desktop app!
 
 ---
 
