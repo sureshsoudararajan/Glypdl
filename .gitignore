@@ -26,6 +26,19 @@ node_modules/
 extension/node_modules/
 extension/dist/
 *.xpi
+extension/*-source.zip
+
+# Android Build Artifacts & Local Configurations
+android/**/.gradle/
+android/**/build/
+android/**/.kotlin/
+android/**/local.properties
+android/**/captures/
+android/**/.externalNativeBuild/
+android/**/.cxx/
+android/**/*.apk
+android/**/*.aab
+android/implementation.md
 
 
 # Local Databases, Logs, and Test Artifacts

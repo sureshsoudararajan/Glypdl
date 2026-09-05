@@ -71,18 +71,36 @@ class OptionsController {
         if (status && status.connected) {
           resultBox.className = 'status-box ok';
           const glypdlText = status.glypdlRunning
-            ? `Connected to Glypdl Desktop Application (v${status.glypdlVersion || '1.0.0'})`
+            ? `Connected to Glypdl Desktop Application (v${status.glypdlVersion || '1.1.0'})`
             : 'Native Host is active (Glypdl desktop app is not currently open and will launch on demand)';
-          resultBox.innerHTML = `✓ <b>Success:</b> ${glypdlText}`;
+          resultBox.replaceChildren();
+          const bold = document.createElement('b');
+          bold.textContent = 'Success:';
+          resultBox.append('✓ ', bold, ` ${glypdlText}`);
         } else {
           resultBox.className = 'status-box fail';
-          resultBox.innerHTML = `
-            ❌ <b>Not Connected:</b> ${status?.error || 'Native Messaging Host not registered.'}<br/><br/>
-            <b>To resolve:</b><br/>
-            1. Open the <b>Glypdl</b> desktop app.<br/>
-            2. Go to <b>Preferences (Ctrl+,) &rarr; Extension</b> tab.<br/>
-            3. Click <b>[Register Host]</b>.
-          `;
+          resultBox.replaceChildren();
+
+          const errorBold = document.createElement('b');
+          errorBold.textContent = 'Not Connected:';
+          const errText = status?.error || 'Native Messaging Host not registered.';
+
+          const resolveTitle = document.createElement('b');
+          resolveTitle.textContent = 'To resolve:';
+
+          const ol = document.createElement('ol');
+          ol.style.margin = '8px 0 0 16px';
+          ol.style.padding = '0';
+
+          const li1 = document.createElement('li');
+          li1.textContent = 'Open the Glypdl desktop app.';
+          const li2 = document.createElement('li');
+          li2.textContent = 'Go to Preferences (Ctrl+,) → Extension tab.';
+          const li3 = document.createElement('li');
+          li3.textContent = 'Click [Register Host].';
+          ol.append(li1, li2, li3);
+
+          resultBox.append('❌ ', errorBold, ` ${errText}`, document.createElement('br'), document.createElement('br'), resolveTitle, ol);
         }
       });
     } catch (e) {

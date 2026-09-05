@@ -94,7 +94,7 @@ class PopupController {
 
     if (!container || !emptyState || !sectionTitle || !downloadAllBtn) return;
 
-    container.innerHTML = '';
+    container.replaceChildren();
 
     if (this.mediaItems.length === 0) {
       emptyState.style.display = 'block';
@@ -112,27 +112,70 @@ class PopupController {
       const card = document.createElement('div');
       card.className = 'media-card';
 
-      const thumbHtml = item.thumbnailUrl
-        ? `<img class="media-thumb" src="${item.thumbnailUrl}" alt="Thumb" />`
-        : `<div class="media-thumb" style="display:flex;align-items:center;justify-content:center;color:#666;">🎬</div>`;
+      let thumbEl: HTMLElement;
+      if (item.thumbnailUrl) {
+        const img = document.createElement('img');
+        img.className = 'media-thumb';
+        img.src = item.thumbnailUrl;
+        img.alt = 'Thumb';
+        thumbEl = img;
+      } else {
+        const placeholder = document.createElement('div');
+        placeholder.className = 'media-thumb';
+        placeholder.style.display = 'flex';
+        placeholder.style.alignItems = 'center';
+        placeholder.style.justifyContent = 'center';
+        placeholder.style.color = '#666';
+        placeholder.textContent = '🎬';
+        thumbEl = placeholder;
+      }
 
-      const badgeText = item.isProtected ? '🔒 DRM' : `${item.quality || 'HD'} • ${item.format.toUpperCase()}`;
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'media-info';
 
-      card.innerHTML = `
-        ${thumbHtml}
-        <div class="media-info">
-          <div class="media-title" title="${item.title}">${item.title}</div>
-          <div class="media-meta">
-            <span class="media-tag">${badgeText}</span>
-            ${item.formattedDuration ? `<span>${item.formattedDuration}</span>` : ''}
-            ${item.formattedSize ? `<span>${item.formattedSize}</span>` : ''}
-          </div>
-        </div>
-        <div class="media-actions">
-          <button class="download-btn btn-normal" ${item.isProtected ? 'disabled' : ''}>Download</button>
-          <button class="download-btn btn-cookie" ${item.isProtected ? 'disabled' : ''} title="Extract site cookies and download with authentication">🍪 Using Cookie</button>
-        </div>
-      `;
+      const titleDiv = document.createElement('div');
+      titleDiv.className = 'media-title';
+      titleDiv.title = item.title;
+      titleDiv.textContent = item.title;
+
+      const metaDiv = document.createElement('div');
+      metaDiv.className = 'media-meta';
+
+      const badgeSpan = document.createElement('span');
+      badgeSpan.className = 'media-tag';
+      badgeSpan.textContent = item.isProtected ? '🔒 DRM' : `${item.quality || 'HD'} • ${item.format.toUpperCase()}`;
+      metaDiv.append(badgeSpan);
+
+      if (item.formattedDuration) {
+        const durSpan = document.createElement('span');
+        durSpan.textContent = item.formattedDuration;
+        metaDiv.append(durSpan);
+      }
+
+      if (item.formattedSize) {
+        const sizeSpan = document.createElement('span');
+        sizeSpan.textContent = item.formattedSize;
+        metaDiv.append(sizeSpan);
+      }
+
+      infoDiv.append(titleDiv, metaDiv);
+
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = 'media-actions';
+
+      const normalBtn = document.createElement('button');
+      normalBtn.className = 'download-btn btn-normal';
+      normalBtn.textContent = 'Download';
+      if (item.isProtected) normalBtn.disabled = true;
+
+      const cookieBtn = document.createElement('button');
+      cookieBtn.className = 'download-btn btn-cookie';
+      cookieBtn.textContent = '🍪 Using Cookie';
+      cookieBtn.title = 'Extract site cookies and download with authentication';
+      if (item.isProtected) cookieBtn.disabled = true;
+
+      actionsDiv.append(normalBtn, cookieBtn);
+      card.append(thumbEl, infoDiv, actionsDiv);
 
       card.querySelector('.btn-normal')?.addEventListener('click', () => {
         const btn = card.querySelector('.btn-normal') as HTMLButtonElement | null;
