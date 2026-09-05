@@ -8,7 +8,7 @@ import tarfile
 import tempfile
 from pathlib import Path
 
-VERSION = "1.1.0"
+VERSION = os.environ.get("VERSION", "1.2.0")
 PACKAGE = "glypdl"
 DEB_NAME = f"{PACKAGE}_{VERSION}_all.deb"
 

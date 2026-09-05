@@ -2,15 +2,16 @@
 
 <div align="center">
   <img src="data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg" width="128" height="128" alt="Glypdl Logo" />
-  <h3>A modern, blazing-fast cross-platform desktop media downloader for yt-dlp</h3>
-  <p>Native <b>Windows 11 (WinUI 3 / C# / .NET 8)</b> and <b>Linux (GTK4 / libadwaita / Python)</b> desktop client.</p>
+  <h3>A modern, blazing-fast cross-platform media downloader for yt-dlp</h3>
+  <p>Native <b>Android (Jetpack Compose / Kotlin)</b>, <b>Windows 11 (WinUI 3 / C# / .NET 8)</b>, and <b>Linux (GTK4 / libadwaita / Python)</b>.</p>
 
   <p>
     <a href="https://github.com/sureshsoudararajan/Glypdl/releases"><img src="https://img.shields.io/github/v/release/sureshsoudararajan/Glypdl?style=flat-square&color=3584e4" alt="Latest Release" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3.0-blue.svg?style=flat-square" alt="License: GPL v3" /></a>
+    <img src="https://img.shields.io/badge/Android-8.0+_(API_26+)-3DDC84.svg?style=flat-square&logo=android" alt="Android 8.0+" />
+    <img src="https://img.shields.io/badge/Kotlin-2.0-7F52FF.svg?style=flat-square&logo=kotlin" alt="Kotlin 2.0" />
     <img src="https://img.shields.io/badge/Windows-11%20%7C%2010-0078D4.svg?style=flat-square&logo=windows" alt="Windows 11/10" />
     <img src="https://img.shields.io/badge/.NET-8.0-512BD4.svg?style=flat-square&logo=dotnet" alt=".NET 8" />
-    <img src="https://img.shields.io/badge/WinUI-3.0-0078D4.svg?style=flat-square" alt="WinUI 3" />
     <img src="https://img.shields.io/badge/Linux-GTK4%20%2F%20libadwaita-2ec27e.svg?style=flat-square&logo=linux" alt="Linux GTK4" />
     <img src="https://img.shields.io/badge/Python-3.10+-yellow.svg?style=flat-square&logo=python" alt="Python 3.10+" />
   </p>
@@ -20,8 +21,9 @@
 
 ## 🌟 Overview
 
-**Glypdl** is an ultra-fast, modern, cross-platform desktop media downloader powered by **yt-dlp** and **FFmpeg**. Built from the ground up to provide native, high-performance desktop experiences on both **Windows** and **Linux**:
+**Glypdl** is an ultra-fast, modern, cross-platform media downloader powered by **yt-dlp** and **FFmpeg**. Built from the ground up to provide native, high-performance experiences on **Android**, **Windows**, and **Linux**:
 
+* **Android Edition**: Native **Kotlin**, **Jetpack Compose**, and **Material 3** application featuring foreground background service, built-in in-app authenticated browser with cookie preservation, multi-quality format selection, and Android system share/intent handling.
 * **Windows Edition**: Native **WinUI 3**, **C#**, and **.NET 8** application featuring Windows 11 Fluent 2 design, translucent Mica material backdrops, automatic system dark/light theming, and an Inno Setup installer.
 * **Linux Edition**: Native **GTK4**, **libadwaita**, and **Python** application conforming to the GNOME Human Interface Guidelines (HIG) with standalone AppImage, Flatpak, Deb, RPM, and Arch Linux packages.
 
@@ -225,6 +227,26 @@ PYTHONPATH=src python3 -m glypdl.app
 
 ---
 
+### Android Build (Kotlin & Jetpack Compose)
+
+#### Prerequisites
+1. Android SDK (API 34, Min SDK 26)
+2. JDK 17+
+
+#### Build & Test
+```bash
+cd android
+
+# Run unit tests
+./gradlew testDebugUnitTest
+
+# Assemble Debug APK
+./gradlew assembleDebug
+# Generated at android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+---
+
 ## ⌨️ Keyboard Shortcuts
 
 | Shortcut | Action |
@@ -242,6 +264,13 @@ PYTHONPATH=src python3 -m glypdl.app
 
 ```
 Glypdl/
+├── android/                        # Native Android app (Kotlin / Jetpack Compose)
+│   ├── app/                        # Main Android application module
+│   │   ├── src/main/java/          # Compose UI, Hilt DI, Room DB, Background Services
+│   │   ├── src/main/res/           # Vector icons, themes, and layouts
+│   │   └── src/test/java/          # Android unit test suite
+│   ├── build.gradle.kts            # Android Gradle project build file
+│   └── settings.gradle.kts         # Android Gradle settings
 ├── data/                           # App icons, metadata, and screenshots
 ├── packaging/                      # Linux packaging (Deb, RPM, Flatpak, Arch, AppImage)
 ├── src/glypdl/                     # Linux GTK4 / Python application source

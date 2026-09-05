@@ -1,7 +1,9 @@
 ; Inno Setup Script for Glypdl (Windows 11 x64)
 
 #define MyAppName "Glypdl"
-#define MyAppVersion "1.0.0"
+#ifndef MyAppVersion
+#define MyAppVersion "1.2.0"
+#endif
 #define MyAppPublisher "Suresh Soundararajan"
 #define MyAppURL "https://github.com/sureshsoudararajan/Glypdl"
 #define MyAppExeName "Glypdl.Windows.exe"

@@ -14,6 +14,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build Debian Package
         run: |
+          TAG_NAME="${{ github.ref_name }}"
+          export VERSION="${TAG_NAME#v}"
+          if [ -z "$VERSION" ]; then export VERSION="1.2.0"; fi
           chmod +x packaging/deb/build_deb.sh
           ./packaging/deb/build_deb.sh
       - name: Upload .deb
@@ -54,6 +57,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build Arch Linux Package
         run: |
+          TAG_NAME="${{ github.ref_name }}"
+          VERSION="${TAG_NAME#v}"
+          if [ -n "$VERSION" ]; then
+            sed -i "s/^pkgver=.*/pkgver=${VERSION}/" PKGBUILD
+          fi
           pacman -Syu --noconfirm base-devel git
           useradd -m builder
           chown -R builder:builder "$GITHUB_WORKSPACE"
@@ -73,6 +81,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build RPM Package
         run: |
+          TAG_NAME="${{ github.ref_name }}"
+          export VERSION="${TAG_NAME#v}"
+          if [ -z "$VERSION" ]; then export VERSION="1.2.0"; fi
           dnf install -y rpm-build python3-devel python3-pip python3-wheel python3-setuptools pyproject-rpm-macros
           chmod +x packaging/rpm/build_rpm.sh
           ./packaging/rpm/build_rpm.sh
@@ -114,8 +125,10 @@ jobs:
       - name: Build Windows Setup.exe
         shell: powershell
         run: |
+          $tag = "${{ github.ref_name }}"
+          $ver = if ($tag -match '^v?(.+)$') { $matches[1] } else { "1.2.0" }
           New-Item -ItemType Directory -Path windows\dist -Force
-          iscc windows/packaging/inno/setup.iss
+          iscc /DMyAppVersion="$ver" windows/packaging/inno/setup.iss
 
       - name: Upload Windows Setup
         uses: actions/upload-artifact@v4
@@ -143,9 +156,41 @@ jobs:
           name: glypdl-firefox-extension
           path: extension/*.xpi
 
+  build-android:
+    name: Build Android APK (.apk)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build Android APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          mkdir -p ../dist-android
+          TAG_NAME="${{ github.ref_name }}"
+          VERSION="${TAG_NAME#v}"
+          if [ -z "$VERSION" ]; then VERSION="1.2.0"; fi
+          cp app/build/outputs/apk/debug/app-debug.apk "../dist-android/Glypdl-${VERSION}.apk"
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: glypdl-android
+          path: dist-android/*.apk
+
   release:
     name: Create GitHub Release
-    needs: [build-deb, build-appimage, build-arch, build-rpm, build-windows, build-extension]
+    needs: [build-deb, build-appimage, build-arch, build-rpm, build-windows, build-extension, build-android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -163,6 +208,7 @@ jobs:
           name: Glypdl ${{ github.ref_name }}
           draft: false
           prerelease: false
+          generate_release_notes: true
           overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

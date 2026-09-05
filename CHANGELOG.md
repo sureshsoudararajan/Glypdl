@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-09-05
+
+### Added
+
+- **Native Android Application (`Glypdl-1.2.0.apk`)**:
+  - Built from the ground up using **Kotlin**, **Jetpack Compose**, **Material 3**, **Hilt (Dependency Injection)**, and **Room Database**.
+  - Powered by embedded **`youtubedl-android`** with bundled Python runtime, **yt-dlp**, **FFmpeg**, and **aria2c**.
+  - **Comprehensive Site Support**: Download video and audio streams from YouTube, Instagram, Facebook, TikTok, and any platform supported by yt-dlp.
+  - **In-App Authenticated Browser**: Built-in interactive WebKit browser session manager that captures and securely stores Netscape-format cookies for Instagram, Facebook, and arbitrary login-walled websites.
+  - **Multi-Quality & Stream Formats**: Format resolution selection up to 4K / 1080p, audio extraction (MP3 / M4A), and FFmpeg-backed video/audio multiplexing.
+  - **Robust Background Service**: Foreground service (`DownloadForegroundService`) with ongoing progress notifications, speed metrics, ETA, and persistent completion/failure notifications that stay in the notification shade until dismissed.
+  - **Queue & Multi-Download Management**: Concurrent downloads (configurable up to 10), pause, resume, cancel, and automatic retry capabilities.
+  - **Search & Download History**: SQLite-backed history tracking completed downloads, file sizes, timestamps, and thumbnail metadata.
+  - **Android OS Integration**: System "Share via Glypdl" and "Open with" intent handlers, clipboard auto-detection banner, and scoped storage / SAF download folder selection.
+  - **Theming**: Full support for Material 3 Dynamic Colors (Android 12+), Dark mode, and Light mode.
+
+### Fixed
+
+- **History Search Input & IME Composition**: Decoupled immediate search field state from asynchronous Room database queries with a 150ms query debounce, eliminating dropped keystrokes and text scrambling when typing on soft keyboards.
+- **Download Completed Notifications**: Fixed notification auto-dismissal on download completion by decoupling completion/failure notification IDs from the terminating foreground service lifecycle.
+- **CI/CD & Automated Release Workflow**: Added `build-android` automated APK compilation to `.github/workflows/release.yml` to automatically build and attach `Glypdl-1.2.0.apk` alongside Linux and Windows release assets.
+
 ## [1.1.0] - 2026-09-04
 
 > **Notice**: The Firefox & LibreWolf Companion Extension currently operates exclusively on **Linux** (communicating with the native desktop application via Native Messaging and Unix domain sockets).

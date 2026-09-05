@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-VERSION="1.1.0"
+VERSION="${VERSION:-1.2.0}"
 PKG_DIR="glypdl_${VERSION}_all"
 rm -rf "$PKG_DIR" "$PKG_DIR.deb"
 
