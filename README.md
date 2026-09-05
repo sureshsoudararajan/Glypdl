@@ -127,10 +127,15 @@
 
 ## 📥 Installation
 
-Choose the package format best suited for your operating system from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases):
+Choose the package format best suited for your operating system from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases/latest):
+
+### 📱 Android (`.apk`)
+1. Download **`Glypdl-1.2.0.apk`** from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases/latest).
+2. Open the downloaded `.apk` file on your Android device (ensure "Install unknown apps" permission is granted for your browser/file manager).
+3. Follow the installation prompts and launch **Glypdl**!
 
 ### 🪟 Windows 11 / 10 Installer (`.exe`)
-1. Download **`Glypdl-1.0.0-Setup-x64.exe`**.
+1. Download **`Glypdl-1.2.0-Setup-x64.exe`** from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases/latest).
 2. Run the installer to set up Start Menu and Desktop shortcuts.
 3. Launch **Glypdl** from your Start Menu!
 
@@ -138,29 +143,29 @@ Choose the package format best suited for your operating system from [GitHub Rel
 
 #### 1. 🚀 Universal Standalone AppImage
 ```bash
-wget -O Glypdl-x86_64.AppImage https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.0.0/Glypdl-x86_64.AppImage
+wget -O Glypdl-x86_64.AppImage https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.0/Glypdl-x86_64.AppImage
 chmod +x Glypdl-x86_64.AppImage
 ./Glypdl-x86_64.AppImage
 ```
 
 #### 2. 📦 Debian / Ubuntu / Linux Mint / Pop!_OS (`.deb`)
 ```bash
-wget -O glypdl.deb https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.0.0/glypdl_1.0.0-1_all.deb
+wget -O glypdl.deb https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.0/glypdl_1.2.0_all.deb
 sudo apt install -y ./glypdl.deb
 glypdl
 ```
 
 #### 3. 📦 Fedora / Rocky Linux / RHEL / AlmaLinux (`.rpm`)
 ```bash
-wget -O glypdl.rpm https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.0.0/glypdl-1.0.0-1.fc44.noarch.rpm
+wget -O glypdl.rpm https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.0/glypdl-1.2.0-1.fc44.noarch.rpm
 sudo dnf install -y ./glypdl.rpm
 glypdl
 ```
 
 #### 4. 📦 Arch Linux / Manjaro / EndeavourOS
 ```bash
-wget https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.0.0/glypdl-1.0.0-1-any.pkg.tar.zst
-sudo pacman -U ./glypdl-1.0.0-1-any.pkg.tar.zst
+wget https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.0/glypdl-1.2.0-1-any.pkg.tar.zst
+sudo pacman -U ./glypdl-1.2.0-1-any.pkg.tar.zst
 glypdl
 ```
 
