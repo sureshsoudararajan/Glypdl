@@ -31,6 +31,19 @@
 
 ## 📸 Screenshots
 
+### 📱 Android Application
+<div align="center">
+  <table>
+    <tr>
+      <td align="center"><b>Home & URL Detection</b><br/><img src="data/screenshots/android_screenshots/HomeScreen.png" width="200" alt="Android Home Screen" /></td>
+      <td align="center"><b>Downloads Queue</b><br/><img src="data/screenshots/android_screenshots/DownloadScreen.png" width="200" alt="Android Downloads Screen" /></td>
+      <td align="center"><b>Download History</b><br/><img src="data/screenshots/android_screenshots/HistoryScreen.png" width="200" alt="Android History Screen" /></td>
+      <td align="center"><b>Preferences & Engine</b><br/><img src="data/screenshots/android_screenshots/SettingScreen.png" width="200" alt="Android Settings Screen" /></td>
+    </tr>
+  </table>
+</div>
+
+### 🐧 Linux Desktop Application (GTK4 / libadwaita)
 <div align="center">
   <table>
     <tr>
