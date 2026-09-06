@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-09-06
+
+### Added
+
+- **Per-Architecture Split APKs (Optimized Android Packaging)**:
+  - Configured Gradle ABI splits generating dedicated APKs for **`arm64-v8a`**, **`armeabi-v7a`**, and **`x86_64`**.
+  - Dramatically slashed Android release APK size from **239.6 MB** down to **~63.7 MB** for `arm64-v8a` (a **176 MB / 73.4% size reduction**).
+  - Added Fastlane metadata structure (`fastlane/metadata/android/en-US/`) for automated F-Droid and IzzyOnDroid repository ingestion.
+
+### Changed & Fixed
+
+- **Removed Unused aria2c Dependency**: Cleanly removed `com.github.yausername.youtubedl-android:aria2c` from Android Gradle dependencies, saving ~20 MB of redundant binary overhead.
+- **Signing & Android 15/16 Compatibility**: Enabled dual V1 (JAR) and V2 (APK Signature Scheme v2) signing schemes, fixing installer aborts and crashes on Android 15/16 (e.g. Motorola, Pixel).
+- **Manifest & Backup Rules**: Fixed invalid `domain="no_backup"` lint errors in `backup_rules.xml` and `data_extraction_rules.xml`, and removed redundant `extractNativeLibs` attribute.
+- **Automated CI Release Workflow**: Updated `.github/workflows/release.yml` to compile production release APKs with ABI splits and attach `Glypdl-1.2.1-arm64-v8a.apk`, `Glypdl-1.2.1-armeabi-v7a.apk`, and `Glypdl-1.2.1-x86_64.apk` to GitHub Releases.
+
 ## [1.2.0] - 2026-09-05
 
 ### Added

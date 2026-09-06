@@ -130,12 +130,15 @@
 Choose the package format best suited for your operating system from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases/latest):
 
 ### 📱 Android (`.apk`)
-1. Download **`Glypdl-1.2.0.apk`** from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases/latest).
-2. Open the downloaded `.apk` file on your Android device (ensure "Install unknown apps" permission is granted for your browser/file manager).
-3. Follow the installation prompts and launch **Glypdl**!
+Download the APK corresponding to your device architecture from [GitHub Releases (v1.2.1)](https://github.com/sureshsoudararajan/Glypdl/releases/latest):
+* **`Glypdl-1.2.1-arm64-v8a.apk`** &mdash; **Recommended for 90%+ modern Android phones & tablets** (64-bit ARM)
+* **`Glypdl-1.2.1-armeabi-v7a.apk`** &mdash; For older 32-bit ARM legacy devices
+* **`Glypdl-1.2.1-x86_64.apk`** &mdash; For Android Studio emulators and ChromeOS
+
+Open the downloaded `.apk` file on your device (ensure "Install unknown apps" permission is granted) and follow the installation prompts!
 
 ### 🪟 Windows 11 / 10 Installer (`.exe`)
-1. Download **`Glypdl-1.2.0-Setup-x64.exe`** from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases/latest).
+1. Download **`Glypdl-1.2.1-Setup-x64.exe`** from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases/latest).
 2. Run the installer to set up Start Menu and Desktop shortcuts.
 3. Launch **Glypdl** from your Start Menu!
 
@@ -143,29 +146,29 @@ Choose the package format best suited for your operating system from [GitHub Rel
 
 #### 1. 🚀 Universal Standalone AppImage
 ```bash
-wget -O Glypdl-x86_64.AppImage https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.0/Glypdl-x86_64.AppImage
+wget -O Glypdl-x86_64.AppImage https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.1/Glypdl-x86_64.AppImage
 chmod +x Glypdl-x86_64.AppImage
 ./Glypdl-x86_64.AppImage
 ```
 
 #### 2. 📦 Debian / Ubuntu / Linux Mint / Pop!_OS (`.deb`)
 ```bash
-wget -O glypdl.deb https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.0/glypdl_1.2.0_all.deb
+wget -O glypdl.deb https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.1/glypdl_1.2.1_all.deb
 sudo apt install -y ./glypdl.deb
 glypdl
 ```
 
 #### 3. 📦 Fedora / Rocky Linux / RHEL / AlmaLinux (`.rpm`)
 ```bash
-wget -O glypdl.rpm https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.0/glypdl-1.2.0-1.fc44.noarch.rpm
+wget -O glypdl.rpm https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.1/glypdl-1.2.1-1.fc44.noarch.rpm
 sudo dnf install -y ./glypdl.rpm
 glypdl
 ```
 
 #### 4. 📦 Arch Linux / Manjaro / EndeavourOS
 ```bash
-wget https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.0/glypdl-1.2.0-1-any.pkg.tar.zst
-sudo pacman -U ./glypdl-1.2.0-1-any.pkg.tar.zst
+wget https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.1/glypdl-1.2.1-1-any.pkg.tar.zst
+sudo pacman -U ./glypdl-1.2.1-1-any.pkg.tar.zst
 glypdl
 ```
 
@@ -243,11 +246,14 @@ PYTHONPATH=src python3 -m glypdl.app
 cd android
 
 # Run unit tests
-./gradlew testDebugUnitTest
+./gradlew testReleaseUnitTest
 
-# Assemble Debug APK
-./gradlew assembleDebug
-# Generated at android/app/build/outputs/apk/debug/app-debug.apk
+# Assemble Release APKs (per-architecture splits)
+./gradlew assembleRelease
+# Output APKs generated at:
+# android/app/build/outputs/apk/release/app-arm64-v8a-release.apk
+# android/app/build/outputs/apk/release/app-armeabi-v7a-release.apk
+# android/app/build/outputs/apk/release/app-x86_64-release.apk
 ```
 
 ---
