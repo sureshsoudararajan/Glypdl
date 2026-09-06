@@ -171,16 +171,18 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Build Android APK
+      - name: Build Android Release APKs
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
           mkdir -p ../dist-android
           TAG_NAME="${{ github.ref_name }}"
           VERSION="${TAG_NAME#v}"
           if [ -z "$VERSION" ]; then VERSION="1.2.0"; fi
-          cp app/build/outputs/apk/debug/app-debug.apk "../dist-android/Glypdl-${VERSION}.apk"
+          cp app/build/outputs/apk/release/app-arm64-v8a-release.apk "../dist-android/Glypdl-${VERSION}-arm64-v8a.apk"
+          cp app/build/outputs/apk/release/app-armeabi-v7a-release.apk "../dist-android/Glypdl-${VERSION}-armeabi-v7a.apk"
+          cp app/build/outputs/apk/release/app-x86_64-release.apk "../dist-android/Glypdl-${VERSION}-x86_64.apk"
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
