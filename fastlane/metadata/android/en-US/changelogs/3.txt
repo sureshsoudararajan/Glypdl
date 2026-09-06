@@ -1,0 +1,1 @@
+Optimized packaging with per-architecture split APKs. Added dual V1 and V2 signing for Android 15 and 16 compatibility. Performance and stability improvements.

@@ -1,0 +1,1 @@
+Native Android release powered by yt-dlp and FFmpeg. Support for YouTube, Instagram, and Facebook downloads with in-app cookie authentication.
