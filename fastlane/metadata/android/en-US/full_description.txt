@@ -1,0 +1,10 @@
+Glypdl is a fast, modern, and privacy-focused open-source media downloader for Android, powered by native yt-dlp and FFmpeg.
+
+Key Features:
+• Download videos and audio from YouTube, Instagram, Facebook, and thousands of supported websites.
+• Seamless adaptive video and audio stream merging via integrated native FFmpeg.
+• In-app browser cookie management and session authentication for protected media.
+• Format selection with audio-only (M4A/MP3) and high-resolution video options.
+• Background download manager with pause, resume, queue, and persistent notifications.
+• Persistent download history and Storage Access Framework (SAF) integration.
+• 100% Free and Open Source (GPL-3.0-or-later) with zero advertisements, zero tracking, and complete privacy.
