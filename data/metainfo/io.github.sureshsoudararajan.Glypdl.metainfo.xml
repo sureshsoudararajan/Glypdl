@@ -56,6 +56,21 @@
     <binary>glypdl</binary>
   </provides>
   <releases>
+    <release version="1.2.1" date="2026-09-06">
+      <description>
+        <p>Optimized packaging, Android per-architecture split APKs, and performance fixes.</p>
+      </description>
+    </release>
+    <release version="1.2.0" date="2026-09-05">
+      <description>
+        <p>Native Android application release with yt-dlp, FFmpeg, and in-app cookie extraction.</p>
+      </description>
+    </release>
+    <release version="1.1.0" date="2026-09-04">
+      <description>
+        <p>Linux Firefox companion extension and session cookie integration.</p>
+      </description>
+    </release>
     <release version="1.0.0" date="2026-08-30">
       <description>
         <p>Initial release of Glypdl native GTK4/libadwaita yt-dlp download manager.</p>
