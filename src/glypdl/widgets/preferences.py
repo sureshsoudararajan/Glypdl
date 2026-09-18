@@ -612,8 +612,30 @@ class PreferencesDialog(Adw.PreferencesDialog):
         )
         extension_page.add(ext_group)
 
+        # Detect if running in Flatpak sandbox
+        is_flatpak = bool(os.environ.get("FLATPAK_ID"))
+        if is_flatpak:
+            flatpak_group = Adw.PreferencesGroup(
+                title="Flatpak Browser Bridge",
+                description="Flatpak runs sandboxed from your host browsers. Run this one-line terminal command once to link your browser extension:"
+            )
+            extension_page.add(flatpak_group)
+
+            cmd_row = Adw.ActionRow(
+                title="curl -sSL https://raw.githubusercontent.com/sureshsoudararajan/Glypdl/main/scripts/install-native-host.sh | bash",
+                subtitle="Click copy and paste in your terminal"
+            )
+            copy_cmd_btn = Gtk.Button(icon_name="edit-copy-symbolic", valign=Gtk.Align.CENTER)
+            copy_cmd_btn.set_tooltip_text("Copy Command to Clipboard")
+            copy_cmd_btn.connect('clicked', lambda b: self._copy_flatpak_command(
+                "curl -sSL https://raw.githubusercontent.com/sureshsoudararajan/Glypdl/main/scripts/install-native-host.sh | bash",
+                b
+            ))
+            cmd_row.add_suffix(copy_cmd_btn)
+            flatpak_group.add(cmd_row)
+
         self.native_host_row = Adw.ActionRow(
-            title="Firefox Native Messaging Host",
+            title="Native Messaging Host Status" if is_flatpak else "Firefox Native Messaging Host",
             subtitle="Registers Glypdl host manifest with Firefox &amp; LibreWolf"
         )
 
@@ -633,6 +655,13 @@ class PreferencesDialog(Adw.PreferencesDialog):
 
         # Check if already registered
         self._check_host_registration()
+
+    def _copy_flatpak_command(self, cmd_text: str, button: Gtk.Button):
+        clipboard = self.get_display().get_clipboard()
+        clipboard.set(cmd_text)
+        old_tooltip = button.get_tooltip_text()
+        button.set_tooltip_text("Copied to Clipboard!")
+        GLib.timeout_add_seconds(2, lambda: button.set_tooltip_text(old_tooltip) or False)
 
     def _check_host_registration(self):
         """Check if native messaging manifests are already installed and update UI."""

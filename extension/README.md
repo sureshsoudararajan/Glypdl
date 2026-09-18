@@ -31,12 +31,18 @@ It provides an **IDM-style media detection experience** that detects video & aud
 
 ### 1. Register the Native Messaging Host (One-Time Setup)
 
-Make sure the Glypdl desktop app is installed, then:
-1. Launch **Glypdl**.
-2. Open **Preferences** (`Ctrl+,`) $\rightarrow$ **Extension** tab.
-3. Click **`[Register Host]`**.
+Make sure the Glypdl desktop app is installed:
 
-This registers `io.github.sureshsoudararajan.glypdl` for standard Firefox, LibreWolf, and Flatpak Firefox.
+* **For Native Packages (Debian `.deb`, Arch Linux AUR, RPM, AppImage)**:
+  1. Open **Preferences** (`Ctrl+,`) → **Extension** tab.
+  2. Click **`[Register Host]`**.
+
+* **For Flatpak Users**:
+  Because Flatpak runs in an isolated sandbox from host browsers, run this one-line command once in your terminal:
+  ```bash
+  curl -sSL https://raw.githubusercontent.com/sureshsoudararajan/Glypdl/main/scripts/install-native-host.sh | bash
+  ```
+  *(Or copy the command directly from Glypdl Preferences → Extension tab).*
 
 ### 2. Load the Extension in Firefox
 
