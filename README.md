@@ -57,6 +57,20 @@
   </table>
 </div>
 
+### 🪟 Windows Desktop Application (WinUI 3 / Windows App SDK)
+<div align="center">
+  <table>
+    <tr>
+      <td align="center"><b>Home & Metadata Preview</b><br/><img src="data/screenshots/Windows_Screenshots/Main_Window.png" width="400" alt="Windows Main Window" /></td>
+      <td align="center"><b>Downloads Queue</b><br/><img src="data/screenshots/Windows_Screenshots/DownloadQueueAndComplete_Screen.png" width="400" alt="Windows Downloads Queue" /></td>
+    </tr>
+    <tr>
+      <td align="center"><b>Download History</b><br/><img src="data/screenshots/Windows_Screenshots/History_Screen.png" width="400" alt="Windows History Screen" /></td>
+      <td align="center"><b>Preferences & Settings</b><br/><img src="data/screenshots/Windows_Screenshots/Settings_Screen.png" width="400" alt="Windows Settings Screen" /></td>
+    </tr>
+  </table>
+</div>
+
 ---
 
 ## 🚀 Key Features
