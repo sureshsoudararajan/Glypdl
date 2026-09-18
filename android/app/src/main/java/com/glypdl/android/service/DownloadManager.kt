@@ -109,7 +109,16 @@ class DownloadManager @Inject constructor(
             val stagingDir = com.glypdl.android.util.StorageHelper.getDefaultStagingDir(context)
             var lastDbUpdateTime = 0L
 
+            var statusSetToProcessing = false
             val result = ytDlpService.download(request, stagingDir.absolutePath) { progress, downloaded, total, speed, eta ->
+                val isMerging = speed.contains("Merging", ignoreCase = true)
+                if (isMerging && !statusSetToProcessing) {
+                    statusSetToProcessing = true
+                    launch {
+                        downloadRepository.updateStatus(entity.id, DownloadStatus.PROCESSING)
+                    }
+                }
+
                 val currentProgress = DownloadProgress(
                     downloadId = entity.id,
                     percent = progress,
@@ -149,8 +158,9 @@ class DownloadManager @Inject constructor(
                     downloadNotificationManager.onDownloadFailed(entity.id, entity.title, errorMsg)
                 } else {
                     val fileLength = file.length()
+                    val actualExt = file.extension.ifBlank { entity.ext }
                     val customTreeUri = settingsRepository.downloadDirUri.first()
-                    val mimeType = com.glypdl.android.util.StorageHelper.getMimeType(entity.ext, entity.isAudioOnly)
+                    val mimeType = com.glypdl.android.util.StorageHelper.getMimeType(actualExt, entity.isAudioOnly)
                     val displayName = file.name
 
                     val exportResult = com.glypdl.android.util.StorageHelper.exportToPermanentStorage(
@@ -171,6 +181,7 @@ class DownloadManager @Inject constructor(
                                 downloadedBytes = fileLength,
                                 totalBytes = fileLength,
                                 progress = 100f,
+                                ext = actualExt,
                                 errorMessage = null,
                                 updatedAt = System.currentTimeMillis()
                             )

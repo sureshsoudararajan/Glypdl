@@ -58,11 +58,12 @@ object FormatNormalizer {
         val bestAudioSize = bestAudio?.filesize ?: bestAudio?.filesizeApprox ?: 0L
 
         val result = mutableListOf<VideoQuality>()
-        val videoFormats = formats.filter { !it.isAudioOnly && getEffectiveDimension(it) != null }
+        val allVideoFormats = formats.filter { !it.isAudioOnly }
+        val videoFormatsWithDim = allVideoFormats.filter { getEffectiveDimension(it) != null }
 
         for (tier in STANDARD_TIERS) {
             // Find formats matching this tier
-            val matching = videoFormats.filter { fmt ->
+            val matching = videoFormatsWithDim.filter { fmt ->
                 val dim = getEffectiveDimension(fmt) ?: 0
                 dim in tier.minDimension..tier.maxDimension
             }
@@ -83,7 +84,11 @@ object FormatNormalizer {
                 }
 
                 val formatSelector = if (best.isVideoOnly) {
-                    "${best.formatId}+bestaudio/bestvideo[height<=${tier.targetHeight}]+bestaudio/best[height<=${tier.targetHeight}]"
+                    if (bestAudio != null) {
+                        "${best.formatId}+bestaudio/bestvideo[height<=${tier.targetHeight}]+bestaudio/best[height<=${tier.targetHeight}]"
+                    } else {
+                        "${best.formatId}/best"
+                    }
                 } else {
                     best.formatId
                 }
@@ -104,21 +109,32 @@ object FormatNormalizer {
             }
         }
 
-        // If no standard tiers matched (e.g. non-standard custom aspect ratios)
-        if (result.isEmpty() && videoFormats.isNotEmpty()) {
-            val best = videoFormats.maxByOrNull { it.filesize ?: it.filesizeApprox ?: 0L } ?: videoFormats.first()
-            val dim = getEffectiveDimension(best) ?: 720
+        // If no standard tiers matched (e.g. non-standard custom aspect ratios or unparsed dimensions)
+        if (result.isEmpty() && allVideoFormats.isNotEmpty()) {
+            val best = allVideoFormats.maxByOrNull { it.filesize ?: it.filesizeApprox ?: 0L } ?: allVideoFormats.first()
+            val dim = getEffectiveDimension(best)
+            val label = if (dim != null) "${dim}p" else (best.resolution?.ifBlank { "Best Quality" } ?: "Best Quality")
             val rawSize = best.filesize ?: best.filesizeApprox ?: 0L
             val totalSize = if (best.isVideoOnly && bestAudioSize > 0) rawSize + bestAudioSize else rawSize
 
+            val formatSelector = if (best.isVideoOnly) {
+                if (bestAudio != null) {
+                    "${best.formatId}+bestaudio/best"
+                } else {
+                    best.formatId
+                }
+            } else {
+                best.formatId
+            }
+
             result.add(
                 VideoQuality(
-                    label = "${dim}p",
+                    label = label,
                     width = best.width,
-                    height = best.height ?: dim,
+                    height = best.height ?: dim ?: 720,
                     codec = best.vcodec?.takeIf { it.isNotBlank() && it != "none" },
                     estimatedSize = if (totalSize > 0) totalSize else null,
-                    formatSelector = if (best.isVideoOnly) "${best.formatId}+bestaudio/best" else best.formatId,
+                    formatSelector = formatSelector,
                     formatId = best.formatId,
                     ext = if (best.ext.isNotBlank() && best.ext != "none") best.ext else "mp4",
                     hasAudio = !best.isVideoOnly

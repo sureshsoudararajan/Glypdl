@@ -170,14 +170,33 @@ class AnalyzeViewModel @Inject constructor(
                         val videoFormats = mediaInfo.formats.filter { it.isVideoOnly || (it.vcodec != null && it.vcodec != "none") }
                         val audioFormats = mediaInfo.formats.filter { it.isAudioOnly || (it.acodec != null && it.vcodec == "none") }
                         val defaultVideoQuality = mediaInfo.videoQualities.firstOrNull()
-                        val defaultAudioQuality = mediaInfo.audioQualities.firstOrNull()
+
+                        // Intelligently harmonize default audio: WebM video requires Opus/Vorbis audio.
+                        // MP4 video natively pairs with AAC/m4a audio.
+                        val isDefaultVideoWebm = defaultVideoQuality?.ext?.equals("webm", ignoreCase = true) == true ||
+                                defaultVideoQuality?.codec?.contains("vp", ignoreCase = true) == true
+                        val defaultAudioQuality = if (isDefaultVideoWebm) {
+                            mediaInfo.audioQualities.firstOrNull {
+                                it.extension.equals("opus", ignoreCase = true) ||
+                                        it.extension.equals("webm", ignoreCase = true) ||
+                                        it.codec?.contains("opus", ignoreCase = true) == true
+                            } ?: mediaInfo.audioQualities.firstOrNull()
+                        } else {
+                            mediaInfo.audioQualities.firstOrNull {
+                                it.extension.equals("m4a", ignoreCase = true) ||
+                                        it.codec?.contains("mp4a", ignoreCase = true) == true ||
+                                        it.codec?.contains("aac", ignoreCase = true) == true
+                            } ?: mediaInfo.audioQualities.firstOrNull()
+                        }
+
+                        val defaultFormat = mediaInfo.formats.firstOrNull { !it.isAudioOnly } ?: mediaInfo.formats.firstOrNull()
 
                         val isInstagram = UrlValidator.isInstagramUrl(mediaInfo.url)
                         val isFacebook = UrlValidator.isFacebookUrl(mediaInfo.url)
 
                         _uiState.value = AnalyzeUiState.Success(
                             mediaInfo = mediaInfo,
-                            selectedFormat = null,
+                            selectedFormat = defaultFormat,
                             selectedVideoQuality = defaultVideoQuality,
                             selectedAudioQuality = defaultAudioQuality,
                             isAudioOnly = false,
@@ -240,8 +259,34 @@ class AnalyzeViewModel @Inject constructor(
     fun onVideoQualitySelected(quality: VideoQuality) {
         _uiState.update { state ->
             if (state is AnalyzeUiState.Success) {
+                val isWebm = quality.ext.equals("webm", ignoreCase = true) ||
+                        quality.codec?.contains("vp", ignoreCase = true) == true
+                val currentAudio = state.selectedAudioQuality
+                val currentAudioIsWebm = currentAudio?.let {
+                    it.extension.equals("opus", ignoreCase = true) ||
+                            it.extension.equals("webm", ignoreCase = true) ||
+                            it.codec?.contains("opus", ignoreCase = true) == true
+                } ?: false
+
+                val harmonizedAudio = if (isWebm && !currentAudioIsWebm) {
+                    state.mediaInfo.audioQualities.firstOrNull {
+                        it.extension.equals("opus", ignoreCase = true) ||
+                                it.extension.equals("webm", ignoreCase = true) ||
+                                it.codec?.contains("opus", ignoreCase = true) == true
+                    } ?: currentAudio
+                } else if (!isWebm && currentAudioIsWebm) {
+                    state.mediaInfo.audioQualities.firstOrNull {
+                        it.extension.equals("m4a", ignoreCase = true) ||
+                                it.codec?.contains("mp4a", ignoreCase = true) == true ||
+                                it.codec?.contains("aac", ignoreCase = true) == true
+                    } ?: currentAudio
+                } else {
+                    currentAudio
+                }
+
                 state.copy(
                     selectedVideoQuality = quality,
+                    selectedAudioQuality = harmonizedAudio,
                     isAudioOnly = false
                 )
             } else state
@@ -372,38 +417,83 @@ class AnalyzeViewModel @Inject constructor(
             } else if (currentState.selectedVideoQuality != null) {
                 val video = currentState.selectedVideoQuality
                 val audio = currentState.selectedAudioQuality
-                val formatId = if (audio != null && video.formatId.isNotBlank() && audio.formatId.isNotBlank()) {
-                    "${video.formatId}+${audio.formatId}"
+                val formatId = if (!video.hasAudio && audio != null && video.formatId.isNotBlank() && audio.formatId.isNotBlank() && video.formatId != audio.formatId) {
+                    "${video.formatId}+${audio.formatId}/${video.formatId}/best"
+                } else if (video.formatSelector.isNotBlank()) {
+                    if (video.formatSelector.contains("/")) video.formatSelector else "${video.formatSelector}/best"
                 } else {
-                    video.formatSelector
+                    "bestvideo+bestaudio/best"
                 }
-                val resLabel = if (audio != null) "${video.label} + ${audio.displayBitrate}" else video.label
+                val resLabel = if (audio != null && !video.hasAudio && video.formatId != audio.formatId) {
+                    "${video.label} + ${audio.displayBitrate}"
+                } else {
+                    video.label
+                }
+                // Check for codec/container harmony: WebM container strictly requires Opus/Vorbis audio.
+                // If WebM video is paired with AAC/m4a audio, we set ext to "mkv" which losslessly supports
+                // both VP9 video and AAC audio without re-encoding.
+                val isVideoWebm = video.ext.equals("webm", ignoreCase = true) ||
+                        video.codec?.contains("vp", ignoreCase = true) == true
+                val isAudioOpus = audio?.let {
+                    it.extension.equals("opus", ignoreCase = true) ||
+                            it.extension.equals("webm", ignoreCase = true) ||
+                            it.codec?.contains("opus", ignoreCase = true) == true
+                } ?: false
+
+                val resolvedExt = if (!video.hasAudio && audio != null) {
+                    if (isVideoWebm && !isAudioOpus) {
+                        "mkv"
+                    } else if (!isVideoWebm && isAudioOpus && !video.ext.equals("mkv", ignoreCase = true)) {
+                        "mkv"
+                    } else {
+                        video.ext.ifBlank { "mp4" }
+                    }
+                } else {
+                    video.ext.ifBlank { "mp4" }
+                }
+
                 DownloadRequest(
                     id = UUID.randomUUID().toString(),
                     url = mediaInfo.url,
                     title = mediaInfo.title,
                     thumbnailUrl = mediaInfo.thumbnail,
                     formatId = formatId,
-                    ext = video.ext.ifBlank { "mp4" },
+                    ext = resolvedExt,
                     resolution = resLabel,
                     isAudioOnly = false,
                     destinationUri = null
                 )
             } else if (currentState.selectedFormat != null) {
                 val format = currentState.selectedFormat
+                val formatId = if (format.formatId.isNotBlank()) {
+                    if (format.isAudioOnly) "${format.formatId}/bestaudio/best" else "${format.formatId}/best"
+                } else {
+                    if (format.isAudioOnly) "bestaudio/best" else "bestvideo+bestaudio/best"
+                }
                 DownloadRequest(
                     id = UUID.randomUUID().toString(),
                     url = mediaInfo.url,
                     title = mediaInfo.title,
                     thumbnailUrl = mediaInfo.thumbnail,
-                    formatId = format.formatId,
-                    ext = format.ext,
-                    resolution = format.resolution,
+                    formatId = formatId,
+                    ext = format.ext.ifBlank { if (format.isAudioOnly) "m4a" else "mp4" },
+                    resolution = format.displayResolution.ifBlank { "Best" },
                     isAudioOnly = format.isAudioOnly,
                     destinationUri = null
                 )
             } else {
-                return
+                // Safe fallback: If no format was explicitly selected, default to best available
+                DownloadRequest(
+                    id = UUID.randomUUID().toString(),
+                    url = mediaInfo.url,
+                    title = mediaInfo.title,
+                    thumbnailUrl = mediaInfo.thumbnail,
+                    formatId = "bestvideo+bestaudio/best",
+                    ext = "mp4",
+                    resolution = "Best",
+                    isAudioOnly = false,
+                    destinationUri = null
+                )
             }
 
             viewModelScope.launch {

@@ -526,6 +526,7 @@ class YtDlpManager @Inject constructor(
 
             val dlRequest = YoutubeDLRequest(targetUrl)
             dlRequest.addOption("--no-playlist")
+            dlRequest.addOption("--verbose")
 
             val cookieFile = authCookieManager.getCookieFile(targetUrl)
             if (cookieFile != null) {
@@ -538,15 +539,34 @@ class YtDlpManager @Inject constructor(
                     request.formatId.contains("bestaudio") || request.formatId.contains("+") || request.formatId.isBlank() -> "bestvideo+bestaudio/best"
                     else -> request.formatId.ifBlank { "bestvideo+bestaudio/best" }
                 }
+            } else if (request.isAudioOnly) {
+                if (request.formatId.isNotBlank() && !request.formatId.contains("/")) {
+                    "${request.formatId}/bestaudio/best"
+                } else {
+                    request.formatId.ifBlank { "bestaudio/best" }
+                }
             } else if (request.formatId.isNotBlank()) {
-                request.formatId
+                if (!request.formatId.contains("/")) {
+                    "${request.formatId}/bestvideo+bestaudio/best"
+                } else {
+                    request.formatId
+                }
             } else {
                 "bestvideo+bestaudio/best"
             }
             dlRequest.addOption("-f", effectiveFormat)
 
+            // Referer header prevents 403 Forbidden on sites checking request origin (e.g. Twitter, Reddit, Streamable, etc.)
+            dlRequest.addOption("--referer", targetUrl)
+
+            // Avoid SSL handshake failures on older/mobile cert stores
+            dlRequest.addOption("--no-check-certificates")
+
             // Preserve non-ASCII / Unicode titles (Tamil, Hindi, Japanese, emoji)
             dlRequest.addOption("--no-restrict-filenames")
+
+            // Mobile-optimized post-processor args (limit thread contention during remux)
+            dlRequest.addOption("--postprocessor-args", "Merger:-threads 4")
 
             // Safe Unicode truncation to <= 80 bytes in UTF-8 to prevent [Errno 36] File name too long
             val safeTitle = com.glypdl.android.util.FileNameSanitizer.safeFsTitle(request.title, 80)
@@ -560,15 +580,29 @@ class YtDlpManager @Inject constructor(
             dlRequest.addOption("-o", outputPath)
 
             if (!request.isAudioOnly && (effectiveFormat.contains("+") || effectiveFormat.contains("bestvideo"))) {
-                dlRequest.addOption("--merge-output-format", request.ext.ifEmpty { "mp4" })
+                // If container is webm or mp4, provide mkv as automatic fallback container
+                // e.g. "webm/mkv" or "mp4/mkv". yt-dlp checks whether the downloaded audio and video
+                // codecs fit into the preferred container (e.g. WebM strictly forbids AAC audio;
+                // only Opus/Vorbis are valid WebM audio). If incompatible, yt-dlp automatically falls back
+                // to Matroska (mkv) without failing FFmpeg remuxing.
+                val preferredExt = request.ext.trim().lowercase().removePrefix(".")
+                val mergeFormat = when {
+                    preferredExt.isBlank() || preferredExt == "mp4" -> "mp4/mkv"
+                    preferredExt == "webm" -> "webm/mkv"
+                    preferredExt == "mkv" -> "mkv"
+                    else -> "$preferredExt/mkv"
+                }
+                dlRequest.addOption("--merge-output-format", mergeFormat)
             }
 
             var finalOutputFile = ""
             var detectedMediaId: String? = null
 
-            YoutubeDL.getInstance().execute(dlRequest, null) { progress, etaInSeconds, line ->
+            val lineProcessor: (Float, Long, String) -> Unit = { progress, etaInSeconds, line ->
                 val parsed = parseProgressLine(line, progress, etaInSeconds)
-                progressCallback(parsed.percent, parsed.downloadedBytes, parsed.totalBytes, parsed.speed, parsed.eta)
+                val isMerging = line.contains("[Merger]") || parsed.speed.contains("Merging", ignoreCase = true)
+                val effectiveSpeed = if (isMerging) "Merging media..." else parsed.speed
+                progressCallback(parsed.percent, parsed.downloadedBytes, parsed.totalBytes, effectiveSpeed, parsed.eta)
 
                 val trimmed = line.trim()
                 if (trimmed.contains("[Instagram:story]") || trimmed.contains("[Instagram]")) {
@@ -601,6 +635,66 @@ class YtDlpManager @Inject constructor(
                 }
             }
 
+            try {
+                YoutubeDL.getInstance().execute(dlRequest, null) { progress, etaInSeconds, line ->
+                    lineProcessor(progress, etaInSeconds, line)
+                }
+            } catch (e: Exception) {
+                val errorMsg = e.message ?: ""
+                val isPostProcessingFailure = errorMsg.contains("Conversion failed", ignoreCase = true) ||
+                        errorMsg.contains("postprocessing", ignoreCase = true) ||
+                        errorMsg.contains("merger", ignoreCase = true)
+
+                var recovered = false
+                if (isPostProcessingFailure) {
+                    val dir = File(downloadDir)
+                    if (dir.exists() && dir.isDirectory) {
+                        // Check if video and audio streams were already downloaded to disk
+                        val streamFiles = dir.listFiles()?.filter { f ->
+                            f.isFile &&
+                            f.length() > 0 &&
+                            !f.name.endsWith(".part") &&
+                            !f.name.endsWith(".temp") &&
+                            !f.name.endsWith(".ytdl") &&
+                            Regex("""\.f\w+\.[a-zA-Z0-9]+$""").containsMatchIn(f.name)
+                        } ?: emptyList()
+
+                        if (streamFiles.isNotEmpty()) {
+                            // File writes need brief stabilization for kernel buffer commit on large files
+                            kotlinx.coroutines.delay(600L)
+                            progressCallback(99f, 0L, 0L, "Merging media...", "")
+
+                            try {
+                                val retryRequest = YoutubeDLRequest(targetUrl).apply {
+                                    addOption("-f", effectiveFormat)
+                                    addOption("--referer", targetUrl)
+                                    addOption("--no-check-certificates")
+                                    addOption("--no-restrict-filenames")
+                                    addOption("--postprocessor-args", "Merger:-threads 4")
+                                    addOption("-o", outputPath)
+                                    // Matroska (.mkv) can containerize any codec combination (e.g. VP9 + AAC)
+                                    addOption("--merge-output-format", "mkv")
+                                }
+                                YoutubeDL.getInstance().execute(retryRequest, null) { progress, etaInSeconds, line ->
+                                    lineProcessor(progress, etaInSeconds, line)
+                                }
+                                recovered = true
+                            } catch (retryEx: Exception) {
+                                retryEx.printStackTrace()
+                                val parsedError = YtDlpErrorParser.parse(retryEx.message ?: e.message, installed)
+                                return@withContext Result.failure(GlypdlException(parsedError))
+                            }
+                        }
+                    }
+                }
+
+                if (!recovered) {
+                    e.printStackTrace()
+                    val parsedError = YtDlpErrorParser.parse(e.message, installed)
+                    return@withContext Result.failure(GlypdlException(parsedError))
+                }
+            }
+
             finalOutputFile = finalOutputFile.trim('"', '\'')
 
             // If path is missing, unexpanded template, or non-existent, find the output file in downloadDir
@@ -608,7 +702,7 @@ class YtDlpManager @Inject constructor(
                 val dir = File(downloadDir)
                 if (dir.exists() && dir.isDirectory) {
                     val candidate = dir.listFiles()
-                        ?.filter { it.isFile && it.length() > 0 && (System.currentTimeMillis() - it.lastModified() < 300_000) }
+                        ?.filter { it.isFile && it.length() > 0 && !it.name.endsWith(".part") && !it.name.endsWith(".temp") && !it.name.endsWith(".ytdl") && !Regex("""\.f\w+\.[a-zA-Z0-9]+$""").containsMatchIn(it.name) && (System.currentTimeMillis() - it.lastModified() < 600_000) }
                         ?.maxByOrNull { it.lastModified() }
                     if (candidate != null) {
                         finalOutputFile = candidate.absolutePath

@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import com.glypdl.android.data.model.AppUpdateInfo
+import com.glypdl.android.service.update.AppUpdateManager
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -34,7 +36,8 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val ytDlpService: YtDlpService,
-    private val authCookieManager: com.glypdl.android.service.auth.AuthCookieManager
+    private val authCookieManager: com.glypdl.android.service.auth.AuthCookieManager,
+    private val appUpdateManager: AppUpdateManager
 ) : ViewModel() {
 
     val authPlatforms = com.glypdl.android.service.auth.AuthCookieManager.SUPPORTED_PLATFORMS
@@ -99,9 +102,21 @@ class SettingsViewModel @Inject constructor(
     private val _engineActionMessage = MutableStateFlow<String?>(null)
     val engineActionMessage: StateFlow<String?> = _engineActionMessage.asStateFlow()
 
+    val currentAppVersion: String = appUpdateManager.getCurrentVersion()
+
+    private val _appUpdateInfo = MutableStateFlow<AppUpdateInfo?>(null)
+    val appUpdateInfo: StateFlow<AppUpdateInfo?> = _appUpdateInfo.asStateFlow()
+
+    private val _isCheckingAppUpdate = MutableStateFlow(false)
+    val isCheckingAppUpdate: StateFlow<Boolean> = _isCheckingAppUpdate.asStateFlow()
+
+    private val _appUpdateMessage = MutableStateFlow<String?>(null)
+    val appUpdateMessage: StateFlow<String?> = _appUpdateMessage.asStateFlow()
+
     init {
         refreshEngineStatus(forceOnline = false)
         refreshCookieStatus()
+        checkAppUpdate(force = false)
     }
 
     fun refreshCookieStatus() {
@@ -168,6 +183,34 @@ class SettingsViewModel @Inject constructor(
                 }
             } finally {
                 _isEngineBusy.value = false
+            }
+        }
+    }
+
+    fun checkAppUpdate(force: Boolean = true) {
+        viewModelScope.launch {
+            _isCheckingAppUpdate.value = true
+            if (force) {
+                _appUpdateMessage.value = "Checking for app updates..."
+            }
+            try {
+                val result = appUpdateManager.checkForUpdate()
+                result.onSuccess { info ->
+                    _appUpdateInfo.value = info
+                    if (info.isUpdateAvailable) {
+                        _appUpdateMessage.value = "New version v${info.latestVersion} available!"
+                    } else if (force) {
+                        _appUpdateMessage.value = "Glypdl is up to date (v${info.currentVersion})"
+                    } else {
+                        _appUpdateMessage.value = null
+                    }
+                }.onFailure { error ->
+                    if (force) {
+                        _appUpdateMessage.value = "Check failed: ${error.localizedMessage ?: "Network error"}"
+                    }
+                }
+            } finally {
+                _isCheckingAppUpdate.value = false
             }
         }
     }

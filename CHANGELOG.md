@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-09-18
+
+### Added
+
+- **GitHub In-App Release Update Checker (Android)**:
+  - Added native GitHub Release update checking in the Settings screen (`SettingsScreen.kt`, `SettingsViewModel.kt`).
+  - Directly queries GitHub Releases API (`AppUpdateManager.kt`) for published Glypdl releases.
+  - Interactive update dialog presenting the new version tag, release date, changelog details, and direct release download buttons.
+  - Runs independently without disrupting existing yt-dlp / FFmpeg engine update checks.
+- **Comprehensive Codebase KDoc Documentation**:
+  - Full developer documentation comments added across all 18 files in `android/app/src/main/java/com/glypdl/android/data` (models, entities, repositories, and Room DAOs).
+
+### Changed & Fixed
+
+- **WebM & Matroska (MKV) Codec Conflict Resolution**:
+  - Fixed FFmpeg post-processing crash (`Only VP8 or VP9 or AV1 video and Vorbis or Opus audio... are supported for WebM`).
+  - Configured `--merge-output-format` fallback containers (`"webm/mkv"` and `"mp4/mkv"`) in `YtDlpManager.kt`. When codecs are incompatible with WebM (e.g. VP9 video + AAC audio), yt-dlp automatically falls back to Matroska (`.mkv`) without failing FFmpeg remuxing.
+  - Post-processing recovery block now forces `--merge-output-format mkv` as a failsafe.
+  - Intelligent audio harmonization in `AnalyzeViewModel.kt`: WebM/VP9 video prioritizes Opus audio streams (e.g. format 251), and MP4/AVC1 prioritizes AAC streams (e.g. format 140).
+  - Dynamic MediaStore MIME type detection in `DownloadManager.kt` matching the actual output extension (`video/x-matroska`, `video/mp4`, `video/webm`).
+- **Stream Format Selection & Fallback Robustness**:
+  - Fixed format resolution fallback in `FormatNormalizer.kt` and `AnalyzeViewModel.kt` for streams with non-standard dimensions and custom aspect ratios, preventing zero-quality selection and silent download failures.
+
 ## [1.2.1] - 2026-09-06
 
 ### Added

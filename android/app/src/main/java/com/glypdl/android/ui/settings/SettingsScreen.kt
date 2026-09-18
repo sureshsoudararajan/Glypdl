@@ -74,6 +74,11 @@ fun SettingsScreen(
     val isEngineBusy by viewModel.isEngineBusy.collectAsState()
     val engineActionMessage by viewModel.engineActionMessage.collectAsState()
 
+    val currentAppVersion = viewModel.currentAppVersion
+    val appUpdateInfo by viewModel.appUpdateInfo.collectAsState()
+    val isCheckingAppUpdate by viewModel.isCheckingAppUpdate.collectAsState()
+    val appUpdateMessage by viewModel.appUpdateMessage.collectAsState()
+
     val scope = rememberCoroutineScope()
 
     // Dialog selection states
@@ -299,7 +304,198 @@ fun SettingsScreen(
                 }
             }
 
-            // 2. ACCOUNTS & AUTHENTICATION SECTION
+            // 2. APP UPDATES SECTION (Glypdl App)
+            item {
+                SettingsGroupCard(title = "App Updates") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                SettingsIconBadge(
+                                    icon = if (appUpdateInfo?.isUpdateAvailable == true) Icons.Default.NewReleases else Icons.Default.SystemUpdate,
+                                    tint = if (appUpdateInfo?.isUpdateAvailable == true) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column {
+                                    Text(
+                                        text = "Glypdl App",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = "Installed: v$currentAppVersion",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            // App Update Status Badge
+                            val updateInfo = appUpdateInfo
+                            if (updateInfo != null) {
+                                if (updateInfo.isUpdateAvailable) {
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                                    ) {
+                                        Text(
+                                            "v${updateInfo.latestVersion} available",
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                } else {
+                                    Badge(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    ) {
+                                        Text(
+                                            "Up to date",
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Banner when update is available
+                        if (appUpdateInfo?.isUpdateAvailable == true) {
+                            val info = appUpdateInfo!!
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Celebration,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Text(
+                                            text = "New update available: v${info.latestVersion}",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                    Text(
+                                        text = "A new version of Glypdl is available on GitHub. Please update to get the latest features, enhancements, and stability fixes.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (!info.releaseTitle.isNullOrBlank() && info.releaseTitle != "Glypdl v${info.latestVersion}") {
+                                        Text(
+                                            text = info.releaseTitle,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        if (!appUpdateMessage.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = appUpdateMessage!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (appUpdateInfo?.isUpdateAvailable == true) {
+                                    MaterialTheme.colorScheme.tertiary
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
+                                modifier = Modifier.padding(start = 54.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Action Buttons: Check for App Updates & Update Now
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { viewModel.checkAppUpdate(force = true) },
+                                enabled = !isCheckingAppUpdate,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                if (isCheckingAppUpdate) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Check App Update")
+                                }
+                            }
+
+                            if (appUpdateInfo?.isUpdateAvailable == true) {
+                                Button(
+                                    onClick = {
+                                        val targetUrl = appUpdateInfo?.releaseUrl
+                                        if (!targetUrl.isNullOrBlank()) {
+                                            try {
+                                                uriHandler.openUri(targetUrl)
+                                            } catch (e: Exception) {
+                                                e.printStackTrace()
+                                            }
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.tertiary,
+                                        contentColor = MaterialTheme.colorScheme.onTertiary
+                                    ),
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.FileDownload,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Update Now")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. ACCOUNTS & AUTHENTICATION SECTION
             item {
                 SettingsGroupCard(title = "Accounts & Authentication") {
                     Column(
@@ -863,7 +1059,7 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.secondaryContainer
                             ) {
                                 Text(
-                                    text = "v1.2.0",
+                                    text = "v$currentAppVersion",
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,

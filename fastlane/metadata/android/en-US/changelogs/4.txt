@@ -1,0 +1,1 @@
+Added in-app GitHub release update checker in Settings. Fixed WebM and Matroska codec merge conversion errors. Enhanced format fallback and stream analysis.

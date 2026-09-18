@@ -217,8 +217,15 @@ object YtDlpErrorParser {
                     GlypdlError.FFmpegError.CorruptInput(redactedDetails)
                 lower.contains("merging formats") || lower.contains("merger failed") ->
                     GlypdlError.FFmpegError.MergeError(redactedDetails)
-                lower.contains("conversion failed") ->
-                    GlypdlError.FFmpegError.ConversionError(redactedDetails)
+                lower.contains("conversion failed") -> {
+                    val specificLine = rawError.lines().firstOrNull { l ->
+                        val lowerL = l.lowercase()
+                        (lowerL.contains("error") || lowerL.contains("invalid") || lowerL.contains("cannot") || lowerL.contains("failed")) &&
+                                !lowerL.contains("postprocessing: conversion failed") &&
+                                !lowerL.contains("traceback")
+                    }?.trim()?.removePrefix("ERROR: ")?.removePrefix("[ffmpeg] ")
+                    GlypdlError.FFmpegError.ConversionError(redactedDetails, specificLine)
+                }
                 else ->
                     GlypdlError.FFmpegError(technicalDetails = redactedDetails)
             }
