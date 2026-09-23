@@ -39,7 +39,9 @@ android/**/.cxx/
 android/**/*.apk
 android/**/*.aab
 android/implementation.md
-
+android/glypdl-release.jks
+*.jks
+*.keystore
 
 # Local Databases, Logs, and Test Artifacts
 *.db

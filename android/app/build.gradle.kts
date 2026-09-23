@@ -37,13 +37,45 @@ android {
             enableV1Signing = true
             enableV2Signing = true
         }
+
+        create("release") {
+            val envPath = System.getenv("RELEASE_KEYSTORE_PATH")
+            val keystoreFile = when {
+                !envPath.isNullOrBlank() -> file(envPath)
+                file("../glypdl-release.jks").exists() -> file("../glypdl-release.jks")
+                file("glypdl-release.jks").exists() -> file("glypdl-release.jks")
+                else -> null
+            }
+
+            val storePasswordEnv = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+            val keyAliasEnv = System.getenv("RELEASE_KEY_ALIAS")
+            val keyPasswordEnv = System.getenv("RELEASE_KEY_PASSWORD")
+
+            if (keystoreFile != null && keystoreFile.exists() && !storePasswordEnv.isNullOrBlank()) {
+                storeFile = keystoreFile
+                storePassword = storePasswordEnv
+                keyAlias = keyAliasEnv ?: "glypdl"
+                keyPassword = keyPasswordEnv ?: storePasswordEnv
+                enableV1Signing = true
+                enableV2Signing = true
+            } else {
+                // Fallback to debug keystore for local development without release secrets
+                val debugConfig = getByName("debug")
+                storeFile = debugConfig.storeFile
+                storePassword = debugConfig.storePassword
+                keyAlias = debugConfig.keyAlias
+                keyPassword = debugConfig.keyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             isShrinkResources = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
