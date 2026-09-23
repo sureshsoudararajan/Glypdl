@@ -56,6 +56,11 @@
     <binary>glypdl</binary>
   </provides>
   <releases>
+    <release version="2.1.0" date="2026-09-23">
+      <description>
+        <p>Fixed Android playlist audio storage failure with unsupported MIME types, improved format stream propagation, and polished Linux desktop download list UI.</p>
+      </description>
+    </release>
     <release version="2.0.0" date="2026-09-18">
       <description>
         <p>In-app update checker, WebM and Matroska codec remuxing fixes, stream format fallback enhancements, and documentation.</p>

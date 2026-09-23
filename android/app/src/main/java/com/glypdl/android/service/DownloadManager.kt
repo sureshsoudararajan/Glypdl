@@ -202,8 +202,20 @@ class DownloadManager @Inject constructor(
                         historyRepository.insertHistory(history)
                         downloadNotificationManager.onDownloadCompleted(entity.id, entity.title, finalUriString)
                     }.onFailure { exportError ->
-                        val errorMsg = "Failed to save file to permanent storage: ${exportError.message}"
-                        val redactedLog = com.glypdl.android.service.engine.LogRedactor.redact(exportError.stackTraceToString())
+                        val mediaLabel = if (entity.isAudioOnly) "audio" else "video"
+                        val errorMsg = "Unable to save $mediaLabel to device storage: ${exportError.message ?: "Unknown storage error"}"
+                        val technicalDetails = buildString {
+                            appendLine("Storage Export Failure:")
+                            appendLine("Display Name: $displayName")
+                            appendLine("Actual Extension: $actualExt")
+                            appendLine("MIME Type: $mimeType")
+                            appendLine("Is Audio: ${entity.isAudioOnly}")
+                            appendLine("Staging File: ${file.absolutePath} (${file.length()} bytes)")
+                            appendLine("Target Storage: ${customTreeUri ?: "Default Public MediaStore"}")
+                            appendLine("Error: ${exportError.message}")
+                            appendLine(exportError.stackTraceToString())
+                        }
+                        val redactedLog = com.glypdl.android.service.engine.LogRedactor.redact(technicalDetails)
                         downloadRepository.updateDownload(
                             entity.copy(
                                 status = DownloadStatus.FAILED,

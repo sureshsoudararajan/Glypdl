@@ -51,11 +51,28 @@ object StorageHelper {
             "m4a" -> "audio/mp4"
             "flac" -> "audio/flac"
             "wav" -> "audio/wav"
-            "ogg", "opus" -> "audio/ogg"
+            "ogg" -> "audio/ogg"
+            "opus" -> "audio/opus"
             "aac" -> "audio/aac"
             "3gp" -> "video/3gpp"
             "avi" -> "video/x-msvideo"
             else -> if (isAudio) "audio/*" else "video/*"
+        }
+    }
+
+    /**
+     * Determines whether the given MIME type is recognized and accepted by Android's
+     * [MediaStore.Audio.Media] table. Android strictly validates audio MIME types and
+     * rejects non-standard types like "audio/webm" with an [IllegalArgumentException].
+     */
+    fun isSupportedAudioMediaStoreMime(mimeType: String): Boolean {
+        val lower = mimeType.lowercase().trim()
+        return when (lower) {
+            "audio/mp4", "audio/mpeg", "audio/aac", "audio/flac",
+            "audio/ogg", "audio/wav", "audio/x-wav", "audio/3gpp",
+            "audio/amr", "audio/amr-wb", "audio/x-m4a", "audio/m4a",
+            "audio/midi", "audio/x-midi" -> true
+            else -> false
         }
     }
 
@@ -86,6 +103,11 @@ object StorageHelper {
         isAudio: Boolean,
         customTreeUriString: String?
     ): Result<Uri> {
+        // 0. Verify staging file exists and has content
+        if (!stagingFile.exists() || stagingFile.length() <= 0L) {
+            return Result.failure(IllegalStateException("Staging file does not exist or is empty: ${stagingFile.absolutePath}"))
+        }
+
         // 1. Try Custom SAF Tree if configured
         if (!customTreeUriString.isNullOrBlank()) {
             try {
@@ -112,13 +134,22 @@ object StorageHelper {
         // 2. Default Public MediaStore Storage
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val collection = if (isAudio) {
-                    MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-                } else {
-                    MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-                }
+                // Determine whether MediaStore.Audio.Media, MediaStore.Video.Media, or MediaStore.Downloads should be used.
+                // Android's MediaStore.Audio.Media strictly rejects "audio/webm" and other non-standard audio MIME types.
+                // MediaStore.Downloads accepts all MIME types without restriction and places files in Download/Glypdl.
+                val useDownloadsCollection = isAudio && !isSupportedAudioMediaStoreMime(mimeType)
 
-                val relativePath = if (isAudio) "Music/Glypdl" else "Movies/Glypdl"
+                val (collection, relativePath) = when {
+                    useDownloadsCollection -> {
+                        MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) to "${Environment.DIRECTORY_DOWNLOADS}/Glypdl"
+                    }
+                    isAudio -> {
+                        MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) to "Music/Glypdl"
+                    }
+                    else -> {
+                        MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) to "Movies/Glypdl"
+                    }
+                }
 
                 val contentValues = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
@@ -127,8 +158,24 @@ object StorageHelper {
                     put(MediaStore.MediaColumns.IS_PENDING, 1)
                 }
 
-                val contentUri = context.contentResolver.insert(collection, contentValues)
-                    ?: throw IllegalStateException("Failed to insert MediaStore record")
+                var contentUri: Uri? = null
+                try {
+                    contentUri = context.contentResolver.insert(collection, contentValues)
+                } catch (e: IllegalArgumentException) {
+                    // Fallback to MediaStore.Downloads if the primary collection rejected the MIME type on this device/ROM
+                    if (collection != MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)) {
+                        val fallbackCollection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                        val fallbackPath = "${Environment.DIRECTORY_DOWNLOADS}/Glypdl"
+                        contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, fallbackPath)
+                        contentUri = context.contentResolver.insert(fallbackCollection, contentValues)
+                    } else {
+                        throw e
+                    }
+                }
+
+                if (contentUri == null) {
+                    throw IllegalStateException("Failed to insert MediaStore record for $displayName with MIME $mimeType")
+                }
 
                 try {
                     context.contentResolver.openOutputStream(contentUri)?.use { out ->
@@ -151,7 +198,9 @@ object StorageHelper {
                 // API 26-28 Fallback
                 val targetDir = File(
                     Environment.getExternalStoragePublicDirectory(
-                        if (isAudio) Environment.DIRECTORY_MUSIC else Environment.DIRECTORY_MOVIES
+                        if (isAudio && isSupportedAudioMediaStoreMime(mimeType)) Environment.DIRECTORY_MUSIC
+                        else if (isAudio) Environment.DIRECTORY_DOWNLOADS
+                        else Environment.DIRECTORY_MOVIES
                     ),
                     "Glypdl"
                 )
@@ -179,6 +228,7 @@ object StorageHelper {
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            // Note: stagingFile is NOT deleted on failure so it can be preserved and retried
             Result.failure(e)
         }
     }

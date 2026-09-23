@@ -29,7 +29,6 @@ class DownloadCard(Gtk.Box):
     def __init__(self, download_item: DownloadItem = None, **kwargs):
         super().__init__(**kwargs)
         self.set_orientation(Gtk.Orientation.VERTICAL)
-        self.add_css_class('card')
         self.set_hexpand(True)
         self.set_halign(Gtk.Align.FILL)
         self.set_margin_top(4)

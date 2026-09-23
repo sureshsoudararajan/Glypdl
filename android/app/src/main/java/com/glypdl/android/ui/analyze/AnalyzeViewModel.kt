@@ -28,6 +28,7 @@ import com.glypdl.android.data.model.MediaFormat
 import com.glypdl.android.data.model.MediaInfo
 import com.glypdl.android.data.model.PlaylistInfo
 import com.glypdl.android.data.model.VideoQuality
+import com.glypdl.android.data.repository.SettingsRepository
 import com.glypdl.android.domain.usecase.AnalyzeUrlUseCase
 import com.glypdl.android.domain.usecase.DownloadMediaUseCase
 import com.glypdl.android.service.YtDlpService
@@ -39,6 +40,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.net.URLDecoder
@@ -53,7 +55,7 @@ enum class SimplifiedMediaChoice(
 ) {
     VIDEO_AND_AUDIO("Video + Audio", "Best video stream with sound", "bestvideo+bestaudio/best", "mp4"),
     VIDEO_ONLY("Video", "Video stream only", "bestvideo/best", "mp4"),
-    AUDIO_ONLY("Audio", "Audio stream only", "bestaudio/best", "m4a")
+    AUDIO_ONLY("Audio", "Audio stream only", "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio/best", "m4a")
 }
 
 typealias InstagramDownloadChoice = SimplifiedMediaChoice
@@ -108,7 +110,8 @@ class AnalyzeViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val analyzeUrlUseCase: AnalyzeUrlUseCase,
     private val downloadMediaUseCase: DownloadMediaUseCase,
-    private val ytDlpService: YtDlpService
+    private val ytDlpService: YtDlpService,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val urlArg: String? = savedStateHandle.get<String>("url")
@@ -360,10 +363,35 @@ class AnalyzeViewModel @Inject constructor(
         if (currentState is AnalyzeUiState.PlaylistSuccess) {
             val selectedItems = currentState.playlistInfo.entries.filter { it.id in currentState.selectedItemIds }
             val isAudio = currentState.isAudioOnly
-            val formatId = if (isAudio) "bestaudio/best" else "bestvideo+bestaudio/best"
-            val ext = if (isAudio) "m4a" else "mp4"
 
             viewModelScope.launch {
+                val preferredAudio = try {
+                    settingsRepository.preferredAudioFormat.first().lowercase().trim()
+                } catch (e: Exception) {
+                    "m4a"
+                }
+
+                val ext = if (isAudio) {
+                    preferredAudio.ifBlank { "m4a" }
+                } else {
+                    "mp4"
+                }
+
+                val formatId = if (isAudio) {
+                    when (ext) {
+                        "m4a" -> "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio/best"
+                        "opus" -> "bestaudio[ext=opus]/bestaudio[ext=webm]/bestaudio/best"
+                        "mp3" -> "bestaudio[ext=mp3]/bestaudio/best"
+                        "flac" -> "bestaudio[ext=flac]/bestaudio/best"
+                        "ogg" -> "bestaudio[ext=ogg]/bestaudio/best"
+                        else -> "bestaudio[ext=$ext]/bestaudio/best"
+                    }
+                } else {
+                    "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best"
+                }
+
+                val resLabel = if (isAudio) "Audio (${ext.uppercase()})" else "Video (Best)"
+
                 selectedItems.forEach { item ->
                     val request = DownloadRequest(
                         id = UUID.randomUUID().toString(),
@@ -372,7 +400,7 @@ class AnalyzeViewModel @Inject constructor(
                         thumbnailUrl = item.thumbnailUrl,
                         formatId = formatId,
                         ext = ext,
-                        resolution = if (isAudio) "Audio (Best)" else "Video (Best)",
+                        resolution = resLabel,
                         isAudioOnly = isAudio,
                         destinationUri = null
                     )

@@ -52,9 +52,9 @@ class AppUpdateManager @Inject constructor(
                     @Suppress("DEPRECATION")
                     context.packageManager.getPackageInfo(context.packageName, 0)
                 }
-                pInfo.versionName ?: "2.0.0"
+                pInfo.versionName ?: "2.1.0"
             } catch (ex: Exception) {
-                "2.0.0"
+                "2.1.0"
             }
         }
     }

@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-09-23
+
+### Fixed
+
+- **Android Playlist Audio Storage Failure (`Unsupported MIME type audio/webm`)**:
+  - Fixed a critical crash where playlist audio downloads failed at the permanent storage export stage with `java.lang.IllegalArgumentException: Unsupported MIME type audio/webm`.
+  - In `StorageHelper.kt`: Added `isSupportedAudioMediaStoreMime()` validation. Routed unsupported audio MIME types like `audio/webm` and `audio/opus` to `MediaStore.Downloads` (`Download/Glypdl`), which accepts all MIME types without restriction on Android Q+ (API 29+).
+  - Added automatic fallback to `MediaStore.Downloads` if any OEM device or ROM rejects a MIME type on `MediaStore.Audio.Media` or `MediaStore.Video.Media`.
+  - Preserved staging files on storage export failure to enable instant retry without re-downloading.
+  - Enhanced user-facing storage error messages and technical diagnostic logs in `DownloadManager.kt`.
+  - Added unit test suite in `StorageHelperTest.kt` verifying MIME resolution and collection whitelist classification.
+
+### Changed & Improved
+
+- **Format Selection & Playlist Propagation (Android)**:
+  - Injected `SettingsRepository` into `AnalyzeViewModel.kt` to propagate the user's preferred audio format (`m4a`, `opus`, `mp3`, `flac`) to playlist downloads.
+  - Configured prioritized audio format selectors (`"bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio/best"` when M4A is selected) across `AnalyzeViewModel.kt` and `YtDlpManager.kt` so native M4A/AAC streams are selected directly without unnecessary container remuxing.
+- **Desktop UI Polish & Modernization (Linux / GTK4 / Libadwaita)**:
+  - **Removed Nested Card Frames**: Removed redundant `card` CSS class from `DownloadCard`, eliminating double borders and nested frame clutter for a cleaner, native Adwaita list aesthetic.
+  - **Dynamic Empty State Visibility**: Enhanced `_update_downloads_ui()` in `GlypdlWindow` to properly hide the empty state placeholder when metadata fetching spinners or preview cards are active, eliminating visual collisions and overlap during link analysis.
+
 ## [2.0.0] - 2026-09-18
 
 ### Added

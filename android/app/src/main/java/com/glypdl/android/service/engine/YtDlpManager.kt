@@ -535,15 +535,31 @@ class YtDlpManager @Inject constructor(
 
             val effectiveFormat = if (isInstagram || isFacebook) {
                 when {
-                    request.isAudioOnly -> "bestaudio/best"
+                    request.isAudioOnly -> {
+                        if (request.ext.equals("m4a", ignoreCase = true)) {
+                            "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio/best"
+                        } else {
+                            "bestaudio/best"
+                        }
+                    }
                     request.formatId.contains("bestaudio") || request.formatId.contains("+") || request.formatId.isBlank() -> "bestvideo+bestaudio/best"
                     else -> request.formatId.ifBlank { "bestvideo+bestaudio/best" }
                 }
             } else if (request.isAudioOnly) {
                 if (request.formatId.isNotBlank() && !request.formatId.contains("/")) {
                     "${request.formatId}/bestaudio/best"
+                } else if (request.formatId.isNotBlank() && request.formatId != "bestaudio/best") {
+                    request.formatId
                 } else {
-                    request.formatId.ifBlank { "bestaudio/best" }
+                    val targetExt = request.ext.trim().lowercase().removePrefix(".")
+                    when (targetExt) {
+                        "m4a" -> "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio/best"
+                        "opus" -> "bestaudio[ext=opus]/bestaudio[ext=webm]/bestaudio/best"
+                        "mp3" -> "bestaudio[ext=mp3]/bestaudio/best"
+                        "flac" -> "bestaudio[ext=flac]/bestaudio/best"
+                        "ogg" -> "bestaudio[ext=ogg]/bestaudio/best"
+                        else -> request.formatId.ifBlank { "bestaudio/best" }
+                    }
                 }
             } else if (request.formatId.isNotBlank()) {
                 if (!request.formatId.contains("/")) {

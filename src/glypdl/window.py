@@ -321,6 +321,7 @@ class GlypdlWindow(Adw.ApplicationWindow):
         self._dismiss_preview(preserve_temp_cookie=preserve_temp)
         self.fetch_spinner_box.set_visible(True)
         self.fetch_spinner.start()
+        self._update_downloads_ui()
 
         cookie_file = cookie_override
         cookies_from_browser = browser_override
@@ -395,6 +396,7 @@ class GlypdlWindow(Adw.ApplicationWindow):
             preview.connect('download-playlist-requested', self._on_download_playlist_requested)
             preview.connect('cancel-preview', lambda _: self._dismiss_preview())
             self.preview_container.append(preview)
+            self._update_downloads_ui()
         else:
             preview = MetadataPreviewCard(metadata=metadata)
             preview.format_selector.set_cookie_profiles(
@@ -409,11 +411,13 @@ class GlypdlWindow(Adw.ApplicationWindow):
             preview.connect('download-requested', self._on_download_requested)
             preview.connect('cancel-preview', lambda _: self._dismiss_preview())
             self.preview_container.append(preview)
+            self._update_downloads_ui()
             self.present()
 
     def _on_metadata_error(self, error_msg: str, url: str = ""):
         self.fetch_spinner.stop()
         self.fetch_spinner_box.set_visible(False)
+        self._update_downloads_ui()
 
         # Discard any temporary cookie file if metadata fetching failed
         if hasattr(self, '_current_temp_cookie') and self._current_temp_cookie:
@@ -610,6 +614,7 @@ class GlypdlWindow(Adw.ApplicationWindow):
                 except Exception:
                     pass
                 self._current_temp_cookie = None
+        self._update_downloads_ui()
 
     def _on_download_requested(self, widget, url: str, mode: DownloadMode, quality: str, audio_format: str):
         # 1. Check if selected video quality is available in metadata
@@ -895,7 +900,9 @@ class GlypdlWindow(Adw.ApplicationWindow):
 
     def _update_downloads_ui(self):
         has_items = len(self.downloads) > 0
-        self.empty_downloads_status.set_visible(not has_items)
+        has_preview = (self.fetch_spinner_box.get_visible()
+                       or self.fetch_spinner_box.get_next_sibling() is not None)
+        self.empty_downloads_status.set_visible(not has_items and not has_preview)
 
         active_count = len([d for d in self.downloads if d.state not in (DownloadState.QUEUED, DownloadState.COMPLETED, DownloadState.FAILED, DownloadState.CANCELLED)])
         queued_count = len([d for d in self.downloads if d.state == DownloadState.QUEUED])
