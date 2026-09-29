@@ -122,4 +122,11 @@ class DownloadRepository @Inject constructor(
     suspend fun clearCompleted() {
         downloadDao.clearCompleted()
     }
+
+    /**
+     * Updates only the aria2 GID for a download task without modifying status or progress.
+     */
+    suspend fun updateAria2Gid(id: String, gid: String) {
+        downloadDao.updateAria2Gid(id, gid)
+    }
 }

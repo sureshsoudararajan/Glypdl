@@ -52,6 +52,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var settingsRepository: SettingsRepository
 
+    @Inject
+    lateinit var downloadResolver: com.glypdl.android.service.resolver.DownloadResolver
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { _: Boolean ->
@@ -73,7 +76,7 @@ class MainActivity : ComponentActivity() {
             if (isFirstRunComplete) Screen.Home.route else Screen.Welcome.route
         }
 
-        val initialUrl = IntentHandler.extractUrlFromIntent(intent)
+        val initialUrl = processIncomingUrl(IntentHandler.extractUrlFromIntent(intent))
         sharedUrlFlow.value = initialUrl
         intent.getStringExtra(EXTRA_NAVIGATE_TO_DOWNLOAD_ID)?.let {
             navigateToDownloadIdFlow.value = it
@@ -93,7 +96,15 @@ class MainActivity : ComponentActivity() {
 
                     LaunchedEffect(pendingUrl) {
                         pendingUrl?.let { url ->
-                            navController.navigate(Screen.Analyze.createRoute(url)) {
+                            val result = downloadResolver.resolve(url)
+                            val dest = if (result.downloadType == com.glypdl.android.data.model.DownloadType.DIRECT_FILE) {
+                                Screen.DirectFilePreview.createRoute(url)
+                            } else if (result.downloadType == com.glypdl.android.data.model.DownloadType.MAGNET || result.downloadType == com.glypdl.android.data.model.DownloadType.TORRENT) {
+                                Screen.TorrentPreview.createRoute(url)
+                            } else {
+                                Screen.Analyze.createRoute(url)
+                            }
+                            navController.navigate(dest) {
                                 launchSingleTop = true
                             }
                             sharedUrlFlow.value = null
@@ -123,12 +134,20 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        IntentHandler.extractUrlFromIntent(intent)?.let { url ->
+        processIncomingUrl(IntentHandler.extractUrlFromIntent(intent))?.let { url ->
             sharedUrlFlow.value = url
         }
         intent.getStringExtra(EXTRA_NAVIGATE_TO_DOWNLOAD_ID)?.let { downloadId ->
             navigateToDownloadIdFlow.value = downloadId
         }
+    }
+
+    private fun processIncomingUrl(rawUrl: String?): String? {
+        if (rawUrl == null) return null
+        if (rawUrl.startsWith("content://", ignoreCase = true) || rawUrl.startsWith("file://", ignoreCase = true)) {
+            return com.glypdl.android.util.TorrentFileHelper.cacheUri(this, rawUrl)
+        }
+        return rawUrl
     }
 
     companion object {

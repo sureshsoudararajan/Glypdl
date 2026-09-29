@@ -69,6 +69,13 @@ class YtDlpManager @Inject constructor(
                 e.printStackTrace()
             }
 
+            try {
+                com.yausername.aria2c.Aria2c.getInstance().init(context)
+            } catch (e: Exception) {
+                // aria2c init failure is non-fatal; direct downloads will be unavailable
+                e.printStackTrace()
+            }
+
             // Auto-update check if enabled
             val autoUpdate = settingsRepository.autoUpdateYtDlp.first()
             val lastCheck = settingsRepository.lastUpdateCheck.first()

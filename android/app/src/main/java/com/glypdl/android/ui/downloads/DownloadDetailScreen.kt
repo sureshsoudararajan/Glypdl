@@ -33,6 +33,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.glypdl.android.data.local.entity.DownloadEntity
 import com.glypdl.android.data.model.DownloadStatus
 import com.glypdl.android.ui.components.ThumbnailImage
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.ContentCopy
@@ -87,14 +88,31 @@ fun DownloadDetailScreen(
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                download.thumbnailUrl?.let { url ->
+                if (!download.thumbnailUrl.isNullOrBlank()) {
                     ThumbnailImage(
-                        url = url,
+                        url = download.thumbnailUrl,
                         contentDescription = "Thumbnail",
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(16f / 9f)
                     )
+                } else if (download.engineType == com.glypdl.android.data.model.EngineType.ARIA2C) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant,
+                                MaterialTheme.shapes.medium
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        com.glypdl.android.ui.components.FileTypeIcon(
+                            category = download.fileCategory,
+                            modifier = Modifier.size(72.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -183,8 +201,16 @@ fun DownloadDetailScreen(
                 }
 
                 Text("URL: ${download.url}", style = MaterialTheme.typography.bodyMedium)
-                Text("Format: $formatDisplay", style = MaterialTheme.typography.bodyMedium)
-                Text("Quality: $qualityDisplay", style = MaterialTheme.typography.bodyMedium)
+                if (download.engineType == com.glypdl.android.data.model.EngineType.ARIA2C) {
+                    Text("Engine: aria2c", style = MaterialTheme.typography.bodyMedium)
+                    Text("Category: ${download.fileCategory.name}", style = MaterialTheme.typography.bodyMedium)
+                    if (!download.aria2Gid.isNullOrBlank()) {
+                        Text("GID: ${download.aria2Gid}", style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    Text("Format: $formatDisplay", style = MaterialTheme.typography.bodyMedium)
+                    Text("Quality: $qualityDisplay", style = MaterialTheme.typography.bodyMedium)
+                }
                 if (!download.filePath.isNullOrBlank()) {
                     Text("File Path: ${download.filePath}", style = MaterialTheme.typography.bodyMedium)
                 }

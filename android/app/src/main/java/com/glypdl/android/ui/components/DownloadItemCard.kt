@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import com.glypdl.android.data.local.entity.DownloadEntity
 import com.glypdl.android.data.model.DownloadProgress
 import com.glypdl.android.data.model.DownloadStatus
+import com.glypdl.android.data.model.EngineType
 
 @Composable
 fun DownloadItemCard(
@@ -65,6 +66,40 @@ fun DownloadItemCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (download.downloadType == com.glypdl.android.data.model.DownloadType.TORRENT || 
+        download.downloadType == com.glypdl.android.data.model.DownloadType.MAGNET) {
+        TorrentDownloadCard(
+            download = download,
+            progress = progress,
+            onPause = onPause,
+            onResume = onResume,
+            onCancel = onCancel,
+            onRetry = onRetry,
+            onOpen = onOpen,
+            onDelete = onDelete,
+            onClick = onClick,
+            modifier = modifier
+        )
+        return
+    }
+
+    if (download.engineType == EngineType.ARIA2C) {
+        Aria2DownloadCard(
+            download = download,
+            progress = progress,
+            onPause = onPause,
+            onResume = onResume,
+            onCancel = onCancel,
+            onRetry = onRetry,
+            onOpen = onOpen,
+            onDelete = onDelete,
+            onClick = onClick,
+            modifier = modifier
+        )
+        return
+    }
+
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -169,11 +204,18 @@ fun DownloadItemCard(
                             }
                         }
                     }
-                    DownloadStatus.PREPARING, DownloadStatus.PROCESSING -> {
+                    DownloadStatus.PREPARING, DownloadStatus.PROCESSING, DownloadStatus.RESOLVING, DownloadStatus.METADATA, DownloadStatus.VERIFYING -> {
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                         Spacer(modifier = Modifier.height(2.dp))
+                        val statusText = when (download.status) {
+                            DownloadStatus.PREPARING -> "Preparing..."
+                            DownloadStatus.RESOLVING -> "Resolving metadata..."
+                            DownloadStatus.METADATA -> "Metadata ready"
+                            DownloadStatus.VERIFYING -> "Verifying..."
+                            else -> "Processing..."
+                        }
                         Text(
-                            text = if (download.status == DownloadStatus.PREPARING) "Preparing..." else "Processing...",
+                            text = statusText,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

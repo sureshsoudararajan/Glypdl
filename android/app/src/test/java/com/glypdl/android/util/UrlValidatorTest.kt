@@ -99,4 +99,28 @@ class UrlValidatorTest {
         val canonical = UrlValidator.canonicalizeInstagramStoryUrl(url)
         assertEquals("https://www.instagram.com/stories/testcreator/123456789012345/", canonical)
     }
+
+    @Test
+    fun `isValidUrl and isMagnetLink handle magnet URIs`() {
+        val magnet = "magnet:?xt=urn:btih:d2474e86c95b19b8bcfdbb72428a2433ec9eecb4&dn=Ubuntu"
+        assertTrue(UrlValidator.isMagnetLink(magnet))
+        assertTrue(UrlValidator.isValidUrl(magnet))
+        assertFalse(UrlValidator.isMagnetLink("https://example.com/file.zip"))
+    }
+
+    @Test
+    fun `isTorrentUrl detects torrent files`() {
+        assertTrue(UrlValidator.isTorrentUrl("https://example.com/file.torrent"))
+        assertTrue(UrlValidator.isTorrentUrl("https://example.com/file.torrent?token=123#dl"))
+        assertTrue(UrlValidator.isTorrentUrl("https://yts.gg/torrent/download/967C82FFE63BA4BE15D19F84CEE04496774A463B"))
+        assertTrue(UrlValidator.isTorrentUrl("https://example.com/torrents/download/abc12345"))
+        assertFalse(UrlValidator.isTorrentUrl("https://example.com/file.zip"))
+    }
+
+    @Test
+    fun `extractUrlFromText extracts magnet link from shared text`() {
+        val sharedText = "Check out this torrent: magnet:?xt=urn:btih:1234567890abcdef&dn=Test"
+        val extracted = UrlValidator.extractUrlFromText(sharedText)
+        assertEquals("magnet:?xt=urn:btih:1234567890abcdef&dn=Test", extracted)
+    }
 }

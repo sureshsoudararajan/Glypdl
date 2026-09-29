@@ -14,8 +14,8 @@ android {
         applicationId = "com.glypdl.android"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "2.1.0"
+        versionCode = 6
+        versionName = "2.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -126,6 +126,7 @@ dependencies {
 
     implementation(libs.youtubedl.android.library)
     implementation(libs.youtubedl.android.ffmpeg)
+    implementation(libs.youtubedl.android.aria2c)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

@@ -78,4 +78,29 @@ class IntentHandlerTest {
         val result = IntentHandler.extractUrlFromIntent(intent)
         assertNull(result)
     }
+
+    @Test
+    fun `ACTION_VIEW with torrent content URI extracts URI`() {
+        val intent = mockk<Intent>()
+        every { intent.action } returns Intent.ACTION_VIEW
+        every { intent.dataString } returns "content://media/external/downloads/test.torrent"
+        every { intent.data } returns null
+        every { intent.type } returns "application/x-bittorrent"
+
+        val result = IntentHandler.extractUrlFromIntent(intent)
+        assertEquals("content://media/external/downloads/test.torrent", result)
+    }
+
+    @Test
+    fun `ACTION_SEND with EXTRA_STREAM extracts torrent URI`() {
+        val mockUri = mockk<android.net.Uri>()
+        every { mockUri.toString() } returns "content://media/external/file/999"
+
+        val intent = mockk<Intent>()
+        every { intent.action } returns Intent.ACTION_SEND
+        every { intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM) } returns mockUri
+
+        val result = IntentHandler.extractUrlFromIntent(intent)
+        assertEquals("content://media/external/file/999", result)
+    }
 }

@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-09-29
+
+### Added
+
+- **BitTorrent & Magnet Link Integration (Android)**:
+  - Added native BitTorrent engine powered by an embedded, managed `aria2c` process daemon communicating via JSON-RPC over localhost with dynamic port discovery and secret token authentication.
+  - Full support for both `.torrent` files and `magnet:?` links with automatic metadata resolution (`RESOLVING` → `METADATA` → `QUEUED` → `DOWNLOADING`).
+  - **Accelerated Tracker Discovery**: Automatically injects high-performance public BitTorrent trackers into magnet links (`MagnetHelper.kt`), dramatically reducing peer discovery and metadata resolution times.
+  - **Interactive Multi-File Torrent Preview (`TorrentPreviewScreen.kt`)**: Displays complete file hierarchy with individual file sizes, checkboxes for granular file selection, and "Select All" / "Deselect All" toggles.
+  - **Canvas-Based Animated Swarm Visualization (`SwarmVisualization.kt`)**: Real-time interactive network diagram displaying connected seeders and leechers with dynamic pulsing particle animations and bidirectional transfer indicators.
+  - **Live Piece Grid (`PieceGrid.kt`)**: Micro-block matrix rendering live completed, downloading, and missing pieces directly mapped from aria2's hexadecimal bitfield bitmask.
+  - **Specialized Torrent Download Card (`TorrentDownloadCard.kt`)**: Displays live seeders/leechers counts, uploaded/downloaded speeds, total pieces, progress ring, and collapsible swarm visualization.
+  - **System Intent & File Association**: Deep system integration for `.torrent` files, MIME types `application/x-bittorrent`, content URIs, file URIs, and magnet links from web browsers, file managers, and share sheets.
+  - **SAF Permission Denial Cache Recovery**: Cached transient content URIs (`TorrentFileHelper.kt`) into private app cache before passing to ViewModels, permanently preventing Android SAF permission expiration crashes.
+
+- **Universal Direct File Downloads (Android)**:
+  - Unified input bar and router (`DownloadResolver.kt`) capable of classifying URLs into Media (yt-dlp), Direct Files (aria2c), or Torrents (aria2c BitTorrent).
+  - **File Category Classification (`FileCategoryClassifier.kt`)**: Automatically categorizes files into Videos, Audio, Torrents, Documents, Apps, Archives, Images, Disk Images, Code, Data, and Fonts based on file extensions and MIME types.
+  - **Direct File Preview Screen (`DirectFilePreviewScreen.kt`)**: Shows category icon, human-readable file type badge, detected file size, and direct download trigger.
+  - **Asynchronous HTTP HEAD Probing**: Performs non-blocking HTTP HEAD requests with standard User-Agent headers to detect Content-Length, Content-Type, and Content-Disposition filenames for direct file links.
+  - **Circular Progress Ring (`CircularFileProgress.kt`)** and **Aria2 Download Card (`Aria2DownloadCard.kt`)** with dedicated states for direct downloads.
+
+- **Unified Storage Architecture (`Download/Glypdl`)**:
+  - Consolidated all download destinations from fragmented directories (`Movies/Glypdl`, `Music/Glypdl`) into a single unified root directory: `Download/Glypdl/` via `MediaStore.Downloads`.
+  - Organized automatically into category subfolders:
+    - `Download/Glypdl/Videos`
+    - `Download/Glypdl/Audio`
+    - `Download/Glypdl/Torrents` (and `Download/Glypdl/Torrents/<TorrentName>/` for multi-file torrent packages)
+    - `Download/Glypdl/Documents`
+    - `Download/Glypdl/Apps`
+    - `Download/Glypdl/Archives`
+    - `Download/Glypdl/Files`
+  - **Complete Thumbnail & Companion Cache Eviction**: Deleting a download now evicts Coil's in-memory and disk image cache, deletes local thumbnail files, removes staging companion files (`.jpg`, `.webp`, `.info.json`), and purges cached torrent files.
+
+- **Enhanced Download Progress Notifications (Android)**:
+  - Updated `NotificationHelper.kt` and `DownloadNotificationManager.kt` to calculate and display rich download metrics:
+    - **Downloaded vs Total Size**: e.g., `2.5 MB / 1.5 GB (0%)`
+    - **Remaining Size**: e.g., `1.49 GB left` (collapsed) and `Remaining: 1.49 GB` (expanded)
+    - **Live Speed & ETA**: e.g., `147 KB/s • ETA: 3h 8m`
+    - Live transfer metrics in system notification `SubText` header and detailed multi-line expanded `BigTextStyle`.
+  - Added remaining size display directly on in-app `Aria2DownloadCard` cards.
+
+- **Official Branding Asset**:
+  - Replaced the placeholder "G" circle in `WelcomeScreen.kt` with the official high-resolution Glypdl branding logo (`ic_glypdl_logo.png`).
+
+### Fixed
+
+- **Download Queue State Sync Race Condition**:
+  - Fixed an issue where direct file downloads remained stuck showing "QUEUED" on the UI card even while downloading in the background.
+  - Replaced full Room entity snapshot writes (`entity.copy(aria2Gid = gid)`) with a targeted `updateAria2Gid(id, gid)` query in `DownloadDao.kt`, eliminating the race condition that was overwriting `DOWNLOADING` status back to `QUEUED`.
+  - Added dedicated `PREPARING` (with progress indicator) and `QUEUED` visual states to `Aria2DownloadCard.kt`.
+- **Direct File Preview "Unknown Size" & Generic MIME Type**:
+  - Fixed preview screen displaying "Unknown Size" and "application/octet-stream" by enabling HTTP HEAD probing for `DIRECT_FILE` URLs that are missing size or MIME data, and adding user-friendly type labels.
+- **Torrent Pause/Resume GID Collision & Re-registration**:
+  - Fixed pause/resume losing the active task by preserving the existing aria2 GID instead of nulling it out.
+  - Added automatic recovery for `errorCode 12` ("already registered") by scanning active/waiting/stopped tasks for matching InfoHash and resuming the existing task.
+- **Torrent 100% Completion & FollowedBy GID Switching**:
+  - Fixed torrents stalling at 100% or falsely reporting completion on pause by updating `Aria2Status.isComplete` to account for metadata-to-content GID transitions (`followedBy`), exclude 0-byte tasks, and guarantee clean transition to `COMPLETED`.
+- **Android DNS Resolution for BitTorrent Trackers**:
+  - Added `--async-dns=false` to `Aria2ProcessManager.kt` to fix tracker DNS resolution on Android systems lacking `/etc/resolv.conf`.
+
 ## [2.1.0] - 2026-09-23
 
 ### Fixed

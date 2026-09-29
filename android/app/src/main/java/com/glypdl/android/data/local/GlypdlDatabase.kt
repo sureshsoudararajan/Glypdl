@@ -26,11 +26,12 @@ import com.glypdl.android.data.local.entity.HistoryEntity
  *
  * Schema versioning:
  * - Version 2 introduces support for enhanced status states (e.g. PROCESSING) and technical diagnostics logging.
+ * - Version 3 introduces new types for Universal Smart Download Manager.
  * - [TypeConverters] registered for serializing enum types such as [DownloadStatus].
  */
 @Database(
     entities = [DownloadEntity::class, HistoryEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

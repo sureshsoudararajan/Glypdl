@@ -160,8 +160,8 @@ fun GlypdlNavHost(
 
         composable(Screen.Home.route) {
             HomeScreen(
-                onNavigateToAnalyze = { url ->
-                    navController.navigate(Screen.Analyze.createRoute(url))
+                onNavigateToRoute = { route ->
+                    navController.navigate(route)
                 },
                 onNavigateToDownloads = {
                     navController.navigate(Screen.Downloads.route) {
@@ -232,6 +232,34 @@ fun GlypdlNavHost(
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        
+        composable(
+            route = Screen.DirectFilePreview.route,
+            arguments = listOf(navArgument("url") { type = NavType.StringType })
+        ) {
+            com.glypdl.android.ui.directfile.DirectFilePreviewScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToDownloads = {
+                    navController.navigate(Screen.Downloads.route) {
+                        popUpTo(Screen.Home.route)
+                    }
+                }
+            )
+        }
+        
+        composable(
+            route = Screen.TorrentPreview.route,
+            arguments = listOf(navArgument("url") { type = NavType.StringType })
+        ) {
+            com.glypdl.android.ui.torrent.TorrentPreviewScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToDownloads = {
+                    navController.navigate(Screen.Downloads.route) {
+                        popUpTo(Screen.Home.route)
+                    }
+                }
             )
         }
     }

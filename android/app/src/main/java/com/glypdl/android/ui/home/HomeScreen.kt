@@ -40,13 +40,14 @@ import com.glypdl.android.ui.components.UrlInputField
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
-    onNavigateToAnalyze: (String) -> Unit,
+    onNavigateToRoute: (String) -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToDownloads: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToDownloadDetail: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
     var downloadToDelete by remember { mutableStateOf<DownloadEntity?>(null) }
     var deleteFileWithDownload by remember { mutableStateOf(true) }
 
@@ -73,17 +74,46 @@ fun HomeScreen(
                 onUrlChange = viewModel::onUrlChange,
                 onAnalyzeClick = { 
                     viewModel.onAnalyzeClick()
-                    onNavigateToAnalyze(uiState.url) 
+                    val effectiveUrl = if (uiState.url.startsWith("content://", ignoreCase = true) || uiState.url.startsWith("file://", ignoreCase = true)) {
+                        com.glypdl.android.util.TorrentFileHelper.cacheUri(context, uiState.url)
+                    } else uiState.url
+                    val resolved = viewModel.resolveUrl(effectiveUrl)
+                    val route = if (resolved.downloadType == com.glypdl.android.data.model.DownloadType.DIRECT_FILE) {
+                        com.glypdl.android.ui.navigation.Screen.DirectFilePreview.createRoute(effectiveUrl)
+                    } else if (resolved.downloadType == com.glypdl.android.data.model.DownloadType.MAGNET || resolved.downloadType == com.glypdl.android.data.model.DownloadType.TORRENT) {
+                        com.glypdl.android.ui.navigation.Screen.TorrentPreview.createRoute(effectiveUrl)
+                    } else {
+                        com.glypdl.android.ui.navigation.Screen.Analyze.createRoute(effectiveUrl)
+                    }
+                    onNavigateToRoute(route)
                 },
                 isValid = uiState.isUrlValid,
-                isLoading = false
+                isLoading = false,
+                onSelectTorrentFile = { uri ->
+                    val cachedPath = com.glypdl.android.util.TorrentFileHelper.cacheUri(context, uri.toString())
+                    val route = com.glypdl.android.ui.navigation.Screen.TorrentPreview.createRoute(cachedPath)
+                    onNavigateToRoute(route)
+                }
             )
 
             uiState.clipboardUrl?.let { clipboardUrl ->
                 Spacer(modifier = Modifier.height(16.dp))
                 ClipboardBanner(
                     url = clipboardUrl,
-                    onAnalyzeClick = { onNavigateToAnalyze(clipboardUrl) },
+                    onAnalyzeClick = {
+                        val effectiveUrl = if (clipboardUrl.startsWith("content://", ignoreCase = true) || clipboardUrl.startsWith("file://", ignoreCase = true)) {
+                            com.glypdl.android.util.TorrentFileHelper.cacheUri(context, clipboardUrl)
+                        } else clipboardUrl
+                        val resolved = viewModel.resolveUrl(effectiveUrl)
+                        val route = if (resolved.downloadType == com.glypdl.android.data.model.DownloadType.DIRECT_FILE) {
+                            com.glypdl.android.ui.navigation.Screen.DirectFilePreview.createRoute(effectiveUrl)
+                        } else if (resolved.downloadType == com.glypdl.android.data.model.DownloadType.MAGNET || resolved.downloadType == com.glypdl.android.data.model.DownloadType.TORRENT) {
+                            com.glypdl.android.ui.navigation.Screen.TorrentPreview.createRoute(effectiveUrl)
+                        } else {
+                            com.glypdl.android.ui.navigation.Screen.Analyze.createRoute(effectiveUrl)
+                        }
+                        onNavigateToRoute(route)
+                    },
                     onDismiss = viewModel::clearClipboardBanner
                 )
             }
@@ -106,7 +136,6 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            val context = androidx.compose.ui.platform.LocalContext.current
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)

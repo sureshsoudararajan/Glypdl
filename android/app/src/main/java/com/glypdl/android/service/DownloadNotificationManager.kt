@@ -77,7 +77,9 @@ open class DownloadNotificationManager @Inject constructor(
         title: String,
         percent: Float,
         speed: String,
-        eta: String
+        eta: String,
+        downloadedBytes: Long = 0L,
+        totalBytes: Long = 0L
     ): Int {
         val notifId = getNotificationId(downloadId)
         activeNotifications[downloadId] = notifId
@@ -88,7 +90,9 @@ open class DownloadNotificationManager @Inject constructor(
             progress = percent.toInt().coerceIn(0, 100),
             speed = speed,
             eta = eta,
-            isIndeterminate = percent <= 0f
+            isIndeterminate = percent <= 0f && totalBytes <= 0L,
+            downloadedBytes = downloadedBytes,
+            totalBytes = totalBytes
         )
         notificationHelper.notify(notifId, notification)
         return notifId

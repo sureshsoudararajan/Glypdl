@@ -23,7 +23,7 @@
 
 **Glypdl** is an ultra-fast, modern, cross-platform media downloader powered by **yt-dlp** and **FFmpeg**. Built from the ground up to provide native, high-performance experiences on **Android**, **Windows**, and **Linux**:
 
-* **Android Edition**: Native **Kotlin**, **Jetpack Compose**, and **Material 3** application featuring foreground background service, built-in in-app authenticated browser with cookie preservation, multi-quality format selection, and Android system share/intent handling.
+* **Android Edition**: Native **Kotlin**, **Jetpack Compose**, and **Material 3** universal download manager supporting **Media streams (yt-dlp)**, **Direct file downloads (HTTP/HTTPS via aria2c)**, and **BitTorrent & Magnet downloads (aria2c)** with interactive multi-file selection, live animated swarm visualization, piece grid, foreground background service, authenticated in-app browser, and unified categorized storage.
 * **Windows Edition**: Native **WinUI 3**, **C#**, and **.NET 8** application featuring Windows 11 Fluent 2 design, translucent Mica material backdrops, automatic system dark/light theming, and an Inno Setup installer.
 * **Linux Edition**: Native **GTK4**, **libadwaita**, and **Python** application conforming to the GNOME Human Interface Guidelines (HIG) with standalone AppImage, Flatpak, Deb, RPM, and Arch Linux packages.
 
@@ -150,6 +150,22 @@
 
 > **Note**: The browser companion extension currently requires the Linux desktop client and is not supported on Windows.
 
+### 🧲 11. Universal Smart Downloader & BitTorrent *(Android)*
+* **Tri-Mode Universal Input**: A single paste bar handles **Media streams (yt-dlp)**, **Direct files (HTTP/HTTPS via aria2c)**, and full **BitTorrent (.torrent files & magnet:? links via aria2c)**.
+* **Full BitTorrent Suite**:
+  - **Tracker Acceleration**: Injects fast public BitTorrent trackers into magnet links for instant peer and metadata discovery.
+  - **Interactive Multi-File Torrent Preview**: Browse the full file hierarchy, check/uncheck individual files to download only what you want, and toggle "Select All" / "Deselect All".
+  - **Canvas Swarm Visualization**: Dynamic real-time particle network illustrating connected seeders, leechers, and bidirectional transfer pulses.
+  - **Live Piece Grid**: Micro-block matrix rendering completed, active, and pending pieces directly decoded from the torrent bitfield.
+* **Smart Direct File Downloads**:
+  - Automatically identifies file categories (Videos, Audio, Documents, Apps/APKs, Archives, Images, Disk Images, Code, Data, Fonts).
+  - Previews file size, MIME type, and formatted labels before starting downloads.
+* **Unified Storage Architecture (`Download/Glypdl`)**:
+  - All downloads route cleanly to `Download/Glypdl/` with automatic subdirectories for `Videos/`, `Audio/`, `Torrents/`, `Documents/`, `Apps/`, `Archives/`, and `Files/`.
+  - Complete companion cleanup: Deleting a download cleans up Coil image caches, thumbnails, and cached torrent metadata.
+* **Rich Ongoing Notifications**:
+  - Live progress showing downloaded vs total size (`2.5 MB / 1.5 GB`), remaining size left (`1.49 GB left`), transfer speed, and ETA countdown.
+
 ---
 
 ## 📥 Installation
@@ -157,15 +173,15 @@
 Choose the package format best suited for your operating system from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases/latest):
 
 ### 📱 Android (`.apk`)
-Download the APK corresponding to your device architecture from [GitHub Releases (v1.2.1)](https://github.com/sureshsoudararajan/Glypdl/releases/latest):
-* **`Glypdl-1.2.1-arm64-v8a.apk`** &mdash; **Recommended for 90%+ modern Android phones & tablets** (64-bit ARM)
-* **`Glypdl-1.2.1-armeabi-v7a.apk`** &mdash; For older 32-bit ARM legacy devices
-* **`Glypdl-1.2.1-x86_64.apk`** &mdash; For Android Studio emulators and ChromeOS
+Download the APK corresponding to your device architecture from [GitHub Releases (v2.2.0)](https://github.com/sureshsoudararajan/Glypdl/releases/latest):
+* **`Glypdl-2.2.0-arm64-v8a.apk`** &mdash; **Recommended for 90%+ modern Android phones & tablets** (64-bit ARM)
+* **`Glypdl-2.2.0-armeabi-v7a.apk`** &mdash; For older 32-bit ARM legacy devices
+* **`Glypdl-2.2.0-x86_64.apk`** &mdash; For Android Studio emulators and ChromeOS
 
 Open the downloaded `.apk` file on your device (ensure "Install unknown apps" permission is granted) and follow the installation prompts!
 
 ### 🪟 Windows 11 / 10 Installer (`.exe`)
-1. Download **`Glypdl-1.2.1-Setup-x64.exe`** from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases/latest).
+1. Download **`Glypdl-2.2.0-Setup-x64.exe`** from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases/latest).
 2. Run the installer to set up Start Menu and Desktop shortcuts.
 3. Launch **Glypdl** from your Start Menu!
 
@@ -173,29 +189,29 @@ Open the downloaded `.apk` file on your device (ensure "Install unknown apps" pe
 
 #### 1. 🚀 Universal Standalone AppImage
 ```bash
-wget -O Glypdl-x86_64.AppImage https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.1/Glypdl-x86_64.AppImage
+wget -O Glypdl-x86_64.AppImage https://github.com/sureshsoudararajan/Glypdl/releases/download/v2.2.0/Glypdl-x86_64.AppImage
 chmod +x Glypdl-x86_64.AppImage
 ./Glypdl-x86_64.AppImage
 ```
 
 #### 2. 📦 Debian / Ubuntu / Linux Mint / Pop!_OS (`.deb`)
 ```bash
-wget -O glypdl.deb https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.1/glypdl_1.2.1_all.deb
+wget -O glypdl.deb https://github.com/sureshsoudararajan/Glypdl/releases/download/v2.2.0/glypdl_2.2.0_all.deb
 sudo apt install -y ./glypdl.deb
 glypdl
 ```
 
 #### 3. 📦 Fedora / Rocky Linux / RHEL / AlmaLinux (`.rpm`)
 ```bash
-wget -O glypdl.rpm https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.1/glypdl-1.2.1-1.fc44.noarch.rpm
+wget -O glypdl.rpm https://github.com/sureshsoudararajan/Glypdl/releases/download/v2.2.0/glypdl-2.2.0-1.fc44.noarch.rpm
 sudo dnf install -y ./glypdl.rpm
 glypdl
 ```
 
 #### 4. 📦 Arch Linux / Manjaro / EndeavourOS
 ```bash
-wget https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.1/glypdl-1.2.1-1-any.pkg.tar.zst
-sudo pacman -U ./glypdl-1.2.1-1-any.pkg.tar.zst
+wget https://github.com/sureshsoudararajan/Glypdl/releases/download/v2.2.0/glypdl-2.2.0-1-any.pkg.tar.zst
+sudo pacman -U ./glypdl-2.2.0-1-any.pkg.tar.zst
 glypdl
 ```
 

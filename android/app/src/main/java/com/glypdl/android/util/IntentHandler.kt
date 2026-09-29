@@ -26,6 +26,22 @@ object IntentHandler {
         
         when (intent.action) {
             Intent.ACTION_SEND -> {
+                // Check if a file (e.g. .torrent) was shared via EXTRA_STREAM
+                val streamUri = try {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(Intent.EXTRA_STREAM, android.net.Uri::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra(Intent.EXTRA_STREAM)
+                    }
+                } catch (e: Throwable) {
+                    null
+                }
+
+                if (streamUri != null) {
+                    return streamUri.toString()
+                }
+
                 if ("text/plain" == intent.type || intent.type?.startsWith("text/") == true) {
                     val text = try {
                         intent.getStringExtra(Intent.EXTRA_TEXT)
@@ -40,7 +56,8 @@ object IntentHandler {
                         val extracted = UrlValidator.extractUrlFromText(text)
                         if (extracted != null) {
                             val url = if (!extracted.startsWith("http://", ignoreCase = true) && 
-                                !extracted.startsWith("https://", ignoreCase = true)) {
+                                !extracted.startsWith("https://", ignoreCase = true) &&
+                                !UrlValidator.isMagnetLink(extracted)) {
                                 "https://$extracted"
                             } else {
                                 extracted
@@ -53,9 +70,21 @@ object IntentHandler {
                 }
             }
             Intent.ACTION_VIEW -> {
-                val data = intent.dataString
-                if (data != null && UrlValidator.isValidUrl(data)) {
-                    return data
+                val data = (try { intent.dataString } catch (e: Throwable) { null })
+                    ?: (try { intent.data?.toString() } catch (e: Throwable) { null })
+                if (data != null) {
+                    if (UrlValidator.isMagnetLink(data) || UrlValidator.isValidUrl(data)) {
+                        return data
+                    }
+                    val type = try { intent.type?.lowercase() } catch (e: Throwable) { null }
+                    val isTorrentType = type == "application/x-bittorrent" ||
+                            type == "application/x-torrent" ||
+                            type?.contains("torrent") == true
+                    val isTorrentPath = data.contains(".torrent", ignoreCase = true)
+
+                    if (isTorrentType || isTorrentPath) {
+                        return data
+                    }
                 }
             }
         }

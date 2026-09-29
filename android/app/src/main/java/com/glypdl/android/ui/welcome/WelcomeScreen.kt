@@ -33,6 +33,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import com.glypdl.android.R
+
 @Composable
 fun WelcomeScreen(
     onComplete: () -> Unit
@@ -50,20 +55,12 @@ fun WelcomeScreen(
         ) {
             Spacer(modifier = Modifier.weight(1f))
             
-            // App Icon Placeholder
-            Box(
-                modifier = Modifier
-                    .size(96.dp)
-                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "G",
-                    style = MaterialTheme.typography.displayMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            // Glypdl App Icon
+            Image(
+                painter = painterResource(id = R.drawable.ic_glypdl_logo),
+                contentDescription = stringResource(id = R.string.app_name),
+                modifier = Modifier.size(96.dp)
+            )
             
             Spacer(modifier = Modifier.height(32.dp))
             

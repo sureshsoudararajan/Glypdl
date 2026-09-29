@@ -94,6 +94,15 @@ class SettingsRepository @Inject constructor(
 
         /** Cached latest yt-dlp version tag string from GitHub. */
         val CACHED_LATEST_VERSION = stringPreferencesKey("cached_latest_version")
+
+        /** Aria2: Maximum concurrent connections per download. */
+        val ARIA2_MAX_CONNECTIONS = intPreferencesKey("aria2_max_connections")
+
+        /** Aria2: Size of each split part for downloading. */
+        val ARIA2_SPLIT_SIZE = stringPreferencesKey("aria2_split_size")
+
+        /** Aria2: Enable Aria2 for downloading. */
+        val ARIA2_ENABLED = booleanPreferencesKey("aria2_enabled")
     }
 
     // Reactive Flow Getters
@@ -148,6 +157,15 @@ class SettingsRepository @Inject constructor(
 
     /** Flow emitting cached latest yt-dlp version string, or null. */
     val cachedLatestVersion: Flow<String?> = dataStore.data.map { it[CACHED_LATEST_VERSION] }
+
+    /** Flow emitting Aria2 max connections (default 8, clamped 1..16). */
+    val aria2MaxConnections: Flow<Int> = dataStore.data.map { (it[ARIA2_MAX_CONNECTIONS] ?: 8).coerceIn(1, 16) }
+
+    /** Flow emitting Aria2 split size (default "1M"). */
+    val aria2SplitSize: Flow<String> = dataStore.data.map { it[ARIA2_SPLIT_SIZE] ?: "1M" }
+
+    /** Flow emitting Aria2 enabled preference (default true). */
+    val aria2Enabled: Flow<Boolean> = dataStore.data.map { it[ARIA2_ENABLED] ?: true }
 
     // Asynchronous Setters
 
@@ -211,4 +229,13 @@ class SettingsRepository @Inject constructor(
             else it[DOWNLOAD_DIR_URI] = value
         } 
     }
+
+    /** Sets Aria2 maximum concurrent connections limit. */
+    suspend fun setAria2MaxConnections(value: Int) { dataStore.edit { it[ARIA2_MAX_CONNECTIONS] = value } }
+
+    /** Sets Aria2 split size. */
+    suspend fun setAria2SplitSize(value: String) { dataStore.edit { it[ARIA2_SPLIT_SIZE] = value } }
+
+    /** Enables or disables Aria2. */
+    suspend fun setAria2Enabled(value: Boolean) { dataStore.edit { it[ARIA2_ENABLED] = value } }
 }

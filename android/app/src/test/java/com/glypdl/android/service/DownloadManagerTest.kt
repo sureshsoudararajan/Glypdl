@@ -47,9 +47,11 @@ class DownloadManagerTest {
         every { downloadRepository.getDownloadsByStatus(any()) } returns flowOf(emptyList())
 
         val downloadNotificationManager: DownloadNotificationManager = mockk(relaxed = true)
+        val aria2DownloadEngine: com.glypdl.android.service.engine.Aria2DownloadEngine = mockk(relaxed = true)
 
         downloadManager = DownloadManager(
             ytDlpService = ytDlpService,
+            aria2DownloadEngine = aria2DownloadEngine,
             downloadRepository = downloadRepository,
             historyRepository = historyRepository,
             settingsRepository = settingsRepository,
@@ -160,6 +162,61 @@ class DownloadManagerTest {
             downloadRepository.updateDownload(match {
                 it.id == downloadId && it.status == DownloadStatus.QUEUED && it.errorMessage == null
             })
+        }
+    }
+
+    @Test
+    fun `aria2 download failure updates status to FAILED and does not crash`() = runTest {
+        val downloadId = "test-aria2-fail"
+        val aria2Engine: com.glypdl.android.service.engine.Aria2DownloadEngine = mockk(relaxed = true)
+        coEvery { aria2Engine.startDownload(any(), any(), any()) } throws java.io.IOException("Cannot run program aria2c: error=2")
+
+        val notifManager: DownloadNotificationManager = mockk(relaxed = true)
+        val testDownloadManager = DownloadManager(
+            ytDlpService = ytDlpService,
+            aria2DownloadEngine = aria2Engine,
+            downloadRepository = downloadRepository,
+            historyRepository = historyRepository,
+            settingsRepository = settingsRepository,
+            downloadNotificationManager = notifManager,
+            context = context
+        )
+
+        coEvery { downloadRepository.getDownloadsByStatus(DownloadStatus.QUEUED) } returns flowOf(
+            listOf(
+                DownloadEntity(
+                    id = downloadId,
+                    url = "https://github.com/test/archive.zip",
+                    title = "archive.zip",
+                    thumbnailUrl = null,
+                    formatId = "direct",
+                    ext = "zip",
+                    resolution = null,
+                    isAudioOnly = false,
+                    status = DownloadStatus.QUEUED,
+                    progress = 0f,
+                    downloadedBytes = 0,
+                    totalBytes = 0,
+                    speed = null,
+                    filePath = null,
+                    errorMessage = null,
+                    createdAt = 0L,
+                    updatedAt = 0L,
+                    downloadType = com.glypdl.android.data.model.DownloadType.DIRECT_FILE,
+                    engineType = com.glypdl.android.data.model.EngineType.ARIA2C,
+                    fileName = "archive.zip"
+                )
+            )
+        )
+
+        testDownloadManager.processQueue()
+        kotlinx.coroutines.delay(200)
+
+        coVerify {
+            downloadRepository.updateDownload(match {
+                it.id == downloadId && it.status == DownloadStatus.FAILED && it.errorMessage?.contains("Cannot run program") == true
+            })
+            notifManager.onDownloadFailed(downloadId, "archive.zip", any())
         }
     }
 }

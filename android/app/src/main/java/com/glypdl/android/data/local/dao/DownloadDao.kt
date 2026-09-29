@@ -121,4 +121,14 @@ interface DownloadDao {
      */
     @Query("DELETE FROM downloads WHERE status IN ('COMPLETED', 'FAILED', 'CANCELLED')")
     suspend fun clearCompleted()
+
+    /**
+     * Updates only the aria2 GID for a download task without modifying any other fields.
+     * Prevents stale entity copies from overwriting status/progress during GID transitions.
+     *
+     * @param id The download task identifier.
+     * @param gid The new aria2 GID value.
+     */
+    @Query("UPDATE downloads SET aria2Gid = :gid, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateAria2Gid(id: String, gid: String, updatedAt: Long = System.currentTimeMillis())
 }

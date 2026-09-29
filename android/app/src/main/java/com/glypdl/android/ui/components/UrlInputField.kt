@@ -19,12 +19,17 @@ package com.glypdl.android.ui.components
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -44,17 +49,26 @@ fun UrlInputField(
     onAnalyzeClick: () -> Unit,
     isValid: Boolean,
     isLoading: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSelectTorrentFile: ((Uri) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+    val torrentFilePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            onSelectTorrentFile?.invoke(uri)
+        }
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         OutlinedTextField(
             value = url,
             onValueChange = onUrlChange,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Enter URL") },
+            label = { Text("Enter URL or select .torrent") },
             singleLine = true,
             isError = url.isNotEmpty() && !isValid,
             trailingIcon = {
@@ -63,14 +77,23 @@ fun UrlInputField(
                         Icon(Icons.Default.Clear, contentDescription = "Clear URL")
                     }
                 } else {
-                    IconButton(onClick = {
-                        val clipData = clipboardManager.primaryClip
-                        if (clipData != null && clipData.itemCount > 0) {
-                            val pasteData = clipData.getItemAt(0).text?.toString() ?: ""
-                            onUrlChange(pasteData)
+                    Row {
+                        if (onSelectTorrentFile != null) {
+                            IconButton(onClick = {
+                                torrentFilePicker.launch(arrayOf("*/*"))
+                            }) {
+                                Icon(Icons.Default.FolderOpen, contentDescription = "Open .torrent file")
+                            }
                         }
-                    }) {
-                        Icon(Icons.Default.ContentPaste, contentDescription = "Paste URL")
+                        IconButton(onClick = {
+                            val clipData = clipboardManager.primaryClip
+                            if (clipData != null && clipData.itemCount > 0) {
+                                val pasteData = clipData.getItemAt(0).text?.toString() ?: ""
+                                onUrlChange(pasteData)
+                            }
+                        }) {
+                            Icon(Icons.Default.ContentPaste, contentDescription = "Paste URL")
+                        }
                     }
                 }
             }

@@ -39,4 +39,18 @@ sealed class Screen(val route: String) {
             return "download_detail/$downloadId"
         }
     }
+    
+    object DirectFilePreview : Screen("direct_file_preview/{url}") {
+        fun createRoute(url: String): String {
+            val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
+            return "direct_file_preview/$encodedUrl"
+        }
+    }
+
+    object TorrentPreview : Screen("torrent_preview/{url}") {
+        fun createRoute(url: String): String {
+            val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
+            return "torrent_preview/$encodedUrl"
+        }
+    }
 }

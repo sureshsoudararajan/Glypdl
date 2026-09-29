@@ -97,4 +97,113 @@ class StorageHelperTest {
             tempFile.delete()
         }
     }
+
+    @Test
+    fun `getCategorySubfolder correctly maps download types and categories`() {
+        // Torrents
+        assertEquals(
+            "Torrents/Ubuntu_24.04",
+            StorageHelper.getCategorySubfolder(
+                downloadType = com.glypdl.android.data.model.DownloadType.TORRENT,
+                fileCategory = null,
+                mimeType = null,
+                isAudio = false,
+                torrentTitle = "Ubuntu:24.04"
+            )
+        )
+        assertEquals(
+            "Torrents",
+            StorageHelper.getCategorySubfolder(
+                downloadType = com.glypdl.android.data.model.DownloadType.MAGNET,
+                fileCategory = null,
+                mimeType = null,
+                isAudio = false,
+                torrentTitle = null
+            )
+        )
+
+        // Videos
+        assertEquals(
+            "Videos",
+            StorageHelper.getCategorySubfolder(
+                downloadType = com.glypdl.android.data.model.DownloadType.MEDIA,
+                fileCategory = com.glypdl.android.data.model.FileCategory.VIDEO,
+                mimeType = "video/mp4",
+                isAudio = false
+            )
+        )
+
+        // Audio
+        assertEquals(
+            "Audio",
+            StorageHelper.getCategorySubfolder(
+                downloadType = com.glypdl.android.data.model.DownloadType.MEDIA,
+                fileCategory = com.glypdl.android.data.model.FileCategory.AUDIO,
+                mimeType = "audio/mpeg",
+                isAudio = true
+            )
+        )
+
+        // Documents
+        assertEquals(
+            "Documents",
+            StorageHelper.getCategorySubfolder(
+                downloadType = com.glypdl.android.data.model.DownloadType.DIRECT_FILE,
+                fileCategory = com.glypdl.android.data.model.FileCategory.DOCUMENT,
+                mimeType = "application/pdf",
+                isAudio = false
+            )
+        )
+
+        // Apps
+        assertEquals(
+            "Apps",
+            StorageHelper.getCategorySubfolder(
+                downloadType = com.glypdl.android.data.model.DownloadType.DIRECT_FILE,
+                fileCategory = com.glypdl.android.data.model.FileCategory.APPLICATION,
+                mimeType = "application/vnd.android.package-archive",
+                isAudio = false
+            )
+        )
+
+        // Archives
+        assertEquals(
+            "Archives",
+            StorageHelper.getCategorySubfolder(
+                downloadType = com.glypdl.android.data.model.DownloadType.DIRECT_FILE,
+                fileCategory = com.glypdl.android.data.model.FileCategory.ARCHIVE,
+                mimeType = "application/zip",
+                isAudio = false
+            )
+        )
+
+        // Images
+        assertEquals(
+            "Images",
+            StorageHelper.getCategorySubfolder(
+                downloadType = com.glypdl.android.data.model.DownloadType.DIRECT_FILE,
+                fileCategory = com.glypdl.android.data.model.FileCategory.IMAGE,
+                mimeType = "image/png",
+                isAudio = false
+            )
+        )
+
+        // Fallback
+        assertEquals(
+            "Files",
+            StorageHelper.getCategorySubfolder(
+                downloadType = com.glypdl.android.data.model.DownloadType.DIRECT_FILE,
+                fileCategory = null,
+                mimeType = "application/octet-stream",
+                isAudio = false
+            )
+        )
+    }
+
+    @Test
+    fun `sanitizeSubfolder strips illegal characters`() {
+        assertEquals("My_Folder_Name", StorageHelper.sanitizeSubfolder("My/Folder:Name"))
+        assertEquals("Clean Title", StorageHelper.sanitizeSubfolder("Clean Title"))
+        assertEquals("A_B_C", StorageHelper.sanitizeSubfolder("A*B?C"))
+    }
 }

@@ -30,5 +30,10 @@ data class DownloadProgress(
     val totalBytes: Long,
     val speed: String,
     val eta: String,
-    val title: String = ""
+    val title: String = "",
+    val seeds: Int = 0,
+    val peers: Int = 0,
+    val uploadSpeed: String = "",
+    val bitfield: String? = null,
+    val totalPieces: Int = 0
 )

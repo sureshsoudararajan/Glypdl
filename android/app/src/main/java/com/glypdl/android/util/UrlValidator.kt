@@ -21,8 +21,38 @@ package com.glypdl.android.util
 import java.net.URI
 
 object UrlValidator {
+    fun isMagnetLink(url: String): Boolean {
+        val trimmed = url.trim()
+        return trimmed.startsWith("magnet:?", ignoreCase = true) && trimmed.length > 8
+    }
+
+    fun isTorrentUrl(url: String): Boolean {
+        val trimmed = url.trim()
+        if (trimmed.startsWith("torrent-base64:", ignoreCase = true)) return true
+        val path = trimmed.substringBefore('?').substringBefore('#')
+        if (path.endsWith(".torrent", ignoreCase = true)) return true
+        if (path.contains("/torrent/download/", ignoreCase = true) ||
+            path.contains("/torrents/download/", ignoreCase = true) ||
+            path.contains("/download/torrent/", ignoreCase = true)) return true
+        return false
+    }
+
+    fun isTorrentUri(uriString: String): Boolean {
+        val trimmed = uriString.trim()
+        if (isMagnetLink(trimmed)) return true
+        if (trimmed.startsWith("torrent-base64:", ignoreCase = true)) return true
+        val lower = trimmed.lowercase()
+        if (lower.startsWith("content://") || lower.startsWith("file://")) {
+            return lower.contains(".torrent") || lower.contains("bittorrent") || lower.contains("torrent")
+        }
+        return isTorrentUrl(trimmed)
+    }
+
     fun isValidUrl(url: String): Boolean {
         if (url.isBlank()) return false
+        if (isMagnetLink(url)) return true
+        if (url.trim().startsWith("torrent-base64:", ignoreCase = true)) return true
+        if (url.trim().startsWith("content://", ignoreCase = true) || url.trim().startsWith("file://", ignoreCase = true)) return true
         return try {
             val uri = URI(url)
             val scheme = uri.scheme?.lowercase()
@@ -108,6 +138,10 @@ object UrlValidator {
     }
 
     fun extractUrlFromText(text: String): String? {
+        val magnetRegex = "(?i)magnet:\\?[^\\s\"'<>\\]\\[\\}\\{]+".toRegex()
+        val magnetMatch = magnetRegex.find(text)
+        if (magnetMatch != null) return magnetMatch.value
+
         val urlRegex = "(?i)\\b((?:https?://|www\\d{0,3}[.]|[a-z0-9.\\-]+[.][a-z]{2,4}/)(?:[^\\s()<>]+|\\(([^\\s()<>]+|(\\([^\\s()<>]+\\)))*\\))+(?:\\(([^\\s()<>]+|(\\([^\\s()<>]+\\)))*\\)|[^\\s`!()\\[\\]{};:'\".,<>?«»“”‘’]))".toRegex()
         val matchResult = urlRegex.find(text)
         return matchResult?.value

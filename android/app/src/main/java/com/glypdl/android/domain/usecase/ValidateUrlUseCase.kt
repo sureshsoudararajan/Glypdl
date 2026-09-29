@@ -16,12 +16,19 @@ class ValidateUrlUseCase @Inject constructor() {
     operator fun invoke(url: String): Result<String> {
         return try {
             val trimmedUrl = url.trim()
+            if (trimmedUrl.startsWith("magnet:?", ignoreCase = true) ||
+                trimmedUrl.startsWith("torrent-base64:", ignoreCase = true) ||
+                trimmedUrl.startsWith("content://", ignoreCase = true) ||
+                trimmedUrl.startsWith("file://", ignoreCase = true)) {
+                return Result.success(trimmedUrl)
+            }
+            
             val uri = URI.create(trimmedUrl)
             
             if (uri.scheme == "http" || uri.scheme == "https") {
                 Result.success(trimmedUrl)
             } else {
-                Result.failure(IllegalArgumentException("URL must use HTTP or HTTPS protocol"))
+                Result.failure(IllegalArgumentException("URL must use HTTP or HTTPS protocol, or be a magnet/torrent link"))
             }
         } catch (e: Exception) {
             Result.failure(IllegalArgumentException("Invalid URL format"))

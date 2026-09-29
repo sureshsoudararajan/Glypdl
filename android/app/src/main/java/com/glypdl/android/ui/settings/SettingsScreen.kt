@@ -750,6 +750,118 @@ fun SettingsScreen(
                 }
             }
 
+            // 3.5 DIRECT DOWNLOADS SECTION
+            item {
+                SettingsGroupCard(title = "Direct Downloads & aria2c") {
+                    var enableAria2c by remember { mutableStateOf(true) }
+                    var aria2cMaxConnections by remember { mutableFloatStateOf(8f) }
+                    var splitSizeDialogVisible by remember { mutableStateOf(false) }
+                    var splitSize by remember { mutableStateOf("10M") }
+
+                    SettingsSwitchRow(
+                        icon = Icons.Default.Bolt,
+                        title = "Enable aria2c engine",
+                        subtitle = "Use aria2c for fast direct file downloads",
+                        checked = enableAria2c,
+                        onCheckedChange = { enableAria2c = it }
+                    )
+
+                    SettingsItemDivider()
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            SettingsIconBadge(
+                                icon = Icons.Default.Speed,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Max connections per server",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer
+                            ) {
+                                Text(
+                                    text = "${aria2cMaxConnections.toInt()}",
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+
+                        Slider(
+                            value = aria2cMaxConnections,
+                            onValueChange = { aria2cMaxConnections = it },
+                            valueRange = 1f..16f,
+                            steps = 14,
+                            modifier = Modifier.padding(start = 54.dp, top = 4.dp)
+                        )
+                    }
+
+                    SettingsItemDivider()
+
+                    SettingsSelectRow(
+                        icon = Icons.Default.VerticalSplit,
+                        title = "Split size",
+                        subtitle = "Size of each download chunk",
+                        currentValue = splitSize,
+                        onClick = { splitSizeDialogVisible = true }
+                    )
+
+                    if (splitSizeDialogVisible) {
+                        AlertDialog(
+                            onDismissRequest = { splitSizeDialogVisible = false },
+                            title = { Text("Select Split Size") },
+                            text = {
+                                Column {
+                                    listOf("1M", "5M", "10M", "20M").forEach { option ->
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    splitSize = option
+                                                    splitSizeDialogVisible = false
+                                                }
+                                                .padding(vertical = 12.dp)
+                                        ) {
+                                            RadioButton(
+                                                selected = splitSize == option,
+                                                onClick = {
+                                                    splitSize = option
+                                                    splitSizeDialogVisible = false
+                                                }
+                                            )
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Text(text = option)
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = { splitSizeDialogVisible = false }) {
+                                    Text("Cancel")
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+
             // 4. DOWNLOAD STORAGE SECTION
             item {
                 SettingsGroupCard(title = "Download Storage") {

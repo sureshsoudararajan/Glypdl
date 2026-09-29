@@ -11,6 +11,9 @@ package com.glypdl.android.data.local.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.glypdl.android.data.model.DownloadType
+import com.glypdl.android.data.model.EngineType
+import com.glypdl.android.data.model.FileCategory
 
 /**
  * Room database entity representing a completed download log entry in the `history` table.
@@ -29,6 +32,9 @@ import androidx.room.PrimaryKey
  * @property fileSize Final verified file size on disk in bytes.
  * @property duration Media duration in seconds (if known).
  * @property completedAt Epoch timestamp in milliseconds when the download completed.
+ * @property downloadType Type of download.
+ * @property engineType Engine used.
+ * @property fileCategory Category of the file.
  */
 @Entity(tableName = "history")
 data class HistoryEntity(
@@ -42,5 +48,8 @@ data class HistoryEntity(
     val fileUri: String?,
     val fileSize: Long,
     val duration: Long?,
-    val completedAt: Long
+    val completedAt: Long,
+    val downloadType: DownloadType = DownloadType.MEDIA,
+    val engineType: EngineType = EngineType.YT_DLP,
+    val fileCategory: FileCategory = FileCategory.UNKNOWN
 )

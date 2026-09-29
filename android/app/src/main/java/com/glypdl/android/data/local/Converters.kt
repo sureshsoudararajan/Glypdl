@@ -45,4 +45,40 @@ class Converters {
             DownloadStatus.QUEUED
         }
     }
+
+    @TypeConverter
+    fun fromDownloadType(type: com.glypdl.android.data.model.DownloadType): String = type.name
+
+    @TypeConverter
+    fun toDownloadType(type: String): com.glypdl.android.data.model.DownloadType {
+        return try {
+            com.glypdl.android.data.model.DownloadType.valueOf(type)
+        } catch (e: IllegalArgumentException) {
+            com.glypdl.android.data.model.DownloadType.MEDIA
+        }
+    }
+
+    @TypeConverter
+    fun fromEngineType(type: com.glypdl.android.data.model.EngineType): String = type.name
+
+    @TypeConverter
+    fun toEngineType(type: String): com.glypdl.android.data.model.EngineType {
+        return try {
+            com.glypdl.android.data.model.EngineType.valueOf(type)
+        } catch (e: IllegalArgumentException) {
+            com.glypdl.android.data.model.EngineType.YT_DLP
+        }
+    }
+
+    @TypeConverter
+    fun fromFileCategory(category: com.glypdl.android.data.model.FileCategory): String = category.name
+
+    @TypeConverter
+    fun toFileCategory(category: String): com.glypdl.android.data.model.FileCategory {
+        return try {
+            com.glypdl.android.data.model.FileCategory.valueOf(category)
+        } catch (e: IllegalArgumentException) {
+            com.glypdl.android.data.model.FileCategory.UNKNOWN
+        }
+    }
 }

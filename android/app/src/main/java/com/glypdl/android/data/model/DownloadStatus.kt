@@ -40,5 +40,14 @@ enum class DownloadStatus {
     FAILED,
 
     /** Download was aborted by the user before completion. */
-    CANCELLED
+    CANCELLED,
+
+    /** Magnet metadata resolution */
+    RESOLVING,
+
+    /** Torrent metadata fetched, awaiting user file selection */
+    METADATA,
+
+    /** Torrent piece verification */
+    VERIFYING
 }

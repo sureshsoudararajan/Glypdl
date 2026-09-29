@@ -49,7 +49,8 @@ class HomeViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val validateUrlUseCase: ValidateUrlUseCase,
     private val downloadManager: DownloadManager,
-    private val deleteDownloadUseCase: DeleteDownloadUseCase
+    private val deleteDownloadUseCase: DeleteDownloadUseCase,
+    private val downloadResolver: com.glypdl.android.service.resolver.DownloadResolver
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -84,6 +85,10 @@ class HomeViewModel @Inject constructor(
 
     fun onAnalyzeClick() {
         // No-op, navigation handled by screen
+    }
+
+    fun resolveUrl(url: String): com.glypdl.android.service.resolver.ResolvedDownload {
+        return downloadResolver.resolve(url)
     }
 
     fun pauseDownload(id: String) {

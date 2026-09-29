@@ -12,6 +12,9 @@ package com.glypdl.android.data.local.entity
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.glypdl.android.data.model.DownloadStatus
+import com.glypdl.android.data.model.DownloadType
+import com.glypdl.android.data.model.EngineType
+import com.glypdl.android.data.model.FileCategory
 
 /**
  * Room database entity representing a media download task in the `downloads` table.
@@ -37,6 +40,14 @@ import com.glypdl.android.data.model.DownloadStatus
  * @property technicalLog Redacted diagnostic log / stack trace for technical error inspection.
  * @property createdAt Epoch timestamp in milliseconds when the download was enqueued.
  * @property updatedAt Epoch timestamp in milliseconds when the download was last updated.
+ * @property downloadType Type of download.
+ * @property engineType Engine to use.
+ * @property fileCategory Category of the file.
+ * @property aria2Gid aria2 GID.
+ * @property connections Number of aria2 connections.
+ * @property fileName Expected file name.
+ * @property contentLength Content length.
+ * @property mimeType MIME type.
  */
 @Entity(tableName = "downloads")
 data class DownloadEntity(
@@ -57,5 +68,13 @@ data class DownloadEntity(
     val errorMessage: String?,
     val technicalLog: String? = null,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val downloadType: DownloadType = DownloadType.MEDIA,
+    val engineType: EngineType = EngineType.YT_DLP,
+    val fileCategory: FileCategory = FileCategory.UNKNOWN,
+    val aria2Gid: String? = null,
+    val connections: Int = 0,
+    val fileName: String? = null,
+    val contentLength: Long = 0L,
+    val mimeType: String? = null
 )

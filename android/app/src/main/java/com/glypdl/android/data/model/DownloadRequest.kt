@@ -9,6 +9,10 @@
  */
 package com.glypdl.android.data.model
 
+import com.glypdl.android.data.model.DownloadType
+import com.glypdl.android.data.model.EngineType
+import com.glypdl.android.data.model.FileCategory
+
 /**
  * Immutable command request created by the UI or share intent handlers
  * to enqueue a new download task in [DownloadManager].
@@ -22,6 +26,12 @@ package com.glypdl.android.data.model
  * @property resolution Display resolution or quality preset (e.g., "1080p", "Best").
  * @property isAudioOnly When true, signals that only audio should be extracted/kept.
  * @property destinationUri Optional custom target destination content tree URI (e.g. SAF folder).
+ * @property downloadType Type of download.
+ * @property engineType Engine to use.
+ * @property fileCategory Category of the file.
+ * @property fileName Custom file name to use.
+ * @property contentLength Expected file size if known.
+ * @property detectedMimeType MIME type if known beforehand.
  */
 data class DownloadRequest(
     val id: String,
@@ -32,5 +42,12 @@ data class DownloadRequest(
     val ext: String,
     val resolution: String?,
     val isAudioOnly: Boolean,
-    val destinationUri: String?
+    val destinationUri: String?,
+    val downloadType: DownloadType = DownloadType.MEDIA,
+    val engineType: EngineType = EngineType.YT_DLP,
+    val fileCategory: FileCategory = FileCategory.UNKNOWN,
+    val fileName: String? = null,
+    val contentLength: Long? = null,
+    val detectedMimeType: String? = null,
+    val selectedFileIndices: List<Int>? = null
 )

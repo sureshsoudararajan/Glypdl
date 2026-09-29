@@ -57,13 +57,16 @@ class NotificationHelper @Inject constructor(
         }
     }
 
+    @JvmOverloads
     fun buildProgressNotification(
         downloadId: String,
         title: String,
         progress: Int,
         speed: String,
         eta: String = "",
-        isIndeterminate: Boolean = false
+        isIndeterminate: Boolean = false,
+        downloadedBytes: Long = 0L,
+        totalBytes: Long = 0L
     ): Notification {
         val pauseIntent = Intent(context, DownloadActionReceiver::class.java).apply {
             action = DownloadActionReceiver.ACTION_PAUSE
@@ -87,13 +90,61 @@ class NotificationHelper @Inject constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val progressDetails = if (totalBytes > 0L) {
+            val dlStr = android.text.format.Formatter.formatShortFileSize(context, downloadedBytes)
+            val totalStr = android.text.format.Formatter.formatShortFileSize(context, totalBytes)
+            val remainingBytes = (totalBytes - downloadedBytes).coerceAtLeast(0L)
+            val remStr = android.text.format.Formatter.formatShortFileSize(context, remainingBytes)
+            "$dlStr / $totalStr ($progress%) • $remStr left"
+        } else if (downloadedBytes > 0L) {
+            val dlStr = android.text.format.Formatter.formatShortFileSize(context, downloadedBytes)
+            "$dlStr downloaded"
+        } else {
+            ""
+        }
+
+        val speedEta = buildString {
+            if (speed.isNotBlank()) append(speed)
+            if (eta.isNotBlank()) {
+                if (isNotEmpty()) append(" • ")
+                append("ETA: $eta")
+            }
+        }
+
         val contentText = buildString {
-            if (speed.isNotBlank()) append("$speed ")
-            if (eta.isNotBlank()) append("• ETA: $eta")
-            if (isEmpty()) append("Downloading...")
+            if (progressDetails.isNotBlank()) {
+                append(progressDetails)
+                if (speedEta.isNotBlank()) append(" • ")
+            }
+            if (speedEta.isNotBlank()) {
+                append(speedEta)
+            }
+            if (isEmpty()) {
+                append("Downloading...")
+            }
         }
 
         val displayTitle = title.ifBlank { "Glypdl - Downloading" }
+
+        val bigText = buildString {
+            if (totalBytes > 0L) {
+                val dlStr = android.text.format.Formatter.formatShortFileSize(context, downloadedBytes)
+                val totalStr = android.text.format.Formatter.formatShortFileSize(context, totalBytes)
+                val remainingBytes = (totalBytes - downloadedBytes).coerceAtLeast(0L)
+                val remStr = android.text.format.Formatter.formatShortFileSize(context, remainingBytes)
+                appendLine("$dlStr of $totalStr ($progress%)")
+                appendLine("Remaining: $remStr")
+            } else if (downloadedBytes > 0L) {
+                val dlStr = android.text.format.Formatter.formatShortFileSize(context, downloadedBytes)
+                appendLine("$dlStr downloaded")
+            }
+            if (speedEta.isNotBlank()) {
+                append("Speed: $speedEta")
+            }
+            if (isEmpty()) {
+                append("Downloading...")
+            }
+        }.trimEnd()
 
         val builder = NotificationCompat.Builder(context, CHANNEL_DOWNLOADS)
             .setContentTitle(displayTitle)
@@ -101,7 +152,7 @@ class NotificationHelper @Inject constructor(
             .setStyle(
                 NotificationCompat.BigTextStyle()
                     .setBigContentTitle(displayTitle)
-                    .bigText(contentText)
+                    .bigText(bigText)
             )
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setProgress(100, progress, isIndeterminate)
@@ -109,6 +160,10 @@ class NotificationHelper @Inject constructor(
             .setOnlyAlertOnce(true)
             .addAction(android.R.drawable.ic_media_pause, "Pause", pausePendingIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancel", cancelPendingIntent)
+
+        if (speedEta.isNotBlank()) {
+            builder.setSubText(speedEta)
+        }
 
         if (downloadId.isNotBlank()) {
             val contentIntent = PendingIntent.getActivity(
