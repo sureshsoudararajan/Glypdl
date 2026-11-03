@@ -10,6 +10,7 @@
 package com.glypdl.android.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
@@ -30,7 +31,13 @@ import androidx.room.PrimaryKey
  * @property duration Media duration in seconds (if known).
  * @property completedAt Epoch timestamp in milliseconds when the download completed.
  */
-@Entity(tableName = "history")
+@Entity(
+    tableName = "history",
+    indices = [
+        Index("completedAt"),
+        Index("downloadId")
+    ]
+)
 data class HistoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val downloadId: String,

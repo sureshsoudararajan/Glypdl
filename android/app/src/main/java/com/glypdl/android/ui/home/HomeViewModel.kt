@@ -68,9 +68,22 @@ class HomeViewModel @Inject constructor(
         initialValue = HomeUiState()
     )
 
+    private var lastDismissedClipboardUrl: String? = null
+
     fun onUrlChange(url: String) {
         val isValid = validateUrlUseCase(url).isSuccess
         _uiState.update { it.copy(url = url, isUrlValid = isValid) }
+    }
+
+    fun checkClipboard(context: android.content.Context) {
+        viewModelScope.launch {
+            val enabled = kotlinx.coroutines.flow.first(settingsRepository.clipboardDetection)
+            if (!enabled) return@launch
+            val url = com.glypdl.android.util.ClipboardHelper.getUrlFromClipboard(context)
+            if (!url.isNullOrBlank() && url != lastDismissedClipboardUrl && url != _uiState.value.url) {
+                _uiState.update { it.copy(clipboardUrl = url) }
+            }
+        }
     }
 
     fun onPasteFromClipboard(url: String) {
@@ -79,6 +92,8 @@ class HomeViewModel @Inject constructor(
     }
 
     fun clearClipboardBanner() {
+        val current = _uiState.value.clipboardUrl
+        lastDismissedClipboardUrl = current
         _uiState.update { it.copy(clipboardUrl = null) }
     }
 

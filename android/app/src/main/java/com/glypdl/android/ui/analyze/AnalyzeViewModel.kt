@@ -37,8 +37,11 @@ import com.glypdl.android.util.UrlValidator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -122,6 +125,9 @@ class AnalyzeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<AnalyzeUiState>(AnalyzeUiState.Loading(isPlaylist = false))
     val uiState: StateFlow<AnalyzeUiState> = _uiState.asStateFlow()
 
+    private val _autoDownloadTriggered = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val autoDownloadTriggered: SharedFlow<Unit> = _autoDownloadTriggered.asSharedFlow()
+
     init {
         val decoded = urlArg?.let {
             try {
@@ -172,7 +178,36 @@ class AnalyzeViewModel @Inject constructor(
                         val mediaInfo = analysisResult.mediaInfo
                         val videoFormats = mediaInfo.formats.filter { it.isVideoOnly || (it.vcodec != null && it.vcodec != "none") }
                         val audioFormats = mediaInfo.formats.filter { it.isAudioOnly || (it.acodec != null && it.vcodec == "none") }
-                        val defaultVideoQuality = mediaInfo.videoQualities.firstOrNull()
+
+                        val askBefore = settingsRepository.askBeforeDownload.first()
+                        val prefQuality = settingsRepository.defaultQuality.first()
+                        val prefFormat = settingsRepository.defaultFormat.first()
+                        val prefVideoCodec = settingsRepository.preferredVideoCodec.first()
+                        val prefAudioFormat = settingsRepository.preferredAudioFormat.first()
+
+                        val isAudioOnlyPref = prefQuality.equals("audio", ignoreCase = true)
+
+                        // Select video quality matching preferences
+                        val defaultVideoQuality = if (isAudioOnlyPref) {
+                            null
+                        } else {
+                            val candidateQualities = if (prefQuality.equals("best", ignoreCase = true)) {
+                                mediaInfo.videoQualities
+                            } else {
+                                val match = mediaInfo.videoQualities.filter {
+                                    it.resolution.contains(prefQuality, ignoreCase = true) ||
+                                    it.label.contains(prefQuality, ignoreCase = true)
+                                }
+                                if (match.isNotEmpty()) match else mediaInfo.videoQualities
+                            }
+
+                            val codecMatch = if (!prefVideoCodec.equals("any", ignoreCase = true)) {
+                                candidateQualities.filter { it.codec?.contains(prefVideoCodec, ignoreCase = true) == true }
+                            } else {
+                                emptyList()
+                            }
+                            codecMatch.firstOrNull() ?: candidateQualities.firstOrNull() ?: mediaInfo.videoQualities.firstOrNull()
+                        }
 
                         // Intelligently harmonize default audio: WebM video requires Opus/Vorbis audio.
                         // MP4 video natively pairs with AAC/m4a audio.
@@ -185,30 +220,47 @@ class AnalyzeViewModel @Inject constructor(
                                         it.codec?.contains("opus", ignoreCase = true) == true
                             } ?: mediaInfo.audioQualities.firstOrNull()
                         } else {
-                            mediaInfo.audioQualities.firstOrNull {
+                            val userPrefAudio = mediaInfo.audioQualities.firstOrNull {
+                                it.extension.equals(prefAudioFormat, ignoreCase = true)
+                            }
+                            userPrefAudio ?: mediaInfo.audioQualities.firstOrNull {
                                 it.extension.equals("m4a", ignoreCase = true) ||
                                         it.codec?.contains("mp4a", ignoreCase = true) == true ||
                                         it.codec?.contains("aac", ignoreCase = true) == true
                             } ?: mediaInfo.audioQualities.firstOrNull()
                         }
 
-                        val defaultFormat = mediaInfo.formats.firstOrNull { !it.isAudioOnly } ?: mediaInfo.formats.firstOrNull()
+                        val defaultFormat = mediaInfo.formats.firstOrNull {
+                            it.ext.equals(prefFormat, ignoreCase = true) && !it.isAudioOnly
+                        } ?: mediaInfo.formats.firstOrNull { !it.isAudioOnly } ?: mediaInfo.formats.firstOrNull()
 
                         val isInstagram = UrlValidator.isInstagramUrl(mediaInfo.url)
                         val isFacebook = UrlValidator.isFacebookUrl(mediaInfo.url)
+
+                        val instagramChoice = if (isAudioOnlyPref) {
+                            SimplifiedMediaChoice.AUDIO_ONLY
+                        } else {
+                            SimplifiedMediaChoice.VIDEO_AND_AUDIO
+                        }
 
                         _uiState.value = AnalyzeUiState.Success(
                             mediaInfo = mediaInfo,
                             selectedFormat = defaultFormat,
                             selectedVideoQuality = defaultVideoQuality,
                             selectedAudioQuality = defaultAudioQuality,
-                            isAudioOnly = false,
+                            isAudioOnly = isAudioOnlyPref,
                             videoFormats = videoFormats,
                             audioFormats = audioFormats,
                             isInstagram = isInstagram,
                             isFacebook = isFacebook,
-                            instagramChoice = SimplifiedMediaChoice.VIDEO_AND_AUDIO
+                            instagramChoice = instagramChoice
                         )
+
+                        // If "Ask before download" is turned off, immediately download with default best quality and navigate
+                        if (!askBefore) {
+                            startDownload()
+                            _autoDownloadTriggered.tryEmit(Unit)
+                        }
                     }
                     is MediaAnalysisResult.Playlist -> {
                         val playlist = analysisResult.playlistInfo

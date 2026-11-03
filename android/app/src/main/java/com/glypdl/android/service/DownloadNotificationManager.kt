@@ -11,8 +11,10 @@ package com.glypdl.android.service
 
 import android.app.Notification
 import com.glypdl.android.data.repository.SettingsRepository
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,6 +26,18 @@ open class DownloadNotificationManager @Inject constructor(
 ) {
     // Map of downloadId to notificationId
     private val activeNotifications = ConcurrentHashMap<String, Int>()
+
+    private var downloadNotificationsEnabled = true
+    private var completionNotificationsEnabled = true
+    private var errorNotificationsEnabled = true
+
+    init {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            launch { settingsRepository.downloadNotifications.collect { downloadNotificationsEnabled = it } }
+            launch { settingsRepository.completionNotifications.collect { completionNotificationsEnabled = it } }
+            launch { settingsRepository.errorNotifications.collect { errorNotificationsEnabled = it } }
+        }
+    }
 
     fun getNotificationId(downloadId: String): Int {
         val hash = downloadId.hashCode() and 0x7FFFFFFF
@@ -60,6 +74,8 @@ open class DownloadNotificationManager @Inject constructor(
         val notifId = getNotificationId(downloadId)
         activeNotifications[downloadId] = notifId
 
+        if (!downloadNotificationsEnabled) return notifId
+
         val notification = notificationHelper.buildProgressNotification(
             downloadId = downloadId,
             title = title,
@@ -82,6 +98,8 @@ open class DownloadNotificationManager @Inject constructor(
         val notifId = getNotificationId(downloadId)
         activeNotifications[downloadId] = notifId
 
+        if (!downloadNotificationsEnabled) return notifId
+
         val notification = notificationHelper.buildProgressNotification(
             downloadId = downloadId,
             title = title,
@@ -101,13 +119,7 @@ open class DownloadNotificationManager @Inject constructor(
 
         val completionNotifId = getCompletionNotificationId(downloadId)
 
-        val showNotification = try {
-            runBlocking { settingsRepository.completionNotifications.first() }
-        } catch (e: Exception) {
-            true
-        }
-
-        if (showNotification) {
+        if (completionNotificationsEnabled) {
             notificationHelper.showCompletionNotification(
                 id = completionNotifId,
                 downloadId = downloadId,
@@ -125,13 +137,7 @@ open class DownloadNotificationManager @Inject constructor(
 
         val failureNotifId = getFailureNotificationId(downloadId)
 
-        val showNotification = try {
-            runBlocking { settingsRepository.errorNotifications.first() }
-        } catch (e: Exception) {
-            true
-        }
-
-        if (showNotification) {
+        if (errorNotificationsEnabled) {
             notificationHelper.showErrorNotification(
                 id = failureNotifId,
                 downloadId = downloadId,

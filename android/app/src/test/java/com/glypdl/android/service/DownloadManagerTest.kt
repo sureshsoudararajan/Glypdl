@@ -47,6 +47,9 @@ class DownloadManagerTest {
         every { downloadRepository.getDownloadsByStatus(any()) } returns flowOf(emptyList())
 
         val downloadNotificationManager: DownloadNotificationManager = mockk(relaxed = true)
+        val networkMonitor: com.glypdl.android.util.NetworkMonitor = mockk(relaxed = true)
+        every { networkMonitor.isWifi } returns kotlinx.coroutines.flow.MutableStateFlow(true)
+        every { settingsRepository.wifiOnly } returns flowOf(false)
 
         downloadManager = DownloadManager(
             ytDlpService = ytDlpService,
@@ -54,6 +57,7 @@ class DownloadManagerTest {
             historyRepository = historyRepository,
             settingsRepository = settingsRepository,
             downloadNotificationManager = downloadNotificationManager,
+            networkMonitor = networkMonitor,
             context = context
         )
     }

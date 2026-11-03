@@ -61,6 +61,9 @@ object YtDlpErrorParser {
         if (lower.contains("sign in to confirm") ||
             lower.contains("login required") ||
             lower.contains("log in to view") ||
+            lower.contains("you need to log in") ||
+            lower.contains("need to log in") ||
+            lower.contains("locked behind the login") ||
             lower.contains("log in to instagram") ||
             lower.contains("log in with facebook") ||
             lower.contains("confirm you’re not a bot") ||

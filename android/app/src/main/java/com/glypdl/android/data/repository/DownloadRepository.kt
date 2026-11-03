@@ -69,10 +69,7 @@ class DownloadRepository @Inject constructor(
      * @param status The new [DownloadStatus] to apply.
      */
     suspend fun updateStatus(id: String, status: DownloadStatus) {
-        val download = downloadDao.getDownloadByIdOnce(id)
-        if (download != null) {
-            downloadDao.update(download.copy(status = status, updatedAt = System.currentTimeMillis()))
-        }
+        downloadDao.updateStatus(id, status)
     }
 
     /**
@@ -85,18 +82,7 @@ class DownloadRepository @Inject constructor(
      * @param speed Formatted bandwidth rate string.
      */
     suspend fun updateProgress(id: String, progress: Float, downloadedBytes: Long, totalBytes: Long, speed: String?) {
-        val download = downloadDao.getDownloadByIdOnce(id)
-        if (download != null) {
-            downloadDao.update(
-                download.copy(
-                    progress = progress,
-                    downloadedBytes = downloadedBytes,
-                    totalBytes = totalBytes,
-                    speed = speed,
-                    updatedAt = System.currentTimeMillis()
-                )
-            )
-        }
+        downloadDao.updateProgress(id, progress, downloadedBytes, totalBytes, speed)
     }
 
     /**

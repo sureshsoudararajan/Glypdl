@@ -20,7 +20,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.glypdl.android.data.local.GlypdlDatabase
-import com.glypdl.android.data.model.HistoryEntity
+import com.glypdl.android.data.local.entity.HistoryEntity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -35,6 +35,28 @@ class HistoryDaoTest {
 
     private lateinit var db: GlypdlDatabase
     private lateinit var historyDao: HistoryDao
+
+    private fun createTestHistory(
+        id: Long = 0,
+        downloadId: String = "dl-1",
+        url: String = "https://example.com",
+        title: String = "Test Video",
+        filePath: String? = "/path/to/file.mp4",
+        fileSize: Long = 1024L,
+        completedAt: Long = 1000L
+    ) = HistoryEntity(
+        id = id,
+        downloadId = downloadId,
+        url = url,
+        title = title,
+        thumbnailUrl = null,
+        format = "1080p • MP4",
+        filePath = filePath,
+        fileUri = null,
+        fileSize = fileSize,
+        duration = 60L,
+        completedAt = completedAt
+    )
 
     @Before
     fun createDb() {
@@ -52,15 +74,9 @@ class HistoryDaoTest {
 
     @Test
     fun insertAndRetrieveHistoryItem() = runTest {
-        val entity = HistoryEntity(
-            url = "https://example.com",
-            title = "Test Video",
-            filePath = "/path/to/file.mp4",
-            fileSize = 1024L,
-            completedAt = 1000L
-        )
+        val entity = createTestHistory(url = "https://example.com", title = "Test Video")
         
-        historyDao.insert(entity)
+        val id = historyDao.insert(entity)
         val loaded = historyDao.getAll().first()
         
         assertEquals(1, loaded.size)
@@ -69,8 +85,8 @@ class HistoryDaoTest {
 
     @Test
     fun searchByTitleMatchesCorrectly() = runTest {
-        historyDao.insert(HistoryEntity(url = "url1", title = "First Video", filePath = "path1", fileSize = 1024L, completedAt = 1000L))
-        historyDao.insert(HistoryEntity(url = "url2", title = "Second Clip", filePath = "path2", fileSize = 1024L, completedAt = 2000L))
+        historyDao.insert(createTestHistory(title = "First Video", completedAt = 1000L))
+        historyDao.insert(createTestHistory(title = "Second Clip", completedAt = 2000L))
         
         val results = historyDao.search("Video").first()
         
@@ -80,7 +96,7 @@ class HistoryDaoTest {
 
     @Test
     fun searchByTitleReturnsEmptyForNoMatch() = runTest {
-        historyDao.insert(HistoryEntity(url = "url1", title = "First Video", filePath = "path1", fileSize = 1024L, completedAt = 1000L))
+        historyDao.insert(createTestHistory(title = "First Video", completedAt = 1000L))
         
         val results = historyDao.search("Nonexistent").first()
         
@@ -89,13 +105,7 @@ class HistoryDaoTest {
 
     @Test
     fun deleteByIdRemovesItem() = runTest {
-        val entity = HistoryEntity(
-            url = "https://example.com",
-            title = "Test Video",
-            filePath = "/path/to/file.mp4",
-            fileSize = 1024L,
-            completedAt = 1000L
-        )
+        val entity = createTestHistory(title = "Test Video")
         
         val id = historyDao.insert(entity)
         historyDao.deleteById(id)
@@ -106,8 +116,8 @@ class HistoryDaoTest {
 
     @Test
     fun clearAllRemovesEverything() = runTest {
-        historyDao.insert(HistoryEntity(url = "url1", title = "First Video", filePath = "path1", fileSize = 1024L, completedAt = 1000L))
-        historyDao.insert(HistoryEntity(url = "url2", title = "Second Clip", filePath = "path2", fileSize = 1024L, completedAt = 2000L))
+        historyDao.insert(createTestHistory(title = "First Video", completedAt = 1000L))
+        historyDao.insert(createTestHistory(title = "Second Clip", completedAt = 2000L))
         
         historyDao.clearAll()
         
@@ -117,8 +127,8 @@ class HistoryDaoTest {
 
     @Test
     fun itemsAreOrderedByCompletedAtDesc() = runTest {
-        historyDao.insert(HistoryEntity(url = "url1", title = "Old", filePath = "path1", fileSize = 1024L, completedAt = 1000L))
-        historyDao.insert(HistoryEntity(url = "url2", title = "New", filePath = "path2", fileSize = 1024L, completedAt = 2000L))
+        historyDao.insert(createTestHistory(title = "Old", completedAt = 1000L))
+        historyDao.insert(createTestHistory(title = "New", completedAt = 2000L))
         
         val loaded = historyDao.getAll().first()
         

@@ -38,6 +38,7 @@ class DownloadManager @Inject constructor(
     private val historyRepository: HistoryRepository,
     private val settingsRepository: SettingsRepository,
     private val downloadNotificationManager: DownloadNotificationManager,
+    private val networkMonitor: com.glypdl.android.util.NetworkMonitor,
     @ApplicationContext private val context: Context
 ) {
     private val _downloadProgress = MutableStateFlow<Map<String, DownloadProgress>>(emptyMap())
@@ -73,6 +74,12 @@ class DownloadManager @Inject constructor(
     }
 
     suspend fun processQueue() {
+        val isWifiOnly = settingsRepository.wifiOnly.first()
+        if (isWifiOnly && !networkMonitor.isWifi.value) {
+            // User requested downloads to proceed strictly over unmetered Wi-Fi
+            return
+        }
+
         val concurrentLimit = settingsRepository.concurrentDownloads.first().coerceIn(1, 10)
         val inFlightCount = activeJobs.size
         

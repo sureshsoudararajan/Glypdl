@@ -56,6 +56,10 @@ class YtDlpManager @Inject constructor(
     private val authCookieManager: com.glypdl.android.service.auth.AuthCookieManager
 ) {
 
+    companion object {
+        const val DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    }
+
     private var ffmpegInitialized = false
 
     suspend fun init(): Result<Unit> = withContext(Dispatchers.IO) {
@@ -264,11 +268,15 @@ class YtDlpManager @Inject constructor(
     ): Result<PlaylistInfo> = withContext(Dispatchers.IO) {
         val installed = getInstalledVersion()
         val pId = processId ?: ("playlist_" + System.currentTimeMillis())
+        val isInstagram = UrlValidator.isInstagramUrl(url)
         try {
             val request = YoutubeDLRequest(url)
             request.addOption("-J")
             request.addOption("--flat-playlist")
             request.addOption("--no-warnings")
+            request.addOption("--no-check-certificates")
+            request.addOption("--user-agent", DEFAULT_USER_AGENT)
+            request.addOption("--referer", if (isInstagram) "https://www.instagram.com/" else url)
 
             val cookieFile = authCookieManager.getCookieFile(url)
             if (cookieFile != null) {
@@ -371,12 +379,22 @@ class YtDlpManager @Inject constructor(
         timeoutMs: Long = 90_000L
     ): Result<MediaInfo> = withContext(Dispatchers.IO) {
         val installed = getInstalledVersion()
+        val isInstagram = UrlValidator.isInstagramUrl(url)
+        val isStory = UrlValidator.isInstagramStory(url)
+        val targetUrl = if (isStory) {
+            UrlValidator.canonicalizeInstagramStoryUrl(url)
+        } else {
+            UrlValidator.sanitizeUrl(url)
+        }
         try {
-            val request = YoutubeDLRequest(url)
+            val request = YoutubeDLRequest(targetUrl)
             request.addOption("-J")
             request.addOption("--no-playlist")
+            request.addOption("--no-check-certificates")
+            request.addOption("--user-agent", DEFAULT_USER_AGENT)
+            request.addOption("--referer", if (isInstagram) "https://www.instagram.com/" else targetUrl)
 
-            val cookieFile = authCookieManager.getCookieFile(url)
+            val cookieFile = authCookieManager.getCookieFile(targetUrl)
             if (cookieFile != null) {
                 request.addOption("--cookies", cookieFile.absolutePath)
             }
@@ -527,6 +545,7 @@ class YtDlpManager @Inject constructor(
             val dlRequest = YoutubeDLRequest(targetUrl)
             dlRequest.addOption("--no-playlist")
             dlRequest.addOption("--verbose")
+            dlRequest.addOption("--user-agent", DEFAULT_USER_AGENT)
 
             val cookieFile = authCookieManager.getCookieFile(targetUrl)
             if (cookieFile != null) {
@@ -572,8 +591,8 @@ class YtDlpManager @Inject constructor(
             }
             dlRequest.addOption("-f", effectiveFormat)
 
-            // Referer header prevents 403 Forbidden on sites checking request origin (e.g. Twitter, Reddit, Streamable, etc.)
-            dlRequest.addOption("--referer", targetUrl)
+            // Referer header prevents 403 Forbidden on sites checking request origin (e.g. Instagram, Twitter, Reddit, Streamable, etc.)
+            dlRequest.addOption("--referer", if (isInstagram) "https://www.instagram.com/" else targetUrl)
 
             // Avoid SSL handshake failures on older/mobile cert stores
             dlRequest.addOption("--no-check-certificates")

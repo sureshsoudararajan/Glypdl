@@ -25,20 +25,21 @@ class Converters {
      * @return The string representation of the enum (e.g., "DOWNLOADING", "COMPLETED").
      */
     @TypeConverter
-    fun fromDownloadStatus(status: DownloadStatus): String {
-        return status.name
+    fun fromDownloadStatus(status: DownloadStatus?): String {
+        return (status ?: DownloadStatus.QUEUED).name
     }
 
     /**
      * Converts a stored [String] back into its matching [DownloadStatus] enum.
-     * Gracefully falls back to [DownloadStatus.QUEUED] if the stored value is unrecognized
-     * or corrupted, preventing database read crashes during app upgrades.
+     * Gracefully falls back to [DownloadStatus.QUEUED] if the stored value is unrecognized,
+     * null, or corrupted, preventing database read crashes during app upgrades.
      *
      * @param status The string stored in the SQLite database column.
      * @return The matching [DownloadStatus] enum, or [DownloadStatus.QUEUED] if invalid.
      */
     @TypeConverter
-    fun toDownloadStatus(status: String): DownloadStatus {
+    fun toDownloadStatus(status: String?): DownloadStatus {
+        if (status.isNullOrBlank()) return DownloadStatus.QUEUED
         return try {
             DownloadStatus.valueOf(status)
         } catch (e: IllegalArgumentException) {

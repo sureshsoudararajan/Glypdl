@@ -72,9 +72,16 @@ class AuthBrowserActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val loginUrl = intent.getStringExtra(EXTRA_LOGIN_URL) ?: "https://www.instagram.com/accounts/login/"
+        val rawLoginUrl = intent.getStringExtra(EXTRA_LOGIN_URL) ?: "https://www.instagram.com/accounts/login/"
         val domain = intent.getStringExtra(EXTRA_DOMAIN) ?: "instagram.com"
         val title = intent.getStringExtra(EXTRA_TITLE) ?: "Log In"
+
+        // Security: Ensure URL uses http or https scheme to block javascript: or file: attacks
+        val loginUrl = if (rawLoginUrl.startsWith("https://", ignoreCase = true) || rawLoginUrl.startsWith("http://", ignoreCase = true)) {
+            rawLoginUrl
+        } else {
+            "https://www.instagram.com/accounts/login/"
+        }
 
         setContent {
             var pageTitle by remember { mutableStateOf(title) }
@@ -153,7 +160,11 @@ class AuthBrowserActivity : ComponentActivity() {
                                         javaScriptEnabled = true
                                         domStorageEnabled = true
                                         databaseEnabled = true
-                                        mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                        // Security: block insecure mixed content to protect credentials from MITM
+                                        mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                                        // Security: disable local file access from WebView
+                                        allowFileAccess = false
+                                        allowContentAccess = false
                                         useWideViewPort = true
                                         loadWithOverviewMode = true
                                         setSupportZoom(true)
@@ -311,7 +322,9 @@ class AuthBrowserActivity : ComponentActivity() {
             url,
             "https://$domain",
             "https://www.$domain",
-            "https://m.$domain"
+            "https://m.$domain",
+            "https://i.$domain",
+            "https://api.$domain"
         ).distinct()
 
         var allCookies = ""
@@ -323,7 +336,7 @@ class AuthBrowserActivity : ComponentActivity() {
         }
 
         val hasSession = when {
-            domain.contains("instagram.com") -> allCookies.contains("sessionid=")
+            domain.contains("instagram.com") -> allCookies.contains("sessionid=") || allCookies.contains("ds_user_id=")
             domain.contains("facebook.com") -> allCookies.contains("c_user=") || allCookies.contains("xs=")
             domain.contains("youtube.com") -> allCookies.contains("SAPISID=") || allCookies.contains("SSID=")
             domain.contains("tiktok.com") -> allCookies.contains("sessionid=")
@@ -343,7 +356,9 @@ class AuthBrowserActivity : ComponentActivity() {
             if (!url.startsWith("http")) "https://$url" else url,
             "https://$domain",
             "https://www.$domain",
-            "https://m.$domain"
+            "https://m.$domain",
+            "https://i.$domain",
+            "https://api.$domain"
         ).distinct()
 
         for (probeUrl in urlsToProbe) {

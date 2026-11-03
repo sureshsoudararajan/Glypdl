@@ -10,6 +10,7 @@
 package com.glypdl.android.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.glypdl.android.data.model.DownloadStatus
 
@@ -38,7 +39,13 @@ import com.glypdl.android.data.model.DownloadStatus
  * @property createdAt Epoch timestamp in milliseconds when the download was enqueued.
  * @property updatedAt Epoch timestamp in milliseconds when the download was last updated.
  */
-@Entity(tableName = "downloads")
+@Entity(
+    tableName = "downloads",
+    indices = [
+        Index("status"),
+        Index("createdAt")
+    ]
+)
 data class DownloadEntity(
     @PrimaryKey val id: String,
     val url: String,

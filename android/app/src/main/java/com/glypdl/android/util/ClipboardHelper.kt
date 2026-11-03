@@ -25,14 +25,18 @@ import android.content.Context
 object ClipboardHelper {
     fun getUrlFromClipboard(context: Context): String? {
         try {
-            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                ?: return null
             if (clipboard.hasPrimaryClip()) {
                 val clip: ClipData? = clipboard.primaryClip
                 if (clip != null && clip.itemCount > 0) {
-                    val text = clip.getItemAt(0).text?.toString()
-                    if (!text.isNullOrEmpty()) {
-                        val extractedUrl = UrlValidator.extractUrlFromText(text)
-                        if (extractedUrl != null && UrlValidator.isValidUrl(extractedUrl)) {
+                    val item = clip.getItemAt(0)
+                    val rawText = item.text?.toString()
+                        ?: item.uri?.toString()
+                        ?: item.coerceToText(context)?.toString()
+                    if (!rawText.isNullOrBlank()) {
+                        val extractedUrl = UrlValidator.extractUrlFromText(rawText) ?: rawText.trim()
+                        if (UrlValidator.isValidUrl(extractedUrl)) {
                             return extractedUrl
                         }
                     }

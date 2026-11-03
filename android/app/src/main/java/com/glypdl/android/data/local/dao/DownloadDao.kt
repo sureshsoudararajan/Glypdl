@@ -46,6 +46,30 @@ interface DownloadDao {
     suspend fun update(download: DownloadEntity)
 
     /**
+     * Atomically updates status and modification timestamp without a read-modify-write cycle.
+     */
+    @Query("UPDATE downloads SET status = :status, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateStatus(id: String, status: DownloadStatus, updatedAt: Long = System.currentTimeMillis())
+
+    /**
+     * Atomically updates progress metrics and modification timestamp.
+     */
+    @Query("UPDATE downloads SET progress = :progress, downloadedBytes = :downloadedBytes, totalBytes = :totalBytes, speed = :speed, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateProgress(id: String, progress: Float, downloadedBytes: Long, totalBytes: Long, speed: String?, updatedAt: Long = System.currentTimeMillis())
+
+    /**
+     * Atomically updates final destination file path.
+     */
+    @Query("UPDATE downloads SET filePath = :filePath, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateFilePath(id: String, filePath: String, updatedAt: Long = System.currentTimeMillis())
+
+    /**
+     * Atomically records failure error message and technical log.
+     */
+    @Query("UPDATE downloads SET errorMessage = :errorMessage, technicalLog = :technicalLog, status = :status, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateError(id: String, errorMessage: String?, technicalLog: String?, status: DownloadStatus = DownloadStatus.FAILED, updatedAt: Long = System.currentTimeMillis())
+
+    /**
      * Deletes a specific download entity from the database.
      *
      * @param download The [DownloadEntity] to remove.
@@ -121,4 +145,19 @@ interface DownloadDao {
      */
     @Query("DELETE FROM downloads WHERE status IN ('COMPLETED', 'FAILED', 'CANCELLED')")
     suspend fun clearCompleted()
+
+    @Query("SELECT * FROM downloads WHERE id = :id")
+    suspend fun getById(id: String): DownloadEntity?
+
+    @Query("SELECT * FROM downloads WHERE status = :status ORDER BY createdAt DESC")
+    fun getByStatus(status: DownloadStatus): Flow<List<DownloadEntity>>
+
+    @Query("SELECT * FROM downloads WHERE status IN ('QUEUED', 'PREPARING', 'DOWNLOADING', 'PAUSED', 'PROCESSING') ORDER BY createdAt ASC")
+    fun getAllActive(): Flow<List<DownloadEntity>>
+
+    @Query("SELECT COUNT(*) FROM downloads WHERE status = 'DOWNLOADING'")
+    fun getActiveCount(): Flow<Int>
+
+    @Query("SELECT * FROM downloads ORDER BY createdAt DESC")
+    fun getAll(): Flow<List<DownloadEntity>>
 }

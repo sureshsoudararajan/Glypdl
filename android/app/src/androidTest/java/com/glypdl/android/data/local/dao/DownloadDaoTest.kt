@@ -20,7 +20,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.glypdl.android.data.local.GlypdlDatabase
-import com.glypdl.android.data.model.DownloadEntity
+import com.glypdl.android.data.local.entity.DownloadEntity
 import com.glypdl.android.data.model.DownloadStatus
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -38,6 +38,34 @@ class DownloadDaoTest {
     private lateinit var db: GlypdlDatabase
     private lateinit var downloadDao: DownloadDao
 
+    private fun createTestDownload(
+        id: String = "test-1",
+        url: String = "https://example.com",
+        title: String = "Video",
+        formatId: String = "1",
+        ext: String = "mp4",
+        status: DownloadStatus = DownloadStatus.QUEUED
+    ) = DownloadEntity(
+        id = id,
+        url = url,
+        title = title,
+        thumbnailUrl = null,
+        formatId = formatId,
+        ext = ext,
+        resolution = "1080p",
+        isAudioOnly = false,
+        status = status,
+        progress = 0f,
+        downloadedBytes = 0L,
+        totalBytes = 1000L,
+        speed = null,
+        filePath = null,
+        errorMessage = null,
+        technicalLog = null,
+        createdAt = System.currentTimeMillis(),
+        updatedAt = System.currentTimeMillis()
+    )
+
     @Before
     fun createDb() {
         db = Room.inMemoryDatabaseBuilder(
@@ -54,16 +82,10 @@ class DownloadDaoTest {
 
     @Test
     fun insertAndRetrieveDownload() = runTest {
-        val entity = DownloadEntity(
-            url = "https://example.com",
-            title = "Video",
-            formatId = "1",
-            ext = "mp4",
-            status = DownloadStatus.QUEUED
-        )
+        val entity = createTestDownload(id = "dl-1", url = "https://example.com", title = "Video")
         
-        val id = downloadDao.insert(entity)
-        val loaded = downloadDao.getById(id)
+        downloadDao.insert(entity)
+        val loaded = downloadDao.getById("dl-1")
         
         assertNotNull(loaded)
         assertEquals(entity.url, loaded?.url)
@@ -72,42 +94,30 @@ class DownloadDaoTest {
 
     @Test
     fun updateDownloadStatus() = runTest {
-        val entity = DownloadEntity(
-            url = "https://example.com",
-            title = "Video",
-            formatId = "1",
-            ext = "mp4",
-            status = DownloadStatus.QUEUED
-        )
+        val entity = createTestDownload(id = "dl-2")
         
-        val id = downloadDao.insert(entity)
-        downloadDao.updateStatus(id, DownloadStatus.DOWNLOADING)
+        downloadDao.insert(entity)
+        downloadDao.updateStatus("dl-2", DownloadStatus.DOWNLOADING)
         
-        val loaded = downloadDao.getById(id)
+        val loaded = downloadDao.getById("dl-2")
         assertEquals(DownloadStatus.DOWNLOADING, loaded?.status)
     }
 
     @Test
     fun deleteDownloadById() = runTest {
-        val entity = DownloadEntity(
-            url = "https://example.com",
-            title = "Video",
-            formatId = "1",
-            ext = "mp4",
-            status = DownloadStatus.QUEUED
-        )
+        val entity = createTestDownload(id = "dl-3")
         
-        val id = downloadDao.insert(entity)
-        downloadDao.deleteById(id)
+        downloadDao.insert(entity)
+        downloadDao.deleteById("dl-3")
         
-        val loaded = downloadDao.getById(id)
+        val loaded = downloadDao.getById("dl-3")
         assertNull(loaded)
     }
 
     @Test
     fun getDownloadsByStatusFiltersCorrectly() = runTest {
-        downloadDao.insert(DownloadEntity(url = "url1", title = "Video1", formatId = "1", ext = "mp4", status = DownloadStatus.QUEUED))
-        downloadDao.insert(DownloadEntity(url = "url2", title = "Video2", formatId = "1", ext = "mp4", status = DownloadStatus.COMPLETED))
+        downloadDao.insert(createTestDownload(id = "q-1", title = "Video1", status = DownloadStatus.QUEUED))
+        downloadDao.insert(createTestDownload(id = "c-1", title = "Video2", status = DownloadStatus.COMPLETED))
         
         val queued = downloadDao.getByStatus(DownloadStatus.QUEUED).first()
         assertEquals(1, queued.size)
@@ -116,9 +126,9 @@ class DownloadDaoTest {
 
     @Test
     fun getActiveDownloadsReturnsCorrectItems() = runTest {
-        downloadDao.insert(DownloadEntity(url = "url1", title = "Video1", formatId = "1", ext = "mp4", status = DownloadStatus.QUEUED))
-        downloadDao.insert(DownloadEntity(url = "url2", title = "Video2", formatId = "1", ext = "mp4", status = DownloadStatus.DOWNLOADING))
-        downloadDao.insert(DownloadEntity(url = "url3", title = "Video3", formatId = "1", ext = "mp4", status = DownloadStatus.COMPLETED))
+        downloadDao.insert(createTestDownload(id = "1", title = "Video1", status = DownloadStatus.QUEUED))
+        downloadDao.insert(createTestDownload(id = "2", title = "Video2", status = DownloadStatus.DOWNLOADING))
+        downloadDao.insert(createTestDownload(id = "3", title = "Video3", status = DownloadStatus.COMPLETED))
         
         val active = downloadDao.getAllActive().first()
         assertEquals(2, active.size)
@@ -126,20 +136,21 @@ class DownloadDaoTest {
 
     @Test
     fun getActiveDownloadCountIsAccurate() = runTest {
-        downloadDao.insert(DownloadEntity(url = "url1", title = "Video1", formatId = "1", ext = "mp4", status = DownloadStatus.QUEUED))
-        downloadDao.insert(DownloadEntity(url = "url2", title = "Video2", formatId = "1", ext = "mp4", status = DownloadStatus.DOWNLOADING))
-        downloadDao.insert(DownloadEntity(url = "url3", title = "Video3", formatId = "1", ext = "mp4", status = DownloadStatus.COMPLETED))
+        downloadDao.insert(createTestDownload(id = "1", title = "Video1", status = DownloadStatus.QUEUED))
+        downloadDao.insert(createTestDownload(id = "2", title = "Video2", status = DownloadStatus.DOWNLOADING))
+        downloadDao.insert(createTestDownload(id = "3", title = "Video3", status = DownloadStatus.DOWNLOADING))
+        downloadDao.insert(createTestDownload(id = "4", title = "Video4", status = DownloadStatus.COMPLETED))
         
-        val count = downloadDao.getActiveCount().first()
+        val count = downloadDao.getActiveDownloadCount()
         assertEquals(2, count)
     }
 
     @Test
     fun clearCompletedRemovesOnlyCompletedFailedCancelled() = runTest {
-        downloadDao.insert(DownloadEntity(url = "url1", title = "Video1", formatId = "1", ext = "mp4", status = DownloadStatus.QUEUED))
-        downloadDao.insert(DownloadEntity(url = "url2", title = "Video2", formatId = "1", ext = "mp4", status = DownloadStatus.COMPLETED))
-        downloadDao.insert(DownloadEntity(url = "url3", title = "Video3", formatId = "1", ext = "mp4", status = DownloadStatus.FAILED))
-        downloadDao.insert(DownloadEntity(url = "url4", title = "Video4", formatId = "1", ext = "mp4", status = DownloadStatus.CANCELLED))
+        downloadDao.insert(createTestDownload(id = "1", status = DownloadStatus.QUEUED))
+        downloadDao.insert(createTestDownload(id = "2", status = DownloadStatus.COMPLETED))
+        downloadDao.insert(createTestDownload(id = "3", status = DownloadStatus.FAILED))
+        downloadDao.insert(createTestDownload(id = "4", status = DownloadStatus.CANCELLED))
         
         downloadDao.clearCompleted()
         
@@ -147,4 +158,5 @@ class DownloadDaoTest {
         assertEquals(1, remaining.size)
         assertEquals(DownloadStatus.QUEUED, remaining[0].status)
     }
+}
 }

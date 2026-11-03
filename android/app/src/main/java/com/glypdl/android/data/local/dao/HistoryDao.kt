@@ -12,6 +12,7 @@ package com.glypdl.android.data.local.dao
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.glypdl.android.data.local.entity.HistoryEntity
 import kotlinx.coroutines.flow.Flow
@@ -27,9 +28,10 @@ interface HistoryDao {
      * Inserts a completed download history record into the database.
      *
      * @param history The [HistoryEntity] record to insert.
+     * @return The auto-generated database primary key.
      */
-    @Insert
-    suspend fun insert(history: HistoryEntity)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(history: HistoryEntity): Long
 
     /**
      * Deletes a specific history record from the database.
@@ -79,4 +81,10 @@ interface HistoryDao {
      */
     @Query("DELETE FROM history WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("SELECT * FROM history ORDER BY completedAt DESC")
+    fun getAll(): Flow<List<HistoryEntity>>
+
+    @Query("SELECT * FROM history WHERE title LIKE '%' || :query || '%' ORDER BY completedAt DESC")
+    fun search(query: String): Flow<List<HistoryEntity>>
 }

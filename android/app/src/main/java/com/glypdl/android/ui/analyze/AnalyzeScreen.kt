@@ -57,6 +57,13 @@ fun AnalyzeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // Automatically navigate to downloads screen when auto-download is triggered (Ask Before Download is off)
+    LaunchedEffect(Unit) {
+        viewModel.autoDownloadTriggered.collect {
+            onNavigateToDownloads()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
