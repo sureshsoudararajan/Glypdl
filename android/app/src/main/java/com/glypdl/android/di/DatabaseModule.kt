@@ -11,6 +11,8 @@ package com.glypdl.android.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.glypdl.android.data.local.GlypdlDatabase
 import com.glypdl.android.data.local.dao.DownloadDao
 import com.glypdl.android.data.local.dao.HistoryDao
@@ -25,6 +27,15 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
+    val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_downloads_status` ON `downloads` (`status`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_downloads_createdAt` ON `downloads` (`createdAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_history_completedAt` ON `history` (`completedAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_history_downloadId` ON `history` (`downloadId`)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): GlypdlDatabase {
@@ -32,7 +43,10 @@ object DatabaseModule {
             context,
             GlypdlDatabase::class.java,
             "glypdl_database"
-        ).fallbackToDestructiveMigration().build()
+        )
+        .addMigrations(MIGRATION_2_3)
+        .fallbackToDestructiveMigration()
+        .build()
     }
 
     @Provides

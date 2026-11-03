@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.glypdl.android.data.repository.SettingsRepository
 import com.glypdl.android.ui.navigation.GlypdlRootApp
@@ -90,22 +91,28 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
+                    val navBackStackEntry by navController.currentBackStackEntryAsState()
+                    val hasNavGraph = navBackStackEntry != null
 
-                    LaunchedEffect(pendingUrl) {
-                        pendingUrl?.let { url ->
-                            navController.navigate(Screen.Analyze.createRoute(url)) {
-                                launchSingleTop = true
+                    LaunchedEffect(pendingUrl, hasNavGraph) {
+                        if (hasNavGraph) {
+                            pendingUrl?.let { url ->
+                                navController.navigate(Screen.Analyze.createRoute(url)) {
+                                    launchSingleTop = true
+                                }
+                                sharedUrlFlow.value = null
                             }
-                            sharedUrlFlow.value = null
                         }
                     }
 
-                    LaunchedEffect(pendingDownloadId) {
-                        pendingDownloadId?.let { downloadId ->
-                            navController.navigate(Screen.DownloadDetail.createRoute(downloadId)) {
-                                launchSingleTop = true
+                    LaunchedEffect(pendingDownloadId, hasNavGraph) {
+                        if (hasNavGraph) {
+                            pendingDownloadId?.let { downloadId ->
+                                navController.navigate(Screen.DownloadDetail.createRoute(downloadId)) {
+                                    launchSingleTop = true
+                                }
+                                navigateToDownloadIdFlow.value = null
                             }
-                            navigateToDownloadIdFlow.value = null
                         }
                     }
 

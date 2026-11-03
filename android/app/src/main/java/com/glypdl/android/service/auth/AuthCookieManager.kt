@@ -113,9 +113,15 @@ class AuthCookieManager @Inject constructor(
                     val name = pair.substringBefore("=").trim()
                     val value = pair.substringAfter("=").trim()
                     if (name.isNotEmpty() && seenKeys.add(name)) {
-                        // In Netscape format, field 4 is 'secure' (FALSE allows cookie over both HTTP & HTTPS),
+                        // In Netscape format, field 4 is 'secure' (TRUE requires HTTPS, matching auth cookies),
                         // and field 2 is 'include subdomains' (TRUE allows .domain.com to cover www, m, api, i, etc.)
-                        writer.write("$dotDomain\tTRUE\t/\tFALSE\t$expiry\t$name\t$value\n")
+                        writer.write("$dotDomain\tTRUE\t/\tTRUE\t$expiry\t$name\t$value\n")
+                        if (domainKey.contains("instagram")) {
+                            writer.write(".i.instagram.com\tTRUE\t/\tTRUE\t$expiry\t$name\t$value\n")
+                            writer.write(".www.instagram.com\tTRUE\t/\tTRUE\t$expiry\t$name\t$value\n")
+                            writer.write("i.instagram.com\tFALSE\t/\tTRUE\t$expiry\t$name\t$value\n")
+                            writer.write("www.instagram.com\tFALSE\t/\tTRUE\t$expiry\t$name\t$value\n")
+                        }
                     }
                 }
             }

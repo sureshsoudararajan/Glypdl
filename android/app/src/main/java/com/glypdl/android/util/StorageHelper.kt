@@ -34,7 +34,7 @@ import java.io.File
 object StorageHelper {
 
     fun getDefaultStagingDir(context: Context): File {
-        val baseDir = context.externalCacheDir ?: context.cacheDir
+        val baseDir = context.externalCacheDir ?: context.cacheDir ?: File(System.getProperty("java.io.tmpdir") ?: "/tmp")
         val dir = File(baseDir, "staging")
         if (!dir.exists()) {
             dir.mkdirs()

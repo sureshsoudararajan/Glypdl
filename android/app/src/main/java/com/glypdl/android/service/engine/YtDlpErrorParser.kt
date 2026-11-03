@@ -165,10 +165,17 @@ object YtDlpErrorParser {
             )
         }
 
-        // 10. Unsupported Website / Invalid Extractor
+        // 10. No video formats (e.g. photo stories, image posts, or text)
+        if (lower.contains("no video formats found") ||
+            lower.contains("there is no video in this") ||
+            lower.contains("no formats found")
+        ) {
+            return GlypdlError.NoVideoFormats(technicalDetails = redactedDetails)
+        }
+
+        // 11. Unsupported Website / Invalid Extractor
         if (lower.contains("unsupported url") ||
             lower.contains("no suitable extractor") ||
-            lower.contains("no video formats found") ||
             lower.contains("is not a valid url")
         ) {
             return GlypdlError.UnsupportedSite(technicalDetails = redactedDetails)

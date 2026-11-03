@@ -266,6 +266,7 @@ class DownloadManager @Inject constructor(
     }
 
     suspend fun pauseDownload(id: String) {
+        ytDlpService.cancelProcess(id)
         activeJobs[id]?.cancel()
         activeJobs.remove(id)
         _downloadProgress.value = _downloadProgress.value.toMutableMap().apply { remove(id) }
@@ -281,6 +282,7 @@ class DownloadManager @Inject constructor(
     }
 
     suspend fun cancelDownload(id: String) {
+        ytDlpService.cancelProcess(id)
         activeJobs[id]?.cancel()
         activeJobs.remove(id)
         downloadRepository.updateStatus(id, DownloadStatus.CANCELLED)
@@ -295,10 +297,19 @@ class DownloadManager @Inject constructor(
                 file.delete()
             }
         }
+        try {
+            val stagingDir = com.glypdl.android.util.StorageHelper.getDefaultStagingDir(context)
+            stagingDir.listFiles()?.filter { f ->
+                f.name.contains(id) || (entity != null && entity.title.isNotBlank() && f.name.contains(entity.title.take(20)))
+            }?.forEach { it.delete() }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         processQueue()
     }
 
     suspend fun deleteDownload(id: String, deleteFile: Boolean = true) {
+        ytDlpService.cancelProcess(id)
         activeJobs[id]?.cancel()
         activeJobs.remove(id)
         _downloadProgress.value = _downloadProgress.value.toMutableMap().apply { remove(id) }
@@ -322,6 +333,14 @@ class DownloadManager @Inject constructor(
                 }
             }
             downloadRepository.deleteDownload(id)
+        }
+        try {
+            val stagingDir = com.glypdl.android.util.StorageHelper.getDefaultStagingDir(context)
+            stagingDir.listFiles()?.filter { f ->
+                f.name.contains(id) || (entity != null && entity.title.isNotBlank() && f.name.contains(entity.title.take(20)))
+            }?.forEach { it.delete() }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
         processQueue()
     }

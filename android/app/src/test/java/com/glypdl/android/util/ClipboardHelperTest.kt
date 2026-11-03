@@ -39,11 +39,16 @@ class ClipboardHelperTest {
         every { clipItem.uri } returns null
         every { clipItem.coerceToText(any()) } returns "Check out this video https://www.instagram.com/reel/C-12345/ now!"
 
+        val clipDesc = mockk<ClipDescription>()
+        every { clipDesc.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) } returns true
+        every { clipDesc.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML) } returns false
+
         val clipData = mockk<ClipData>()
         every { clipData.itemCount } returns 1
         every { clipData.getItemAt(0) } returns clipItem
 
         every { clipboardManager.hasPrimaryClip() } returns true
+        every { clipboardManager.primaryClipDescription } returns clipDesc
         every { clipboardManager.primaryClip } returns clipData
 
         val result = ClipboardHelper.getUrlFromClipboard(context)
@@ -65,11 +70,16 @@ class ClipboardHelperTest {
         every { clipItem.uri } returns null
         every { clipItem.coerceToText(any()) } returns "Just regular text with no links"
 
+        val clipDesc = mockk<ClipDescription>()
+        every { clipDesc.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) } returns true
+        every { clipDesc.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML) } returns false
+
         val clipData = mockk<ClipData>()
         every { clipData.itemCount } returns 1
         every { clipData.getItemAt(0) } returns clipItem
 
         every { clipboardManager.hasPrimaryClip() } returns true
+        every { clipboardManager.primaryClipDescription } returns clipDesc
         every { clipboardManager.primaryClip } returns clipData
 
         val result = ClipboardHelper.getUrlFromClipboard(context)

@@ -30,5 +30,7 @@ data class AppUpdateInfo(
     val releaseUrl: String,
     val releaseTitle: String? = null,
     val releaseNotes: String? = null,
-    val apkDownloadUrl: String? = null
+    val apkDownloadUrl: String? = null,
+    val apkFileName: String? = null,
+    val apkFileSize: Long = 0L
 )

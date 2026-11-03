@@ -65,6 +65,7 @@ typealias InstagramDownloadChoice = SimplifiedMediaChoice
 
 sealed interface AnalyzeUiState {
     data class Loading(val isPlaylist: Boolean = false) : AnalyzeUiState
+    object StartingDownload : AnalyzeUiState
     data class Success(
         val mediaInfo: MediaInfo,
         val selectedFormat: MediaFormat? = null,
@@ -243,23 +244,36 @@ class AnalyzeViewModel @Inject constructor(
                             SimplifiedMediaChoice.VIDEO_AND_AUDIO
                         }
 
-                        _uiState.value = AnalyzeUiState.Success(
-                            mediaInfo = mediaInfo,
-                            selectedFormat = defaultFormat,
-                            selectedVideoQuality = defaultVideoQuality,
-                            selectedAudioQuality = defaultAudioQuality,
-                            isAudioOnly = isAudioOnlyPref,
-                            videoFormats = videoFormats,
-                            audioFormats = audioFormats,
-                            isInstagram = isInstagram,
-                            isFacebook = isFacebook,
-                            instagramChoice = instagramChoice
-                        )
-
-                        // If "Ask before download" is turned off, immediately download with default best quality and navigate
+                        // If "Ask before download" is turned off, avoid showing the format selection screen
+                        // entirely (eliminating any UI glitch) and immediately start downloading with preferred quality
                         if (!askBefore) {
-                            startDownload()
-                            _autoDownloadTriggered.tryEmit(Unit)
+                            _uiState.value = AnalyzeUiState.StartingDownload
+                            val request = createDownloadRequest(
+                                mediaInfo = mediaInfo,
+                                isSimplifiedPlatform = isInstagram || isFacebook,
+                                instagramChoice = instagramChoice,
+                                isAudioOnly = isAudioOnlyPref,
+                                selectedAudioQuality = defaultAudioQuality,
+                                selectedVideoQuality = defaultVideoQuality,
+                                selectedFormat = defaultFormat
+                            )
+                            viewModelScope.launch {
+                                downloadMediaUseCase(request)
+                                _autoDownloadTriggered.emit(Unit)
+                            }
+                        } else {
+                            _uiState.value = AnalyzeUiState.Success(
+                                mediaInfo = mediaInfo,
+                                selectedFormat = defaultFormat,
+                                selectedVideoQuality = defaultVideoQuality,
+                                selectedAudioQuality = defaultAudioQuality,
+                                isAudioOnly = isAudioOnlyPref,
+                                videoFormats = videoFormats,
+                                audioFormats = audioFormats,
+                                isInstagram = isInstagram,
+                                isFacebook = isFacebook,
+                                instagramChoice = instagramChoice
+                            )
                         }
                     }
                     is MediaAnalysisResult.Playlist -> {
@@ -462,120 +476,132 @@ class AnalyzeViewModel @Inject constructor(
         }
     }
 
-    fun startDownload() {
-        val currentState = _uiState.value
-        if (currentState is AnalyzeUiState.Success) {
-            val mediaInfo = currentState.mediaInfo
+    private fun createDownloadRequest(
+        mediaInfo: MediaInfo,
+        isSimplifiedPlatform: Boolean,
+        instagramChoice: SimplifiedMediaChoice,
+        isAudioOnly: Boolean,
+        selectedAudioQuality: AudioQuality?,
+        selectedVideoQuality: VideoQuality?,
+        selectedFormat: MediaFormat?
+    ): DownloadRequest {
+        return if (isSimplifiedPlatform) {
+            val isAudio = instagramChoice == SimplifiedMediaChoice.AUDIO_ONLY
+            DownloadRequest(
+                id = UUID.randomUUID().toString(),
+                url = mediaInfo.url,
+                title = mediaInfo.title,
+                thumbnailUrl = mediaInfo.thumbnail,
+                formatId = instagramChoice.formatSelector,
+                ext = instagramChoice.ext,
+                resolution = instagramChoice.label,
+                isAudioOnly = isAudio,
+                destinationUri = null
+            )
+        } else if (isAudioOnly && selectedAudioQuality != null) {
+            val audio = selectedAudioQuality
+            DownloadRequest(
+                id = UUID.randomUUID().toString(),
+                url = mediaInfo.url,
+                title = mediaInfo.title,
+                thumbnailUrl = mediaInfo.thumbnail,
+                formatId = audio.formatSelector,
+                ext = audio.extension,
+                resolution = audio.displayBitrate,
+                isAudioOnly = true,
+                destinationUri = null
+            )
+        } else if (selectedVideoQuality != null) {
+            val video = selectedVideoQuality
+            val audio = selectedAudioQuality
+            val formatId = if (!video.hasAudio && audio != null && video.formatId.isNotBlank() && audio.formatId.isNotBlank() && video.formatId != audio.formatId) {
+                "${video.formatId}+${audio.formatId}/${video.formatId}/best"
+            } else if (video.formatSelector.isNotBlank()) {
+                if (video.formatSelector.contains("/")) video.formatSelector else "${video.formatSelector}/best"
+            } else {
+                "bestvideo+bestaudio/best"
+            }
+            val resLabel = if (audio != null && !video.hasAudio && video.formatId != audio.formatId) {
+                "${video.label} + ${audio.displayBitrate}"
+            } else {
+                video.label
+            }
+            val isVideoWebm = video.ext.equals("webm", ignoreCase = true) ||
+                    video.codec?.contains("vp", ignoreCase = true) == true
+            val isAudioOpus = audio?.let {
+                it.extension.equals("opus", ignoreCase = true) ||
+                        it.extension.equals("webm", ignoreCase = true) ||
+                        it.codec?.contains("opus", ignoreCase = true) == true
+            } ?: false
 
-            val request = if (currentState.isSimplifiedPlatform) {
-                val choice = currentState.instagramChoice
-                val isAudio = choice == SimplifiedMediaChoice.AUDIO_ONLY
-                DownloadRequest(
-                    id = UUID.randomUUID().toString(),
-                    url = mediaInfo.url,
-                    title = mediaInfo.title,
-                    thumbnailUrl = mediaInfo.thumbnail,
-                    formatId = choice.formatSelector,
-                    ext = choice.ext,
-                    resolution = choice.label,
-                    isAudioOnly = isAudio,
-                    destinationUri = null
-                )
-            } else if (currentState.isAudioOnly && currentState.selectedAudioQuality != null) {
-                val audio = currentState.selectedAudioQuality
-                DownloadRequest(
-                    id = UUID.randomUUID().toString(),
-                    url = mediaInfo.url,
-                    title = mediaInfo.title,
-                    thumbnailUrl = mediaInfo.thumbnail,
-                    formatId = audio.formatSelector,
-                    ext = audio.extension,
-                    resolution = audio.displayBitrate,
-                    isAudioOnly = true,
-                    destinationUri = null
-                )
-            } else if (currentState.selectedVideoQuality != null) {
-                val video = currentState.selectedVideoQuality
-                val audio = currentState.selectedAudioQuality
-                val formatId = if (!video.hasAudio && audio != null && video.formatId.isNotBlank() && audio.formatId.isNotBlank() && video.formatId != audio.formatId) {
-                    "${video.formatId}+${audio.formatId}/${video.formatId}/best"
-                } else if (video.formatSelector.isNotBlank()) {
-                    if (video.formatSelector.contains("/")) video.formatSelector else "${video.formatSelector}/best"
-                } else {
-                    "bestvideo+bestaudio/best"
-                }
-                val resLabel = if (audio != null && !video.hasAudio && video.formatId != audio.formatId) {
-                    "${video.label} + ${audio.displayBitrate}"
-                } else {
-                    video.label
-                }
-                // Check for codec/container harmony: WebM container strictly requires Opus/Vorbis audio.
-                // If WebM video is paired with AAC/m4a audio, we set ext to "mkv" which losslessly supports
-                // both VP9 video and AAC audio without re-encoding.
-                val isVideoWebm = video.ext.equals("webm", ignoreCase = true) ||
-                        video.codec?.contains("vp", ignoreCase = true) == true
-                val isAudioOpus = audio?.let {
-                    it.extension.equals("opus", ignoreCase = true) ||
-                            it.extension.equals("webm", ignoreCase = true) ||
-                            it.codec?.contains("opus", ignoreCase = true) == true
-                } ?: false
-
-                val resolvedExt = if (!video.hasAudio && audio != null) {
-                    if (isVideoWebm && !isAudioOpus) {
-                        "mkv"
-                    } else if (!isVideoWebm && isAudioOpus && !video.ext.equals("mkv", ignoreCase = true)) {
-                        "mkv"
-                    } else {
-                        video.ext.ifBlank { "mp4" }
-                    }
+            val resolvedExt = if (!video.hasAudio && audio != null) {
+                if (isVideoWebm && !isAudioOpus) {
+                    "mkv"
+                } else if (!isVideoWebm && isAudioOpus && !video.ext.equals("mkv", ignoreCase = true)) {
+                    "mkv"
                 } else {
                     video.ext.ifBlank { "mp4" }
                 }
-
-                DownloadRequest(
-                    id = UUID.randomUUID().toString(),
-                    url = mediaInfo.url,
-                    title = mediaInfo.title,
-                    thumbnailUrl = mediaInfo.thumbnail,
-                    formatId = formatId,
-                    ext = resolvedExt,
-                    resolution = resLabel,
-                    isAudioOnly = false,
-                    destinationUri = null
-                )
-            } else if (currentState.selectedFormat != null) {
-                val format = currentState.selectedFormat
-                val formatId = if (format.formatId.isNotBlank()) {
-                    if (format.isAudioOnly) "${format.formatId}/bestaudio/best" else "${format.formatId}/best"
-                } else {
-                    if (format.isAudioOnly) "bestaudio/best" else "bestvideo+bestaudio/best"
-                }
-                DownloadRequest(
-                    id = UUID.randomUUID().toString(),
-                    url = mediaInfo.url,
-                    title = mediaInfo.title,
-                    thumbnailUrl = mediaInfo.thumbnail,
-                    formatId = formatId,
-                    ext = format.ext.ifBlank { if (format.isAudioOnly) "m4a" else "mp4" },
-                    resolution = format.displayResolution.ifBlank { "Best" },
-                    isAudioOnly = format.isAudioOnly,
-                    destinationUri = null
-                )
             } else {
-                // Safe fallback: If no format was explicitly selected, default to best available
-                DownloadRequest(
-                    id = UUID.randomUUID().toString(),
-                    url = mediaInfo.url,
-                    title = mediaInfo.title,
-                    thumbnailUrl = mediaInfo.thumbnail,
-                    formatId = "bestvideo+bestaudio/best",
-                    ext = "mp4",
-                    resolution = "Best",
-                    isAudioOnly = false,
-                    destinationUri = null
-                )
+                video.ext.ifBlank { "mp4" }
             }
 
+            DownloadRequest(
+                id = UUID.randomUUID().toString(),
+                url = mediaInfo.url,
+                title = mediaInfo.title,
+                thumbnailUrl = mediaInfo.thumbnail,
+                formatId = formatId,
+                ext = resolvedExt,
+                resolution = resLabel,
+                isAudioOnly = false,
+                destinationUri = null
+            )
+        } else if (selectedFormat != null) {
+            val format = selectedFormat
+            val formatId = if (format.formatId.isNotBlank()) {
+                if (format.isAudioOnly) "${format.formatId}/bestaudio/best" else "${format.formatId}/best"
+            } else {
+                if (format.isAudioOnly) "bestaudio/best" else "bestvideo+bestaudio/best"
+            }
+            DownloadRequest(
+                id = UUID.randomUUID().toString(),
+                url = mediaInfo.url,
+                title = mediaInfo.title,
+                thumbnailUrl = mediaInfo.thumbnail,
+                formatId = formatId,
+                ext = format.ext.ifBlank { if (format.isAudioOnly) "m4a" else "mp4" },
+                resolution = format.displayResolution.ifBlank { "Best" },
+                isAudioOnly = format.isAudioOnly,
+                destinationUri = null
+            )
+        } else {
+            DownloadRequest(
+                id = UUID.randomUUID().toString(),
+                url = mediaInfo.url,
+                title = mediaInfo.title,
+                thumbnailUrl = mediaInfo.thumbnail,
+                formatId = "bestvideo+bestaudio/best",
+                ext = "mp4",
+                resolution = "Best",
+                isAudioOnly = false,
+                destinationUri = null
+            )
+        }
+    }
+
+    fun startDownload() {
+        val currentState = _uiState.value
+        if (currentState is AnalyzeUiState.Success) {
+            val request = createDownloadRequest(
+                mediaInfo = currentState.mediaInfo,
+                isSimplifiedPlatform = currentState.isSimplifiedPlatform,
+                instagramChoice = currentState.instagramChoice,
+                isAudioOnly = currentState.isAudioOnly,
+                selectedAudioQuality = currentState.selectedAudioQuality,
+                selectedVideoQuality = currentState.selectedVideoQuality,
+                selectedFormat = currentState.selectedFormat
+            )
             viewModelScope.launch {
                 downloadMediaUseCase(request)
             }

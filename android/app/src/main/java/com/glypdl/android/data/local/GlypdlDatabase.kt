@@ -30,7 +30,7 @@ import com.glypdl.android.data.local.entity.HistoryEntity
  */
 @Database(
     entities = [DownloadEntity::class, HistoryEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

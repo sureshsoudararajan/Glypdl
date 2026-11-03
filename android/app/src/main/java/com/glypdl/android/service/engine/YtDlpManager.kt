@@ -57,7 +57,7 @@ class YtDlpManager @Inject constructor(
 ) {
 
     companion object {
-        const val DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+        const val DEFAULT_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
     }
 
     private var ffmpegInitialized = false
@@ -546,6 +546,9 @@ class YtDlpManager @Inject constructor(
             dlRequest.addOption("--no-playlist")
             dlRequest.addOption("--verbose")
             dlRequest.addOption("--user-agent", DEFAULT_USER_AGENT)
+            if (isInstagram) {
+                dlRequest.addOption("--referer", "https://www.instagram.com/")
+            }
 
             val cookieFile = authCookieManager.getCookieFile(targetUrl)
             if (cookieFile != null) {
@@ -671,7 +674,7 @@ class YtDlpManager @Inject constructor(
             }
 
             try {
-                YoutubeDL.getInstance().execute(dlRequest, null) { progress, etaInSeconds, line ->
+                YoutubeDL.getInstance().execute(dlRequest, request.id) { progress, etaInSeconds, line ->
                     lineProcessor(progress, etaInSeconds, line)
                 }
             } catch (e: Exception) {
@@ -710,7 +713,7 @@ class YtDlpManager @Inject constructor(
                                     // Matroska (.mkv) can containerize any codec combination (e.g. VP9 + AAC)
                                     addOption("--merge-output-format", "mkv")
                                 }
-                                YoutubeDL.getInstance().execute(retryRequest, null) { progress, etaInSeconds, line ->
+                                YoutubeDL.getInstance().execute(retryRequest, request.id) { progress, etaInSeconds, line ->
                                     lineProcessor(progress, etaInSeconds, line)
                                 }
                                 recovered = true
@@ -750,11 +753,13 @@ class YtDlpManager @Inject constructor(
             }
 
             // CRITICAL VALIDATION: For Instagram Story, verify downloaded story ID matches requested story ID
+            // Checks both numeric media PK and base64 shortcode representation
             if (requestedStoryId != null) {
                 val fileObj = File(finalOutputFile)
                 val fileName = fileObj.name
-                val matchesFileName = fileName.contains(requestedStoryId)
-                val matchesDetectedId = detectedMediaId == requestedStoryId
+                val expectedShortcode = UrlValidator.pkToShortcode(requestedStoryId)
+                val matchesFileName = fileName.contains(requestedStoryId) || (expectedShortcode != null && fileName.contains(expectedShortcode))
+                val matchesDetectedId = detectedMediaId == requestedStoryId || (expectedShortcode != null && detectedMediaId == expectedShortcode)
 
                 if (!matchesFileName && detectedMediaId != null && !matchesDetectedId) {
                     // Mismatched story was downloaded! Clean up the incorrect file

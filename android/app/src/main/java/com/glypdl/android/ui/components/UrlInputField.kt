@@ -47,7 +47,7 @@ fun UrlInputField(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
 
     Column(modifier = modifier.fillMaxWidth()) {
         OutlinedTextField(
@@ -64,7 +64,7 @@ fun UrlInputField(
                     }
                 } else {
                     IconButton(onClick = {
-                        val clipData = clipboardManager.primaryClip
+                        val clipData = clipboardManager?.primaryClip
                         if (clipData != null && clipData.itemCount > 0) {
                             val pasteData = clipData.getItemAt(0).text?.toString() ?: ""
                             onUrlChange(pasteData)

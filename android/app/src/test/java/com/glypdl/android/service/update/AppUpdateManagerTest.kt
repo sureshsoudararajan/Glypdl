@@ -10,13 +10,16 @@
 package com.glypdl.android.service.update
 
 import android.content.Context
+import com.glypdl.android.data.model.AppUpdateDownloadState
 import com.glypdl.android.data.model.AppUpdateInfo
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.File
 
 class AppUpdateManagerTest {
 
@@ -87,5 +90,64 @@ class AppUpdateManagerTest {
         assertEquals("Glypdl v1.2.2", info.releaseTitle)
         assertEquals("Fixes & performance improvements", info.releaseNotes)
         assertEquals("https://github.com/sureshsoudararajan/Glypdl/releases/download/v1.2.2/Glypdl-1.2.2-arm64-v8a.apk", info.apkDownloadUrl)
+    }
+
+    @Test
+    fun testAppUpdateInfo_withApkDetails() {
+        val info = AppUpdateInfo(
+            currentVersion = "2.0.0",
+            latestVersion = "2.1.0",
+            isUpdateAvailable = true,
+            releaseUrl = "https://github.com/sureshsoudararajan/Glypdl/releases/tag/v2.1.0",
+            apkDownloadUrl = "https://github.com/sureshsoudararajan/Glypdl/releases/download/v2.1.0/Glypdl-2.1.0-arm64-v8a.apk",
+            apkFileName = "Glypdl-2.1.0-arm64-v8a.apk",
+            apkFileSize = 52428800L
+        )
+
+        assertEquals("Glypdl-2.1.0-arm64-v8a.apk", info.apkFileName)
+        assertEquals(52428800L, info.apkFileSize)
+    }
+
+    @Test
+    fun testAppUpdateDownloadState_lifecycle() {
+        // Initial
+        val initial = AppUpdateDownloadState()
+        assertFalse(initial.isDownloading)
+        assertEquals(0f, initial.progress, 0.001f)
+        assertNull(initial.downloadedApkFile)
+        assertFalse(initial.isReadyToInstall)
+        assertNull(initial.error)
+
+        // Downloading
+        val downloading = initial.copy(
+            isDownloading = true,
+            progress = 0.45f,
+            downloadedBytes = 23592960L,
+            totalBytes = 52428800L,
+            speed = "4.2 MB/s"
+        )
+        assertTrue(downloading.isDownloading)
+        assertEquals(0.45f, downloading.progress, 0.001f)
+        assertEquals(23592960L, downloading.downloadedBytes)
+        assertEquals(52428800L, downloading.totalBytes)
+        assertEquals("4.2 MB/s", downloading.speed)
+
+        // Ready to install
+        val dummyFile = File("/tmp/Glypdl-2.1.0-arm64-v8a.apk")
+        val ready = downloading.copy(
+            isDownloading = false,
+            progress = 1f,
+            downloadedApkFile = dummyFile,
+            isReadyToInstall = true
+        )
+        assertFalse(ready.isDownloading)
+        assertTrue(ready.isReadyToInstall)
+        assertEquals(dummyFile, ready.downloadedApkFile)
+
+        // Error state
+        val errorState = initial.copy(
+            error = "Network timeout"
+        )
+        assertEquals("Network timeout", errorState.error)
     }
 }

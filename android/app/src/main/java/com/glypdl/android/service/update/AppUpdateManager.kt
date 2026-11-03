@@ -10,13 +10,20 @@
 package com.glypdl.android.service.update
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
+import androidx.core.content.FileProvider
 import com.glypdl.android.BuildConfig
 import com.glypdl.android.data.model.AppUpdateInfo
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
@@ -33,6 +40,10 @@ class AppUpdateManager @Inject constructor(
             "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
         const val GITHUB_RELEASES_URL =
             "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+    }
+
+    init {
+        cleanUpOldUpdateApks()
     }
 
     /**
@@ -52,17 +63,67 @@ class AppUpdateManager @Inject constructor(
                     @Suppress("DEPRECATION")
                     context.packageManager.getPackageInfo(context.packageName, 0)
                 }
-                pInfo.versionName ?: "2.1.0"
+                pInfo.versionName ?: "3.0.0"
             } catch (ex: Exception) {
-                "2.1.0"
+                "3.0.0"
             }
         }
+    }
+
+    private data class ApkAssetCandidate(
+        val name: String,
+        val downloadUrl: String,
+        val size: Long
+    )
+
+    /**
+     * Finds the best matching APK for the current device architecture in strict priority order.
+     */
+    private fun findMatchingApkAsset(assets: JSONArray?): ApkAssetCandidate? {
+        if (assets == null || assets.length() == 0) return null
+
+        val candidates = mutableListOf<ApkAssetCandidate>()
+        for (i in 0 until assets.length()) {
+            val asset = assets.optJSONObject(i) ?: continue
+            val name = asset.optString("name", "")
+            val url = asset.optString("browser_download_url", "")
+            val size = asset.optLong("size", 0L)
+            if (name.endsWith(".apk", ignoreCase = true) && url.isNotBlank()) {
+                candidates.add(ApkAssetCandidate(name, url, size))
+            }
+        }
+
+        if (candidates.isEmpty()) return null
+
+        // 1. Check supported ABIs in exact priority order (e.g. arm64-v8a before armeabi-v7a)
+        val supportedAbis = Build.SUPPORTED_ABIS.map { it.lowercase() }
+        for (abi in supportedAbis) {
+            val match = candidates.firstOrNull { candidate ->
+                val name = candidate.name.lowercase()
+                if (abi == "x86") {
+                    name.contains("x86") && !name.contains("x86_64") && !name.contains("x86-64")
+                } else {
+                    name.contains(abi)
+                }
+            }
+            if (match != null) return match
+        }
+
+        // 2. Check for universal APK
+        val universalMatch = candidates.firstOrNull { it.name.lowercase().contains("universal") }
+        if (universalMatch != null) return universalMatch
+
+        // 3. Fallback to first available APK
+        return candidates.firstOrNull()
     }
 
     /**
      * Checks GitHub releases for the latest published Glypdl release.
      */
     suspend fun checkForUpdate(): Result<AppUpdateInfo> = withContext(Dispatchers.IO) {
+        // Automatically purge any stale APKs when checking for updates
+        cleanUpOldUpdateApks()
+
         try {
             val url = URL(LATEST_RELEASE_API_URL)
             val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -85,36 +146,7 @@ class AppUpdateManager @Inject constructor(
                 val releaseTitle = json.optString("name", "Glypdl v$tagName")
                 val releaseNotes = json.optString("body", "")
 
-                // Look for matching APK in release assets
-                var apkUrl: String? = null
-                val assets = json.optJSONArray("assets")
-                if (assets != null) {
-                    val supportedAbis = Build.SUPPORTED_ABIS.map { it.lowercase() }
-                    var bestMatchUrl: String? = null
-                    var fallbackApkUrl: String? = null
-
-                    for (i in 0 until assets.length()) {
-                        val asset = assets.optJSONObject(i) ?: continue
-                        val assetName = asset.optString("name", "")
-                        val downloadUrl = asset.optString("browser_download_url", "")
-
-                        if (assetName.endsWith(".apk", ignoreCase = true)) {
-                            if (fallbackApkUrl == null) {
-                                fallbackApkUrl = downloadUrl
-                            }
-                            val lowerName = assetName.lowercase()
-                            for (abi in supportedAbis) {
-                                if (lowerName.contains(abi)) {
-                                    bestMatchUrl = downloadUrl
-                                    break
-                                }
-                            }
-                            if (bestMatchUrl != null) break
-                        }
-                    }
-                    apkUrl = bestMatchUrl ?: fallbackApkUrl
-                }
-
+                val matchingAsset = findMatchingApkAsset(json.optJSONArray("assets"))
                 val currentVer = getCurrentVersion()
                 val hasUpdate = isNewerVersion(tagName, currentVer)
 
@@ -126,7 +158,9 @@ class AppUpdateManager @Inject constructor(
                         releaseUrl = htmlUrl.ifBlank { GITHUB_RELEASES_URL },
                         releaseTitle = releaseTitle,
                         releaseNotes = releaseNotes,
-                        apkDownloadUrl = apkUrl
+                        apkDownloadUrl = matchingAsset?.downloadUrl,
+                        apkFileName = matchingAsset?.name,
+                        apkFileSize = matchingAsset?.size ?: 0L
                     )
                 )
             } else {
@@ -135,6 +169,195 @@ class AppUpdateManager @Inject constructor(
             }
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    /**
+     * Streams the APK update file directly with progress callback.
+     */
+    suspend fun downloadUpdate(
+        downloadUrl: String,
+        fileName: String,
+        onProgress: (percent: Float, downloaded: Long, total: Long, speed: String) -> Unit
+    ): Result<File> = withContext(Dispatchers.IO) {
+        try {
+            val updatesDir = File(context.cacheDir, "updates")
+            if (!updatesDir.exists()) {
+                updatesDir.mkdirs()
+            }
+
+            val tempFile = File(updatesDir, "$fileName.tmp")
+            val targetFile = File(updatesDir, fileName)
+
+            var currentUrl = downloadUrl
+            var connection: HttpURLConnection
+            var redirects = 0
+            while (true) {
+                val url = URL(currentUrl)
+                connection = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    setRequestProperty("User-Agent", "Glypdl-Android-App")
+                    connectTimeout = 15000
+                    readTimeout = 30000
+                    instanceFollowRedirects = false
+                }
+                val status = connection.responseCode
+                if (status in 300..399) {
+                    val location = connection.getHeaderField("Location")
+                        ?: throw Exception("HTTP redirect missing Location header")
+                    connection.disconnect()
+                    currentUrl = location
+                    redirects++
+                    if (redirects > 10) throw Exception("Too many HTTP redirects")
+                    continue
+                }
+                break
+            }
+
+            if (connection.responseCode !in 200..299) {
+                val code = connection.responseCode
+                connection.disconnect()
+                return@withContext Result.failure(Exception("Download failed with HTTP $code"))
+            }
+
+            val totalBytes = connection.contentLengthLong.takeIf { it > 0 }
+                ?: connection.contentLength.toLong()
+            var downloadedBytes = 0L
+            var lastProgressTime = System.currentTimeMillis()
+            var bytesSinceLastProgress = 0L
+            var currentSpeed = "0 KB/s"
+
+            connection.inputStream.use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    val buffer = ByteArray(16384)
+                    var bytesRead: Int
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                        downloadedBytes += bytesRead
+                        bytesSinceLastProgress += bytesRead
+
+                        val now = System.currentTimeMillis()
+                        val elapsed = now - lastProgressTime
+                        if (elapsed >= 300L) {
+                            val speedBps = (bytesSinceLastProgress * 1000f) / elapsed
+                            currentSpeed = formatSpeed(speedBps)
+                            val percent = if (totalBytes > 0) (downloadedBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
+                            onProgress(percent, downloadedBytes, totalBytes, currentSpeed)
+                            lastProgressTime = now
+                            bytesSinceLastProgress = 0L
+                        }
+                    }
+                }
+            }
+            connection.disconnect()
+
+            if (targetFile.exists()) {
+                targetFile.delete()
+            }
+            if (!tempFile.renameTo(targetFile)) {
+                tempFile.copyTo(targetFile, overwrite = true)
+                tempFile.delete()
+            }
+
+            onProgress(1f, downloadedBytes, totalBytes, "")
+            Result.success(targetFile)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Checks whether the app has permission to install packages from unknown sources.
+     */
+    fun canInstallApks(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.packageManager.canRequestPackageInstalls()
+        } else {
+            true
+        }
+    }
+
+    /**
+     * Creates an intent navigating the user to the system setting to grant install permission.
+     */
+    fun createInstallPermissionIntent(): Intent {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                data = Uri.parse("package:${context.packageName}")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        } else {
+            Intent(Settings.ACTION_SECURITY_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        }
+    }
+
+    /**
+     * Triggers the native Android package installer using FileProvider.
+     */
+    fun installApk(apkFile: File): Result<Unit> {
+        return try {
+            val contentUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                apkFile
+            )
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(contentUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Scans for old update APKs in the cache directory and deletes them only if
+     * the currently installed version is equal to or newer than the APK's version.
+     */
+    fun cleanUpOldUpdateApks() {
+        try {
+            val updatesDir = File(context.cacheDir, "updates")
+            if (!updatesDir.exists() || !updatesDir.isDirectory) return
+            val currentVer = getCurrentVersion()
+
+            updatesDir.listFiles()?.forEach { file ->
+                if (file.name.endsWith(".tmp")) {
+                    file.delete()
+                } else if (file.name.endsWith(".apk", ignoreCase = true)) {
+                    val pkgInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        context.packageManager.getPackageArchiveInfo(
+                            file.absolutePath,
+                            android.content.pm.PackageManager.PackageInfoFlags.of(0)
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        context.packageManager.getPackageArchiveInfo(file.absolutePath, 0)
+                    }
+                    val apkVer = pkgInfo?.versionName
+                    // If current app version is equal or newer than the APK's version, the update has completed!
+                    if (apkVer == null || !isNewerVersion(apkVer, currentVer)) {
+                        android.util.Log.d("AppUpdateManager", "Deleting cached update APK: ${file.name} (apkVer=$apkVer, currentVer=$currentVer)")
+                        file.delete()
+                    }
+                }
+            }
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun formatSpeed(bytesPerSec: Float): String {
+        return when {
+            bytesPerSec >= 1024 * 1024 -> String.format(java.util.Locale.US, "%.1f MB/s", bytesPerSec / (1024 * 1024))
+            bytesPerSec >= 1024 -> String.format(java.util.Locale.US, "%.0f KB/s", bytesPerSec / 1024)
+            else -> String.format(java.util.Locale.US, "%.0f B/s", bytesPerSec)
         }
     }
 

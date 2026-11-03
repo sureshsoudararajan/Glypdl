@@ -71,6 +71,17 @@ sealed class GlypdlError(
         requiresUpdate = false
     )
 
+    /** No downloadable video streams were found in this media (e.g. photo stories, image posts, or text). */
+    class NoVideoFormats(
+        technicalDetails: String? = null
+    ) : GlypdlError(
+        userTitle = "No Video Found",
+        userMessage = "No downloadable video streams were found. This story or post may contain only photos or text.",
+        technicalDetails = technicalDetails,
+        canRetry = false,
+        requiresUpdate = false
+    )
+
     /** The content is blocked in the user's country or geographical area. */
     class GeoRestricted(
         technicalDetails: String? = null

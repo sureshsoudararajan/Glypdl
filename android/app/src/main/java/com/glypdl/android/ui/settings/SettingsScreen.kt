@@ -78,6 +78,15 @@ fun SettingsScreen(
     val appUpdateInfo by viewModel.appUpdateInfo.collectAsState()
     val isCheckingAppUpdate by viewModel.isCheckingAppUpdate.collectAsState()
     val appUpdateMessage by viewModel.appUpdateMessage.collectAsState()
+    val appUpdateDownloadState by viewModel.appUpdateDownloadState.collectAsState()
+
+    val installPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (viewModel.canInstallApks()) {
+            viewModel.installDownloadedAppUpdate()
+        }
+    }
 
     val scope = rememberCoroutineScope()
 
@@ -86,6 +95,7 @@ fun SettingsScreen(
     var formatDialogVisible by remember { mutableStateOf(false) }
     var videoCodecDialogVisible by remember { mutableStateOf(false) }
     var audioFormatDialogVisible by remember { mutableStateOf(false) }
+    var showWelcomeTour by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -403,7 +413,7 @@ fun SettingsScreen(
                                         )
                                     }
                                     Text(
-                                        text = "A new version of Glypdl is available on GitHub. Please update to get the latest features, enhancements, and stability fixes.",
+                                        text = "A new version of Glypdl is available. Download and install directly without leaving the app.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -415,11 +425,213 @@ fun SettingsScreen(
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                     }
+                                    if (!info.apkFileName.isNullOrBlank()) {
+                                        val sizeStr = if (info.apkFileSize > 0) {
+                                            " • ${android.text.format.Formatter.formatFileSize(context, info.apkFileSize)}"
+                                        } else ""
+                                        Text(
+                                            text = "Package: ${info.apkFileName}$sizeStr",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                        )
+                                    }
                                 }
                             }
                         }
 
-                        if (!appUpdateMessage.isNullOrBlank()) {
+                        // Downloading State Card
+                        if (appUpdateDownloadState.isDownloading) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Downloading Update...",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = "${(appUpdateDownloadState.progress * 100).toInt()}%",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+
+                                    LinearProgressIndicator(
+                                        progress = { appUpdateDownloadState.progress },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(8.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        val downloadedStr = android.text.format.Formatter.formatFileSize(
+                                            context,
+                                            appUpdateDownloadState.downloadedBytes
+                                        )
+                                        val totalStr = if (appUpdateDownloadState.totalBytes > 0) {
+                                            android.text.format.Formatter.formatFileSize(
+                                                context,
+                                                appUpdateDownloadState.totalBytes
+                                            )
+                                        } else {
+                                            "--"
+                                        }
+                                        Text(
+                                            text = "$downloadedStr / $totalStr",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        if (appUpdateDownloadState.speed.isNotBlank()) {
+                                            Text(
+                                                text = appUpdateDownloadState.speed,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    OutlinedButton(
+                                        onClick = { viewModel.cancelAppUpdateDownload() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Cancel Download")
+                                    }
+                                }
+                            }
+                        }
+
+                        // Ready to Install Card
+                        if (appUpdateDownloadState.isReadyToInstall && appUpdateDownloadState.downloadedApkFile != null) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.secondary,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                        Text(
+                                            text = "Update Ready to Install",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Text(
+                                        text = "Download complete. Tap below to install the update without leaving the app.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = { viewModel.cancelAppUpdateDownload() },
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) {
+                                            Text("Dismiss")
+                                        }
+                                        Button(
+                                            onClick = {
+                                                if (viewModel.canInstallApks()) {
+                                                    viewModel.installDownloadedAppUpdate()
+                                                } else {
+                                                    installPermissionLauncher.launch(
+                                                        viewModel.createInstallPermissionIntent()
+                                                    )
+                                                }
+                                            },
+                                            modifier = Modifier.weight(1.5f),
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.SystemUpdate,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Install Update")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Download / Install Error Card
+                        if (!appUpdateDownloadState.error.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.ErrorOutline,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = appUpdateDownloadState.error!!,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (!appUpdateMessage.isNullOrBlank() && !appUpdateDownloadState.isDownloading) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = appUpdateMessage!!,
@@ -435,59 +647,97 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Action Buttons: Check for App Updates & Update Now
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { viewModel.checkAppUpdate(force = true) },
-                                enabled = !isCheckingAppUpdate,
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp)
+                        // Action Buttons: Check for App Updates & Update Now (when not downloading/ready)
+                        if (!appUpdateDownloadState.isDownloading && !appUpdateDownloadState.isReadyToInstall) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                if (isCheckingAppUpdate) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                } else {
-                                    Icon(
-                                        Icons.Default.Refresh,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Check App Update")
+                                OutlinedButton(
+                                    onClick = { viewModel.checkAppUpdate(force = true) },
+                                    enabled = !isCheckingAppUpdate,
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    if (isCheckingAppUpdate) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                    } else {
+                                        Icon(
+                                            Icons.Default.Refresh,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Check Update")
+                                    }
+                                }
+
+                                if (appUpdateInfo?.isUpdateAvailable == true) {
+                                    Button(
+                                        onClick = {
+                                            if (!appUpdateInfo?.apkDownloadUrl.isNullOrBlank()) {
+                                                viewModel.startAppUpdateDownload()
+                                            } else {
+                                                val targetUrl = appUpdateInfo?.releaseUrl
+                                                if (!targetUrl.isNullOrBlank()) {
+                                                    try {
+                                                        uriHandler.openUri(targetUrl)
+                                                    } catch (e: Exception) {
+                                                        e.printStackTrace()
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.tertiary,
+                                            contentColor = MaterialTheme.colorScheme.onTertiary
+                                        ),
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.FileDownload,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Update Now")
+                                    }
                                 }
                             }
 
                             if (appUpdateInfo?.isUpdateAvailable == true) {
-                                Button(
-                                    onClick = {
-                                        val targetUrl = appUpdateInfo?.releaseUrl
-                                        if (!targetUrl.isNullOrBlank()) {
-                                            try {
-                                                uriHandler.openUri(targetUrl)
-                                            } catch (e: Exception) {
-                                                e.printStackTrace()
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    TextButton(
+                                        onClick = {
+                                            val url = appUpdateInfo?.releaseUrl
+                                            if (!url.isNullOrBlank()) {
+                                                try {
+                                                    uriHandler.openUri(url)
+                                                } catch (e: Exception) {
+                                                    e.printStackTrace()
+                                                }
                                             }
                                         }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.tertiary,
-                                        contentColor = MaterialTheme.colorScheme.onTertiary
-                                    ),
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.FileDownload,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Update Now")
+                                    ) {
+                                        Icon(
+                                            Icons.AutoMirrored.Filled.OpenInNew,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "View release on GitHub",
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1122,6 +1372,40 @@ fun SettingsScreen(
                             )
                         }
                     }
+
+                    SettingsItemDivider()
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showWelcomeTour = true }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SettingsIconBadge(
+                            icon = Icons.Default.Explore,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Welcome Tour",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "Revisit the app introduction and showcase",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowForwardIos,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
         }
@@ -1207,6 +1491,18 @@ fun SettingsScreen(
             },
             onDismiss = { audioFormatDialogVisible = false }
         )
+    }
+
+    // Full-screen Welcome Tour Preview
+    if (showWelcomeTour) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showWelcomeTour = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            com.glypdl.android.ui.welcome.WelcomeScreen(
+                onComplete = { showWelcomeTour = false }
+            )
+        }
     }
 }
 

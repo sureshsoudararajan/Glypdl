@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-11-03
+
+### Added
+
+- **Innovative Next-Gen Welcome Screen (`WelcomeScreen.kt`)**:
+  - Completely redesigned the onboarding experience with an interactive, animated 3-slide tour powered by Jetpack Compose `HorizontalPager`.
+  - Ambient breathing radial aurora glow backdrop with smooth multi-layer elevation.
+  - **Slide 1 — Universal Media Engine**: Pulsing concentric orbital rings with central download core and native branded platform chips (YouTube, Instagram, TikTok, X/Twitter).
+  - **Slide 2 — Zero-Effort Workflow**: Simulated interactive clipboard interception card showing live link auto-detection (`instagram.com/reel/...`) and 1-tap quality options (1080p MP4 / Audio 320k).
+  - **Slide 3 — Studio Fidelity & Total Freedom**: Hardware studio deck mockup featuring video codec engine selector (AV1, H.264, VP9), zero-telemetry local privacy card, and detected hardware architecture chip (`Native 64-bit arm64-v8a`).
+  - Fluid, animated page indicator pills that expand as you swipe or tap.
+  - Added **"Welcome Tour"** under **Settings $\rightarrow$ About Glypdl** allowing users to revisit and preview the onboarding tour anytime without clearing app data or session cookies.
+- **In-App Direct Architecture-Matched APK Updater**:
+  - Implemented direct in-app APK download and installation directly from GitHub Releases inside **Settings $\rightarrow$ Glypdl App Updates** without navigating to an external browser.
+  - **Hardware Architecture Matching**: Automatically detects device `SUPPORTED_ABIS` (e.g. `arm64-v8a`, `armeabi-v7a`, `x86_64`) to fetch the exact matching APK.
+  - **Live In-App Progress Card**: Displays live linear progress bar, percentage, downloaded bytes / total size, and real-time transfer speed.
+  - **Direct Native Installation**: Automatically triggers native package installation via `FileProvider` with unknown sources permission check and prompt handling (`REQUEST_INSTALL_PACKAGES`).
+  - **Automatic Post-Install Cleanup**: Detects running app version and safely deletes cached update APKs once the new version is verified as installed.
+
+### Fixed & Improved
+
+- **Instagram Story Analysis & Authentication**:
+  - Resolved HTTP 400 Bad Request errors on Instagram story extraction by supplying real-world mobile client headers (`User-Agent`, `Sec-Fetch-Mode`, `Sec-Fetch-Site`).
+  - Fixed story mismatch errors where numeric PK differed from shortcode IDs (`StoryMismatch: Requested story ID ... but yt-dlp extracted media ...`) by matching both numeric PK and shortcode conversions (`pkToShortcode`).
+  - Preserved on-device Netscape session cookies seamlessly across authenticated sessions.
+- **Download Process Lifecycle & Process Termination**:
+  - Registered unique request IDs with `YoutubeDL.getInstance().execute(dlRequest, request.id)`.
+  - Terminated active background yt-dlp processes on pause, cancel, and delete, preventing zombie background downloads and orphaned system notifications.
+  - Cleaned up partial temporary files on cancellation and deletion.
+- **UI Glitch Fixes & Stability**:
+  - Fixed the transient format selector flash/glitch when "Ask Before Download" is disabled by introducing `AnalyzeUiState.StartingDownload`.
+  - Prevented clipboard crash on startup by validating URLs before processing.
+
 ## [2.1.0] - 2026-09-23
 
 ### Fixed

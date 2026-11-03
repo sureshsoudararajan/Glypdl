@@ -19,6 +19,7 @@
 package com.glypdl.android.util
 
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 
@@ -27,22 +28,30 @@ object ClipboardHelper {
         try {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                 ?: return null
-            if (clipboard.hasPrimaryClip()) {
-                val clip: ClipData? = clipboard.primaryClip
-                if (clip != null && clip.itemCount > 0) {
-                    val item = clip.getItemAt(0)
-                    val rawText = item.text?.toString()
-                        ?: item.uri?.toString()
-                        ?: item.coerceToText(context)?.toString()
-                    if (!rawText.isNullOrBlank()) {
-                        val extractedUrl = UrlValidator.extractUrlFromText(rawText) ?: rawText.trim()
-                        if (UrlValidator.isValidUrl(extractedUrl)) {
-                            return extractedUrl
-                        }
+            if (!clipboard.hasPrimaryClip()) return null
+            
+            // Check clip description before accessing primaryClip to avoid unnecessary clipboard toasts
+            val description = clipboard.primaryClipDescription
+            if (description != null &&
+                !description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) &&
+                !description.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML)) {
+                return null
+            }
+
+            val clip: ClipData? = clipboard.primaryClip
+            if (clip != null && clip.itemCount > 0) {
+                val item = clip.getItemAt(0)
+                val rawText = item.text?.toString()
+                    ?: item.uri?.toString()
+                    ?: item.coerceToText(context)?.toString()
+                if (!rawText.isNullOrBlank()) {
+                    val extractedUrl = UrlValidator.extractUrlFromText(rawText) ?: rawText.trim()
+                    if (UrlValidator.isValidUrl(extractedUrl)) {
+                        return extractedUrl
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
         }
         return null

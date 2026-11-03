@@ -87,6 +87,22 @@ fun AnalyzeScreen(
                 .padding(paddingValues)
         ) {
             when (val state = uiState) {
+                is AnalyzeUiState.StartingDownload -> {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(48.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Text(
+                            text = "Starting download...",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
                 is AnalyzeUiState.Loading -> {
                     Column(
                         modifier = Modifier

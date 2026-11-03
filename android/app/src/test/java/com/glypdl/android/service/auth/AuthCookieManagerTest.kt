@@ -64,7 +64,7 @@ class AuthCookieManagerTest {
 
         val content = file.readText()
         assertTrue(content.contains("# Netscape HTTP Cookie File"))
-        assertTrue(content.contains(".instagram.com\tTRUE\t/\tFALSE\t"))
+        assertTrue(content.contains(".instagram.com\tTRUE\t/\tTRUE\t"))
         assertTrue(content.contains("sessionid\t12345abcd"))
         assertTrue(content.contains("csrftoken\ttoken999"))
     }
@@ -79,7 +79,7 @@ class AuthCookieManagerTest {
         assertNotNull(file)
         assertTrue(file!!.exists())
         val content = file.readText()
-        assertTrue(content.contains(".facebook.com\tTRUE\t/\tFALSE\t"))
+        assertTrue(content.contains(".facebook.com\tTRUE\t/\tTRUE\t"))
         assertTrue(content.contains("c_user\t100012345678"))
         assertTrue(content.contains("xs\t32%3Aabcde%3A2%3A123"))
     }

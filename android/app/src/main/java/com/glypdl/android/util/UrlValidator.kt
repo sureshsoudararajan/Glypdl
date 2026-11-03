@@ -50,6 +50,25 @@ object UrlValidator {
         return lower.contains("facebook.com") || lower.contains("fb.watch") || lower.contains("fb.com")
     }
 
+    fun pkToShortcode(mediaId: String): String? {
+        val pkStr = mediaId.substringBefore("_").trim()
+        val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        return try {
+            var num = java.math.BigInteger(pkStr)
+            if (num <= java.math.BigInteger.ZERO) return null
+            val base = java.math.BigInteger.valueOf(64)
+            val sb = StringBuilder()
+            while (num > java.math.BigInteger.ZERO) {
+                val rem = num.mod(base).toInt()
+                sb.append(alphabet[rem])
+                num = num.divide(base)
+            }
+            sb.reverse().toString()
+        } catch (e: Throwable) {
+            null
+        }
+    }
+
     fun extractInstagramStoryId(url: String): String? {
         if (!isInstagramStory(url)) return null
         val match = Regex("""/stories/[^/?#]+/(\d+)""").find(url)
@@ -58,13 +77,19 @@ object UrlValidator {
 
     fun extractInstagramStoryUsername(url: String): String? {
         if (!isInstagramStory(url)) return null
-        val match = Regex("""/stories/([^/?#]+)/""").find(url)
+        val match = Regex("""/stories/([^/?#]+)""").find(url)
         return match?.groupValues?.get(1)
     }
 
     fun canonicalizeInstagramStoryUrl(url: String): String {
         val storyId = extractInstagramStoryId(url)
         val username = extractInstagramStoryUsername(url)
+        if (storyId != null && username != "highlights") {
+            val shortcode = pkToShortcode(storyId)
+            if (!shortcode.isNullOrBlank()) {
+                return "https://www.instagram.com/p/$shortcode/"
+            }
+        }
         return if (storyId != null && username != null) {
             "https://www.instagram.com/stories/$username/$storyId/"
         } else {

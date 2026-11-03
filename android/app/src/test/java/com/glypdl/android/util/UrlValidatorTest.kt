@@ -94,9 +94,16 @@ class UrlValidatorTest {
     }
 
     @Test
-    fun `canonicalizeInstagramStoryUrl preserves username and exact story ID`() {
-        val url = "https://www.instagram.com/stories/testcreator/123456789012345/?utm_source=ig_story_item_share&igsh=abcdef123456"
+    fun `canonicalizeInstagramStoryUrl converts story ID to shortcode post URL`() {
+        val url = "https://www.instagram.com/stories/testcreator/4022146624017033069/?utm_source=ig_story_item_share&igsh=abcdef123456"
         val canonical = UrlValidator.canonicalizeInstagramStoryUrl(url)
-        assertEquals("https://www.instagram.com/stories/testcreator/123456789012345/", canonical)
+        assertEquals("https://www.instagram.com/p/DfRiQtXEmdt/", canonical)
+    }
+
+    @Test
+    fun `canonicalizeInstagramStoryUrl preserves highlights`() {
+        val url = "https://www.instagram.com/stories/highlights/123456789012345/?utm_source=ig_story_item_share"
+        val canonical = UrlValidator.canonicalizeInstagramStoryUrl(url)
+        assertEquals("https://www.instagram.com/stories/highlights/123456789012345/", canonical)
     }
 }
