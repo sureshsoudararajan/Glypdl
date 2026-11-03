@@ -195,8 +195,8 @@ class AnalyzeViewModel @Inject constructor(
                                 mediaInfo.videoQualities
                             } else {
                                 val match = mediaInfo.videoQualities.filter {
-                                    it.resolution.contains(prefQuality, ignoreCase = true) ||
-                                    it.label.contains(prefQuality, ignoreCase = true)
+                                    it.label.contains(prefQuality, ignoreCase = true) ||
+                                    (it.height != null && "${it.height}p".contains(prefQuality, ignoreCase = true))
                                 }
                                 if (match.isNotEmpty()) match else mediaInfo.videoQualities
                             }

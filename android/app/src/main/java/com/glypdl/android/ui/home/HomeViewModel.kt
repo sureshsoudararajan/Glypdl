@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -77,7 +78,7 @@ class HomeViewModel @Inject constructor(
 
     fun checkClipboard(context: android.content.Context) {
         viewModelScope.launch {
-            val enabled = kotlinx.coroutines.flow.first(settingsRepository.clipboardDetection)
+            val enabled = settingsRepository.clipboardDetection.first()
             if (!enabled) return@launch
             val url = com.glypdl.android.util.ClipboardHelper.getUrlFromClipboard(context)
             if (!url.isNullOrBlank() && url != lastDismissedClipboardUrl && url != _uiState.value.url) {

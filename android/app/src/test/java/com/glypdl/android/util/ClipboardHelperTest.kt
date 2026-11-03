@@ -34,9 +34,15 @@ class ClipboardHelperTest {
 
     @Test
     fun testGetUrlFromClipboardWithValidHttpUrl() {
-        val clipItem = ClipData.Item("Check out this video https://www.instagram.com/reel/C-12345/ now!")
-        val clipData = ClipData("label", arrayOf("text/plain"), clipItem)
-        
+        val clipItem = mockk<ClipData.Item>()
+        every { clipItem.text } returns "Check out this video https://www.instagram.com/reel/C-12345/ now!"
+        every { clipItem.uri } returns null
+        every { clipItem.coerceToText(any()) } returns "Check out this video https://www.instagram.com/reel/C-12345/ now!"
+
+        val clipData = mockk<ClipData>()
+        every { clipData.itemCount } returns 1
+        every { clipData.getItemAt(0) } returns clipItem
+
         every { clipboardManager.hasPrimaryClip() } returns true
         every { clipboardManager.primaryClip } returns clipData
 
@@ -54,9 +60,15 @@ class ClipboardHelperTest {
 
     @Test
     fun testGetUrlFromClipboardWithNonUrlTextReturnsNull() {
-        val clipItem = ClipData.Item("Just regular text with no links")
-        val clipData = ClipData("label", arrayOf("text/plain"), clipItem)
-        
+        val clipItem = mockk<ClipData.Item>()
+        every { clipItem.text } returns "Just regular text with no links"
+        every { clipItem.uri } returns null
+        every { clipItem.coerceToText(any()) } returns "Just regular text with no links"
+
+        val clipData = mockk<ClipData>()
+        every { clipData.itemCount } returns 1
+        every { clipData.getItemAt(0) } returns clipItem
+
         every { clipboardManager.hasPrimaryClip() } returns true
         every { clipboardManager.primaryClip } returns clipData
 
