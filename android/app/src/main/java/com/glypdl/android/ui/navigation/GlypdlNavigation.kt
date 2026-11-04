@@ -50,6 +50,8 @@ import com.glypdl.android.ui.downloads.DownloadsScreen
 import com.glypdl.android.ui.history.HistoryScreen
 import com.glypdl.android.ui.home.HomeScreen
 import com.glypdl.android.ui.settings.SettingsScreen
+import com.glypdl.android.ui.status.StatusPreviewScreen
+import com.glypdl.android.ui.status.StatusSaverScreen
 import com.glypdl.android.ui.welcome.WelcomeScreen
 import kotlinx.coroutines.launch
 
@@ -63,7 +65,7 @@ fun GlypdlRootApp(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val showBottomBar = currentRoute != Screen.Welcome.route
+    val showBottomBar = currentRoute != Screen.Welcome.route && currentRoute?.startsWith("status_preview") != true
 
     Scaffold(
         bottomBar = {
@@ -186,6 +188,9 @@ fun GlypdlNavHost(
                 },
                 onNavigateToDownloadDetail = { downloadId ->
                     navController.navigate(Screen.DownloadDetail.createRoute(downloadId))
+                },
+                onNavigateToStatusSaver = {
+                    navController.navigate(Screen.StatusSaver.route)
                 }
             )
         }
@@ -231,6 +236,24 @@ fun GlypdlNavHost(
 
         composable(Screen.Settings.route) {
             SettingsScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.StatusSaver.route) {
+            StatusSaverScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToPreview = { mediaUri ->
+                    navController.navigate(Screen.StatusPreview.createRoute(mediaUri))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.StatusPreview.route,
+            arguments = listOf(navArgument("mediaUri") { type = NavType.StringType })
+        ) {
+            StatusPreviewScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

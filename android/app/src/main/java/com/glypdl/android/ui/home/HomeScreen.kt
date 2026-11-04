@@ -29,12 +29,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.glypdl.android.R
 import com.glypdl.android.data.local.entity.DownloadEntity
 import com.glypdl.android.ui.components.ClipboardBanner
 import com.glypdl.android.ui.components.DownloadItemCard
 import com.glypdl.android.ui.components.UrlInputField
+import com.glypdl.android.ui.theme.WhatsAppGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +47,8 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToDownloads: () -> Unit,
     onNavigateToHistory: () -> Unit,
-    onNavigateToDownloadDetail: (String) -> Unit
+    onNavigateToDownloadDetail: (String) -> Unit,
+    onNavigateToStatusSaver: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var downloadToDelete by remember { mutableStateOf<DownloadEntity?>(null) }
@@ -71,6 +75,14 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("Glypdl") },
                 actions = {
+                    IconButton(onClick = onNavigateToStatusSaver) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_whatsapp),
+                            contentDescription = "WhatsApp Status Saver",
+                            tint = WhatsAppGreen,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }

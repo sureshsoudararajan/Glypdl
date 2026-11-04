@@ -78,3 +78,7 @@ val ErrorDark = Color(0xFFF2B8B5)
 val OnErrorDark = Color(0xFF601410)
 val ErrorContainerDark = Color(0xFF8C1D18)
 val OnErrorContainerDark = Color(0xFFF9DEDC)
+
+// WhatsApp Brand
+val WhatsAppGreen = Color(0xFF25D366)
+val WhatsAppDarkGreen = Color(0xFF128C7E)

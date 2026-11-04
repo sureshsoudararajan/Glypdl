@@ -39,4 +39,13 @@ sealed class Screen(val route: String) {
             return "download_detail/$downloadId"
         }
     }
+
+    object StatusSaver : Screen("status_saver")
+
+    object StatusPreview : Screen("status_preview/{mediaUri}") {
+        fun createRoute(mediaUri: String): String {
+            val encodedUri = URLEncoder.encode(mediaUri, StandardCharsets.UTF_8.toString())
+            return "status_preview/$encodedUri"
+        }
+    }
 }

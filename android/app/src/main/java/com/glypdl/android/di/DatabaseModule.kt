@@ -16,6 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.glypdl.android.data.local.GlypdlDatabase
 import com.glypdl.android.data.local.dao.DownloadDao
 import com.glypdl.android.data.local.dao.HistoryDao
+import com.glypdl.android.data.local.dao.SavedStatusDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -36,6 +37,27 @@ object DatabaseModule {
         }
     }
 
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `saved_statuses` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `originalUri` TEXT NOT NULL,
+                    `savedUri` TEXT NOT NULL,
+                    `displayName` TEXT NOT NULL,
+                    `mimeType` TEXT NOT NULL,
+                    `mediaType` TEXT NOT NULL,
+                    `sizeBytes` INTEGER NOT NULL,
+                    `savedAt` INTEGER NOT NULL,
+                    `contentHash` TEXT,
+                    `sourcePackage` TEXT NOT NULL DEFAULT 'com.whatsapp'
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_saved_statuses_originalUri` ON `saved_statuses` (`originalUri`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_saved_statuses_savedAt` ON `saved_statuses` (`savedAt`)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): GlypdlDatabase {
@@ -44,7 +66,7 @@ object DatabaseModule {
             GlypdlDatabase::class.java,
             "glypdl_database"
         )
-        .addMigrations(MIGRATION_2_3)
+        .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
         .fallbackToDestructiveMigration()
         .build()
     }
@@ -59,5 +81,11 @@ object DatabaseModule {
     @Singleton
     fun provideHistoryDao(database: GlypdlDatabase): HistoryDao {
         return database.historyDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSavedStatusDao(database: GlypdlDatabase): SavedStatusDao {
+        return database.savedStatusDao()
     }
 }

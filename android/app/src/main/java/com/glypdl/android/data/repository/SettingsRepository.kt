@@ -86,6 +86,9 @@ class SettingsRepository @Inject constructor(
         /** Custom user-selected Storage Access Framework (SAF) folder tree URI string. */
         val DOWNLOAD_DIR_URI = stringPreferencesKey("download_dir_uri")
 
+        /** User-selected SAF tree URI for WhatsApp status directory. */
+        val WHATSAPP_STATUS_FOLDER_URI = stringPreferencesKey("whatsapp_status_folder_uri")
+
         /** True to automatically check and update yt-dlp binary on app launch. */
         val AUTO_UPDATE_YTDLP = booleanPreferencesKey("auto_update_ytdlp")
 
@@ -139,6 +142,9 @@ class SettingsRepository @Inject constructor(
 
     /** Flow emitting custom download storage directory tree URI string, or null for default. */
     val downloadDirUri: Flow<String?> = dataStore.data.map { it[DOWNLOAD_DIR_URI] }
+
+    /** Flow emitting WhatsApp status directory tree URI string, or null if not configured. */
+    val whatsappStatusFolderUri: Flow<String?> = dataStore.data.map { it[WHATSAPP_STATUS_FOLDER_URI] }
 
     /** Flow emitting auto-update yt-dlp preference (defaults to true). */
     val autoUpdateYtDlp: Flow<Boolean> = dataStore.data.map { it[AUTO_UPDATE_YTDLP] ?: true }
@@ -210,5 +216,13 @@ class SettingsRepository @Inject constructor(
             if (value == null) it.remove(DOWNLOAD_DIR_URI)
             else it[DOWNLOAD_DIR_URI] = value
         } 
+    }
+
+    /** Configures or clears the WhatsApp status directory tree URI. */
+    suspend fun setWhatsappStatusFolderUri(value: String?) {
+        dataStore.edit {
+            if (value == null) it.remove(WHATSAPP_STATUS_FOLDER_URI)
+            else it[WHATSAPP_STATUS_FOLDER_URI] = value
+        }
     }
 }
