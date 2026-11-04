@@ -15,7 +15,10 @@ package com.glypdl.android.service.status
 
 import android.content.Context
 import com.glypdl.android.data.local.dao.SavedStatusDao
+import com.glypdl.android.data.repository.SettingsRepository
+import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -25,13 +28,16 @@ class StatusExportManagerTest {
 
     private lateinit var context: Context
     private lateinit var savedStatusDao: SavedStatusDao
+    private lateinit var settingsRepository: SettingsRepository
     private lateinit var exportManager: StatusExportManager
 
     @Before
     fun setUp() {
         context = mockk(relaxed = true)
         savedStatusDao = mockk(relaxed = true)
-        exportManager = StatusExportManager(context, savedStatusDao)
+        settingsRepository = mockk(relaxed = true)
+        every { settingsRepository.downloadDirUri } returns flowOf(null)
+        exportManager = StatusExportManager(context, savedStatusDao, settingsRepository)
     }
 
     @Test

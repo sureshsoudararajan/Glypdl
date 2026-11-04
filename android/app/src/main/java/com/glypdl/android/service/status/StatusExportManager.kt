@@ -20,12 +20,15 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.documentfile.provider.DocumentFile
 import com.glypdl.android.data.local.dao.SavedStatusDao
 import com.glypdl.android.data.local.entity.SavedStatusEntity
+import com.glypdl.android.data.repository.SettingsRepository
 import com.glypdl.android.data.status.model.StatusMedia
 import com.glypdl.android.data.status.model.StatusMediaType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.security.DigestInputStream
@@ -42,7 +45,8 @@ sealed class ExportResult {
 @Singleton
 class StatusExportManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val savedStatusDao: SavedStatusDao
+    private val savedStatusDao: SavedStatusDao,
+    private val settingsRepository: SettingsRepository
 ) {
 
     companion object {
@@ -50,9 +54,8 @@ class StatusExportManager @Inject constructor(
     }
 
     /**
-     * Exports a WhatsApp status media item to the device's public media gallery.
-     * Images go to `Pictures/Glypdl/Status/`
-     * Videos go to `Movies/Glypdl/Status/`
+     * Exports a WhatsApp status media item to `Glypdl/status`.
+     * Both images and videos are saved to the unified `Glypdl/status` directory.
      */
     suspend fun exportStatus(
         status: StatusMedia,
@@ -75,12 +78,29 @@ class StatusExportManager @Inject constructor(
             val isVideo = status.mediaType == StatusMediaType.VIDEO
             val mimeType = status.mimeType
 
-            // 3. Export stream to MediaStore (Android 10+) or Public Directory (Android 8-9)
+            // 3. Export stream to Custom SAF Tree (if configured) or MediaStore/Downloads
             val md = MessageDigest.getInstance("SHA-256")
-            val (savedUri, hashHex) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                exportToMediaStore(status.uri, baseName, mimeType, isVideo, md)
+            val customTreeUri = try {
+                settingsRepository.downloadDirUri.first()
+            } catch (e: Exception) {
+                null
+            }
+
+            val (savedUri, hashHex) = if (!customTreeUri.isNullOrBlank()) {
+                try {
+                    exportToCustomTree(status.uri, baseName, mimeType, customTreeUri, md)
+                } catch (e: Exception) {
+                    // Fallback to default MediaStore if custom tree fails
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        exportToMediaStore(status.uri, baseName, mimeType, md)
+                    } else {
+                        exportToLegacyStorage(status.uri, baseName, mimeType, md)
+                    }
+                }
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                exportToMediaStore(status.uri, baseName, mimeType, md)
             } else {
-                exportToLegacyStorage(status.uri, baseName, mimeType, isVideo, md)
+                exportToLegacyStorage(status.uri, baseName, mimeType, md)
             }
 
             // 4. Duplicate content hash check: If another file with identical SHA-256 exists
@@ -117,20 +137,59 @@ class StatusExportManager @Inject constructor(
         }
     }
 
+    private fun exportToCustomTree(
+        sourceUri: Uri,
+        displayName: String,
+        mimeType: String,
+        treeUriString: String,
+        md: MessageDigest
+    ): Pair<Uri, String> {
+        val treeUri = Uri.parse(treeUriString)
+        val docTree = DocumentFile.fromTreeUri(context, treeUri)
+            ?: throw IllegalStateException("Cannot access custom directory")
+
+        val statusFolder = docTree.findFile("status")
+            ?: docTree.createDirectory("status")
+            ?: docTree
+
+        val targetDoc = statusFolder.createFile(mimeType, displayName)
+            ?: throw IllegalStateException("Cannot create document file: $displayName")
+
+        var hashString = ""
+        try {
+            val inputStream = context.contentResolver.openInputStream(sourceUri)
+                ?: throw IllegalStateException("Cannot open input stream for: $sourceUri")
+
+            val outputStream = context.contentResolver.openOutputStream(targetDoc.uri)
+                ?: throw IllegalStateException("Cannot open output stream for: ${targetDoc.uri}")
+
+            DigestInputStream(inputStream, md).use { dis ->
+                outputStream.use { os ->
+                    val buffer = ByteArray(BUFFER_SIZE)
+                    var bytesRead: Int
+                    while (dis.read(buffer).also { bytesRead = it } != -1) {
+                        os.write(buffer, 0, bytesRead)
+                    }
+                    os.flush()
+                }
+            }
+
+            hashString = md.digest().joinToString("") { "%02x".format(it) }
+            return targetDoc.uri to hashString
+        } catch (e: Exception) {
+            targetDoc.delete()
+            throw e
+        }
+    }
+
     private fun exportToMediaStore(
         sourceUri: Uri,
         displayName: String,
         mimeType: String,
-        isVideo: Boolean,
         md: MessageDigest
     ): Pair<Uri, String> {
-        val collection = if (isVideo) {
-            MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        } else {
-            MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-        }
-
-        val relativePath = if (isVideo) "Movies/Glypdl/Status" else "Pictures/Glypdl/Status"
+        val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val relativePath = "${Environment.DIRECTORY_DOWNLOADS}/Glypdl/status"
 
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
@@ -180,14 +239,11 @@ class StatusExportManager @Inject constructor(
         sourceUri: Uri,
         displayName: String,
         mimeType: String,
-        isVideo: Boolean,
         md: MessageDigest
     ): Pair<Uri, String> {
         val parentDir = File(
-            Environment.getExternalStoragePublicDirectory(
-                if (isVideo) Environment.DIRECTORY_MOVIES else Environment.DIRECTORY_PICTURES
-            ),
-            "Glypdl/Status"
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "Glypdl/status"
         )
         if (!parentDir.exists()) {
             parentDir.mkdirs()
