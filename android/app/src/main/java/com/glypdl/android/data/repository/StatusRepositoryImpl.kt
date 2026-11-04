@@ -35,6 +35,8 @@ class StatusRepositoryImpl @Inject constructor(
 
     override val configuredFolderUri: Flow<String?> = settingsRepository.whatsappStatusFolderUri
 
+    override var activePreviewMedia: StatusMedia? = null
+
     override suspend fun setConfiguredFolderUri(uriString: String?) {
         settingsRepository.setWhatsappStatusFolderUri(uriString)
     }

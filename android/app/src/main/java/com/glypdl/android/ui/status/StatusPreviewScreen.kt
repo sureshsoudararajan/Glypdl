@@ -13,17 +13,21 @@
  */
 package com.glypdl.android.ui.status
 
+import android.content.Context
 import android.content.Intent
+import android.graphics.SurfaceTexture
+import android.media.MediaPlayer
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.text.format.Formatter
-import android.widget.MediaController
-import android.widget.VideoView
+import android.view.Surface
+import android.view.TextureView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,14 +35,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -112,6 +115,29 @@ fun StatusPreviewScreen(
                         }
                     },
                     actions = {
+                        // Open in external video player (if video)
+                        if (uiState.mediaType == StatusMediaType.VIDEO && uiState.uri != Uri.EMPTY) {
+                            IconButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                        setDataAndType(uiState.uri, uiState.mimeType.ifEmpty { "video/*" })
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    try {
+                                        context.startActivity(Intent.createChooser(intent, "Open Video"))
+                                    } catch (e: Exception) {
+                                        // Ignore
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    Icons.Default.OpenInNew,
+                                    contentDescription = "Open in Player",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+
                         // Share action
                         IconButton(
                             onClick = {
@@ -121,7 +147,11 @@ fun StatusPreviewScreen(
                                         putExtra(Intent.EXTRA_STREAM, uiState.uri)
                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                     }
-                                    context.startActivity(Intent.createChooser(shareIntent, "Share Status"))
+                                    try {
+                                        context.startActivity(Intent.createChooser(shareIntent, "Share Status"))
+                                    } catch (e: Exception) {
+                                        // Ignore
+                                    }
                                 }
                             }
                         ) {
@@ -155,7 +185,7 @@ fun StatusPreviewScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Black.copy(alpha = 0.6f)
+                        containerColor = Color.Black.copy(alpha = 0.65f)
                     )
                 )
             }
@@ -167,7 +197,7 @@ fun StatusPreviewScreen(
                 exit = fadeOut()
             ) {
                 Surface(
-                    color = Color.Black.copy(alpha = 0.6f),
+                    color = Color.Black.copy(alpha = 0.65f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -216,7 +246,7 @@ fun StatusPreviewScreen(
                                     tint = Color.White
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text("Save to Gallery", color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -233,49 +263,15 @@ fun StatusPreviewScreen(
             if (uiState.uri == Uri.EMPTY) {
                 CircularProgressIndicator(color = WhatsAppGreen)
             } else if (uiState.mediaType == StatusMediaType.VIDEO) {
-                // Video Player with Android VideoView
-                var isVideoError by remember { mutableStateOf(false) }
-
-                if (isVideoError) {
-                    Text(
-                        text = "Unable to play video preview",
-                        color = Color.White.copy(alpha = 0.7f),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                } else {
-                    AndroidView(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectTapGestures {
-                                    showControls = !showControls
-                                }
-                            },
-                        factory = { ctx ->
-                            VideoView(ctx).apply {
-                                val mediaController = MediaController(ctx)
-                                mediaController.setAnchorView(this)
-                                setMediaController(mediaController)
-                                setVideoURI(uiState.uri)
-                                setOnPreparedListener { mp ->
-                                    mp.isLooping = true
-                                    start()
-                                }
-                                setOnErrorListener { _, _, _ ->
-                                    isVideoError = true
-                                    true
-                                }
-                            }
-                        },
-                        update = { view ->
-                            // VideoView is managed by MediaController
-                        }
-                    )
-                }
+                // Basic Video Player
+                BasicStatusVideoPlayer(
+                    uri = uiState.uri,
+                    onToggleControls = { showControls = !showControls },
+                    modifier = Modifier.fillMaxSize()
+                )
             } else {
-                // Interactive Zoomable Image Viewer
+                // Basic Image Preview
                 var scale by remember { mutableFloatStateOf(1f) }
-                var offset by remember { mutableStateOf(Offset.Zero) }
 
                 Box(
                     modifier = Modifier
@@ -283,31 +279,10 @@ fun StatusPreviewScreen(
                         .pointerInput(Unit) {
                             detectTapGestures(
                                 onTap = { showControls = !showControls },
-                                onDoubleTap = { tapOffset ->
-                                    if (scale > 1f) {
-                                        scale = 1f
-                                        offset = Offset.Zero
-                                    } else {
-                                        scale = 2.5f
-                                        offset = Offset.Zero
-                                    }
+                                onDoubleTap = {
+                                    scale = if (scale > 1f) 1f else 2.5f
                                 }
                             )
-                        }
-                        .pointerInput(Unit) {
-                            detectTransformGestures { _, pan, zoom, _ ->
-                                scale = (scale * zoom).coerceIn(1f, 5f)
-                                offset = if (scale > 1f) {
-                                    val maxOffsetX = 500f * (scale - 1f)
-                                    val maxOffsetY = 500f * (scale - 1f)
-                                    Offset(
-                                        x = (offset.x + pan.x).coerceIn(-maxOffsetX, maxOffsetX),
-                                        y = (offset.y + pan.y).coerceIn(-maxOffsetY, maxOffsetY)
-                                    )
-                                } else {
-                                    Offset.Zero
-                                }
-                            }
                         },
                     contentAlignment = Alignment.Center
                 ) {
@@ -320,13 +295,159 @@ fun StatusPreviewScreen(
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxSize()
-                            .graphicsLayer(
-                                scaleX = scale,
-                                scaleY = scale,
-                                translationX = offset.x,
-                                translationY = offset.y
-                            )
+                            .graphicsLayer(scaleX = scale, scaleY = scale)
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BasicStatusVideoPlayer(
+    uri: Uri,
+    onToggleControls: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var isPlaying by remember { mutableStateOf(false) }
+    var isError by remember { mutableStateOf(false) }
+    val mediaPlayerRef = remember { mutableStateOf<MediaPlayer?>(null) }
+    val pfdRef = remember { mutableStateOf<ParcelFileDescriptor?>(null) }
+
+    DisposableEffect(uri) {
+        val player = MediaPlayer()
+        mediaPlayerRef.value = player
+        try {
+            val pfd = context.contentResolver.openFileDescriptor(uri, "r")
+            pfdRef.value = pfd
+            if (pfd != null) {
+                player.setDataSource(pfd.fileDescriptor)
+                player.isLooping = true
+                player.setOnPreparedListener { mp ->
+                    mp.start()
+                    isPlaying = true
+                }
+                player.setOnErrorListener { _, _, _ ->
+                    isError = true
+                    true
+                }
+            } else {
+                isError = true
+            }
+        } catch (e: Exception) {
+            isError = true
+        }
+
+        onDispose {
+            try {
+                player.stop()
+                player.release()
+            } catch (e: Exception) {
+                // Ignore
+            }
+            try {
+                pfdRef.value?.close()
+            } catch (e: Exception) {
+                // Ignore
+            }
+            mediaPlayerRef.value = null
+        }
+    }
+
+    if (isError) {
+        Column(
+            modifier = modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Video preview format not supported natively",
+                color = Color.White.copy(alpha = 0.8f),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, "video/*")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    try {
+                        context.startActivity(Intent.createChooser(intent, "Play Video"))
+                    } catch (e: Exception) {
+                        // Ignore
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen)
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Open in Video Player", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
+    } else {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .clickable {
+                    val p = mediaPlayerRef.value
+                    if (p != null && !isError) {
+                        if (p.isPlaying) {
+                            p.pause()
+                            isPlaying = false
+                        } else {
+                            p.start()
+                            isPlaying = true
+                        }
+                    }
+                    onToggleControls()
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            AndroidView(
+                factory = { ctx ->
+                    TextureView(ctx).apply {
+                        surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                            override fun onSurfaceTextureAvailable(st: SurfaceTexture, width: Int, height: Int) {
+                                val surface = Surface(st)
+                                mediaPlayerRef.value?.setSurface(surface)
+                                try {
+                                    mediaPlayerRef.value?.prepareAsync()
+                                } catch (e: Exception) {
+                                    // Already preparing or prepared
+                                }
+                            }
+
+                            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, width: Int, height: Int) {}
+
+                            override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+                                mediaPlayerRef.value?.setSurface(null)
+                                return true
+                            }
+
+                            override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Play pause overlay indicator when paused
+            if (!isPlaying) {
+                Surface(
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.6f),
+                    modifier = Modifier.size(64.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = "Play",
+                            tint = Color.White,
+                            modifier = Modifier.size(40.dp)
+                        )
+                    }
                 }
             }
         }

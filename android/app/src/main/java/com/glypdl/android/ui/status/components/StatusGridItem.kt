@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.decode.VideoFrameDecoder
 import coil.request.ImageRequest
 import com.glypdl.android.data.status.model.StatusMedia
 import com.glypdl.android.data.status.model.StatusMediaType
@@ -81,6 +82,11 @@ fun StatusGridItem(
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(status.uri)
+                    .apply {
+                        if (isVideo) {
+                            decoderFactory(VideoFrameDecoder.Factory())
+                        }
+                    }
                     .crossfade(true)
                     .build(),
                 contentDescription = status.displayName,

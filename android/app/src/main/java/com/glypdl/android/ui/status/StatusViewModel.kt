@@ -341,6 +341,23 @@ class StatusViewModel @Inject constructor(
         }
     }
 
+    fun setPreviewItem(item: StatusMedia) {
+        statusRepository.activePreviewMedia = item
+    }
+
+    fun setPreviewItemFromSaved(saved: SavedStatusEntity) {
+        statusRepository.activePreviewMedia = StatusMedia(
+            id = saved.originalUri,
+            uri = Uri.parse(saved.savedUri),
+            displayName = saved.displayName,
+            mimeType = saved.mimeType,
+            mediaType = if (saved.mediaType == "VIDEO") StatusMediaType.VIDEO else StatusMediaType.IMAGE,
+            sizeBytes = saved.sizeBytes,
+            modifiedAt = saved.savedAt,
+            isSaved = true
+        )
+    }
+
     fun clearSnackbar() {
         _uiState.update { it.copy(snackbarMessage = null) }
     }

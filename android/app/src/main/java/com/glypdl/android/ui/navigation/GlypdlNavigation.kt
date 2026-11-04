@@ -65,7 +65,7 @@ fun GlypdlRootApp(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val showBottomBar = currentRoute != Screen.Welcome.route && currentRoute?.startsWith("status_preview") != true
+    val showBottomBar = currentRoute != Screen.Welcome.route && currentRoute != Screen.StatusPreview.route
 
     Scaffold(
         bottomBar = {
@@ -243,16 +243,13 @@ fun GlypdlNavHost(
         composable(Screen.StatusSaver.route) {
             StatusSaverScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToPreview = { mediaUri ->
-                    navController.navigate(Screen.StatusPreview.createRoute(mediaUri))
+                onNavigateToPreview = {
+                    navController.navigate(Screen.StatusPreview.route)
                 }
             )
         }
 
-        composable(
-            route = Screen.StatusPreview.route,
-            arguments = listOf(navArgument("mediaUri") { type = NavType.StringType })
-        ) {
+        composable(Screen.StatusPreview.route) {
             StatusPreviewScreen(
                 onNavigateBack = { navController.popBackStack() }
             )

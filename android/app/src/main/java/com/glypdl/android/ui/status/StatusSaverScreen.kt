@@ -52,7 +52,7 @@ import com.glypdl.android.ui.theme.WhatsAppGreen
 fun StatusSaverScreen(
     viewModel: StatusViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit,
-    onNavigateToPreview: (String) -> Unit
+    onNavigateToPreview: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -322,7 +322,8 @@ fun StatusSaverScreen(
                                 if (uiState.isSelectionMode) {
                                     viewModel.toggleSelection(item.id)
                                 } else {
-                                    onNavigateToPreview(item.uri.toString())
+                                    viewModel.setPreviewItem(item)
+                                    onNavigateToPreview()
                                 }
                             },
                             onItemLongClick = { item ->
@@ -356,7 +357,10 @@ fun StatusSaverScreen(
                             ) { item ->
                                 StatusSavedGridItem(
                                     item = item,
-                                    onOpenClick = { onNavigateToPreview(item.savedUri) },
+                                    onOpenClick = {
+                                        viewModel.setPreviewItemFromSaved(item)
+                                        onNavigateToPreview()
+                                    },
                                     onShareClick = {
                                         val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                             type = item.mimeType

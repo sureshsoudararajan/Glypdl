@@ -48,4 +48,6 @@ interface StatusRepository {
     suspend fun deleteAllSavedStatusRecords()
 
     suspend fun isStatusSaved(originalUri: String): Boolean
+
+    var activePreviewMedia: StatusMedia?
 }

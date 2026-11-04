@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.decode.VideoFrameDecoder
 import coil.request.ImageRequest
 import com.glypdl.android.data.local.entity.SavedStatusEntity
 
@@ -63,6 +64,11 @@ fun StatusSavedGridItem(
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(Uri.parse(item.savedUri))
+                    .apply {
+                        if (isVideo) {
+                            decoderFactory(VideoFrameDecoder.Factory())
+                        }
+                    }
                     .crossfade(true)
                     .build(),
                 contentDescription = item.displayName,

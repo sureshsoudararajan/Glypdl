@@ -164,4 +164,14 @@ class StatusViewModelTest {
         assertFalse(viewModel.uiState.value.isSelectionMode)
         assertFalse(viewModel.uiState.value.selectedIds.contains("item_1"))
     }
+
+    @Test
+    fun `setPreviewItem sets activePreviewMedia on statusRepository`() = runTest(testDispatcher) {
+        val viewModel = StatusViewModel(context, statusRepository)
+        advanceUntilIdle()
+
+        val item = sampleItems.first()
+        viewModel.setPreviewItem(item)
+        io.mockk.verify { statusRepository.activePreviewMedia = item }
+    }
 }
