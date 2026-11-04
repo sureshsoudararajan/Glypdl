@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-11-04
+
+### Added
+
+- **WhatsApp Status Saver (Regular WhatsApp)**:
+  - Added a dedicated WhatsApp quick-launch icon beside the Settings icon in the main top app bar.
+  - Implemented Android Storage Access Framework (SAF) folder picker with persistable read permissions (`takePersistableUriPermission()`), storing the folder preference securely in DataStore.
+  - **Dual Folder Selection Behavior**: Supports both Option A (selecting `Android/media/com.whatsapp/WhatsApp/Media/` with automatic `.Statuses/` subfolder resolution) and Option B (direct selection of `.Statuses/`), plus manual multi-file import fallback (`OpenMultipleDocuments`).
+  - **Video Thumbnail Decoding**: Integrated `coil-video` (`VideoFrameDecoder`) to automatically extract and cache sharp video thumbnails in the status gallery.
+  - **Dedicated Status Saver Screen (`StatusSaverScreen.kt`)**: Features Available and Saved tabs with dynamic count badges, media filter chips (`All`, `Photos`, `Videos`), and batch multi-select selection bar with a live progress dialog.
+  - **Interactive In-App Media Viewer (`StatusPreviewScreen.kt`)**: Fullscreen zoomable image viewer with double-tap zoom toggle, native `MediaPlayer` video playback with tap-to-pause/play controls, external video player fallback launcher, and direct 1-tap save/share actions.
+  - **Unified Export Storage (`Glypdl/status`)**: Saved status images and videos export to a unified `Glypdl/status` location (`Download/Glypdl/status` via `MediaStore.Downloads` or custom user SAF tree `[tree]/status`).
+  - **Room Database Migration (`MIGRATION_3_4`)**: Bumped Room database to version 4 with `saved_statuses` table, preserving all existing download records and history while providing streaming SHA-256 duplicate detection.
+
+- **Categorized Download Storage (`StorageHelper.kt`)**:
+  - Automatically categorizes downloaded media files into dedicated subfolders based on file type:
+    - `videos/` for MP4, MKV, WebM, 3GP, AVI, MOV
+    - `music/` for MP3, M4A, Opus, FLAC, WAV, AAC
+    - `images/` for JPG, PNG, WebP, GIF, SVG
+    - `others/` for subtitles and generic formats
+  - Supports both the default `Download/Glypdl/` path and custom user-selected SAF folders.
+
+### Fixed & Improved
+
+- **Facebook Video, Reels & Stories Download Fixes**:
+  - Resolved `Unsupported URL` and `Cannot parse data` errors on Facebook links.
+  - Added URL canonicalization in `UrlValidator.kt` to normalize mobile share URLs (`/share/r/<id>`, `/share/v/<id>`, `/share/p/<id>`, `story.php`) into standard `/reel/<id>` and `/watch/?v=<id>` formats before passing to the engine.
+  - Configured Desktop User-Agent and browser navigation headers for Facebook requests to bypass mobile layout parsing errors on Android.
+
 ## [3.0.0] - 2026-11-03
 
 ### Added

@@ -14,8 +14,8 @@ android {
         applicationId = "com.glypdl.android"
         minSdk = 26
         targetSdk = 34
-        versionCode = 7
-        versionName = "3.0.0"
+        versionCode = 8
+        versionName = "3.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
