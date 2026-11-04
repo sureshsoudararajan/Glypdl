@@ -33,6 +33,39 @@ import java.io.File
 
 object StorageHelper {
 
+    enum class MediaCategory(val folderName: String) {
+        VIDEOS("videos"),
+        MUSIC("music"),
+        IMAGES("images"),
+        OTHERS("others");
+    }
+
+    fun getMediaCategory(ext: String, mimeType: String = "", isAudio: Boolean = false): MediaCategory {
+        val cleanExt = ext.lowercase().removePrefix(".").trim()
+        val cleanMime = mimeType.lowercase().trim()
+
+        if (isAudio || cleanMime.startsWith("audio/")) {
+            return MediaCategory.MUSIC
+        }
+        if (cleanMime.startsWith("video/")) {
+            return MediaCategory.VIDEOS
+        }
+        if (cleanMime.startsWith("image/")) {
+            return MediaCategory.IMAGES
+        }
+
+        return when (cleanExt) {
+            // Videos
+            "mp4", "m4v", "mkv", "webm", "avi", "mov", "wmv", "flv", "3gp", "ts" -> MediaCategory.VIDEOS
+            // Music / Audio
+            "mp3", "m4a", "opus", "flac", "wav", "aac", "ogg", "oga", "wma", "amr", "mka" -> MediaCategory.MUSIC
+            // Images
+            "jpg", "jpeg", "png", "webp", "gif", "bmp", "svg", "heic", "heif" -> MediaCategory.IMAGES
+            // Others
+            else -> MediaCategory.OTHERS
+        }
+    }
+
     fun getDefaultStagingDir(context: Context): File {
         val baseDir = context.externalCacheDir ?: context.cacheDir ?: File(System.getProperty("java.io.tmpdir") ?: "/tmp")
         val dir = File(baseDir, "staging")
@@ -43,7 +76,7 @@ object StorageHelper {
     }
 
     fun getMimeType(ext: String, isAudio: Boolean): String {
-        return when (ext.lowercase().removePrefix(".")) {
+        return when (val cleanExt = ext.lowercase().removePrefix(".").trim()) {
             "mp4", "m4v" -> if (isAudio) "audio/mp4" else "video/mp4"
             "mkv" -> "video/x-matroska"
             "webm" -> if (isAudio) "audio/webm" else "video/webm"
@@ -56,6 +89,17 @@ object StorageHelper {
             "aac" -> "audio/aac"
             "3gp" -> "video/3gpp"
             "avi" -> "video/x-msvideo"
+            "jpg", "jpeg" -> "image/jpeg"
+            "png" -> "image/png"
+            "webp" -> "image/webp"
+            "gif" -> "image/gif"
+            "bmp" -> "image/bmp"
+            "svg" -> "image/svg+xml"
+            "srt" -> "application/x-subrip"
+            "vtt" -> "text/vtt"
+            "txt" -> "text/plain"
+            "pdf" -> "application/pdf"
+            "json" -> "application/json"
             else -> if (isAudio) "audio/*" else "video/*"
         }
     }
@@ -78,17 +122,17 @@ object StorageHelper {
 
     fun getReadableStorageName(context: Context, treeUriString: String?): String {
         if (treeUriString.isNullOrBlank()) {
-            return "Default: Movies/Glypdl (Videos) & Music/Glypdl (Audio)"
+            return "Internal Storage: Download/Glypdl (videos, music, images, others)"
         }
         return try {
             val uri = Uri.parse(treeUriString)
             val doc = DocumentFile.fromTreeUri(context, uri)
             val displayName = doc?.name
             if (!displayName.isNullOrBlank()) {
-                "Folder: $displayName"
+                "Folder: $displayName (videos, music, images, others)"
             } else {
                 val lastSeg = uri.lastPathSegment?.substringAfterLast(':')
-                if (!lastSeg.isNullOrBlank()) "Folder: $lastSeg" else treeUriString
+                if (!lastSeg.isNullOrBlank()) "Folder: $lastSeg (videos, music, images, others)" else treeUriString
             }
         } catch (e: Exception) {
             "Custom Folder"
@@ -108,13 +152,19 @@ object StorageHelper {
             return Result.failure(IllegalStateException("Staging file does not exist or is empty: ${stagingFile.absolutePath}"))
         }
 
+        val ext = displayName.substringAfterLast('.', "")
+        val category = getMediaCategory(ext, mimeType, isAudio)
+
         // 1. Try Custom SAF Tree if configured
         if (!customTreeUriString.isNullOrBlank()) {
             try {
                 val treeUri = Uri.parse(customTreeUriString)
                 val docTree = DocumentFile.fromTreeUri(context, treeUri)
                 if (docTree != null && docTree.canWrite()) {
-                    val targetDoc = docTree.createFile(mimeType, displayName)
+                    val categoryFolder = docTree.findFile(category.folderName)
+                        ?: docTree.createDirectory(category.folderName)
+                        ?: docTree
+                    val targetDoc = categoryFolder.createFile(mimeType, displayName)
                         ?: throw IllegalStateException("Cannot create file in custom folder")
                     context.contentResolver.openOutputStream(targetDoc.uri)?.use { out ->
                         stagingFile.inputStream().use { input ->
@@ -134,22 +184,8 @@ object StorageHelper {
         // 2. Default Public MediaStore Storage
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // Determine whether MediaStore.Audio.Media, MediaStore.Video.Media, or MediaStore.Downloads should be used.
-                // Android's MediaStore.Audio.Media strictly rejects "audio/webm" and other non-standard audio MIME types.
-                // MediaStore.Downloads accepts all MIME types without restriction and places files in Download/Glypdl.
-                val useDownloadsCollection = isAudio && !isSupportedAudioMediaStoreMime(mimeType)
-
-                val (collection, relativePath) = when {
-                    useDownloadsCollection -> {
-                        MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) to "${Environment.DIRECTORY_DOWNLOADS}/Glypdl"
-                    }
-                    isAudio -> {
-                        MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) to "Music/Glypdl"
-                    }
-                    else -> {
-                        MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) to "Movies/Glypdl"
-                    }
-                }
+                val relativePath = "${Environment.DIRECTORY_DOWNLOADS}/Glypdl/${category.folderName}"
+                val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
 
                 val contentValues = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
@@ -158,24 +194,8 @@ object StorageHelper {
                     put(MediaStore.MediaColumns.IS_PENDING, 1)
                 }
 
-                var contentUri: Uri? = null
-                try {
-                    contentUri = context.contentResolver.insert(collection, contentValues)
-                } catch (e: IllegalArgumentException) {
-                    // Fallback to MediaStore.Downloads if the primary collection rejected the MIME type on this device/ROM
-                    if (collection != MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)) {
-                        val fallbackCollection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-                        val fallbackPath = "${Environment.DIRECTORY_DOWNLOADS}/Glypdl"
-                        contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, fallbackPath)
-                        contentUri = context.contentResolver.insert(fallbackCollection, contentValues)
-                    } else {
-                        throw e
-                    }
-                }
-
-                if (contentUri == null) {
-                    throw IllegalStateException("Failed to insert MediaStore record for $displayName with MIME $mimeType")
-                }
+                val contentUri = context.contentResolver.insert(collection, contentValues)
+                    ?: throw IllegalStateException("Failed to insert MediaStore record for $displayName with MIME $mimeType")
 
                 try {
                     context.contentResolver.openOutputStream(contentUri)?.use { out ->
@@ -197,12 +217,8 @@ object StorageHelper {
             } else {
                 // API 26-28 Fallback
                 val targetDir = File(
-                    Environment.getExternalStoragePublicDirectory(
-                        if (isAudio && isSupportedAudioMediaStoreMime(mimeType)) Environment.DIRECTORY_MUSIC
-                        else if (isAudio) Environment.DIRECTORY_DOWNLOADS
-                        else Environment.DIRECTORY_MOVIES
-                    ),
-                    "Glypdl"
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    "Glypdl/${category.folderName}"
                 )
                 if (!targetDir.exists()) {
                     targetDir.mkdirs()
@@ -240,7 +256,7 @@ object StorageHelper {
             val mime: String
             if (uriOrPath.startsWith("content://")) {
                 uri = Uri.parse(uriOrPath)
-                mime = context.contentResolver.getType(uri) ?: (if (isAudio) "audio/*" else "video/*")
+                mime = context.contentResolver.getType(uri) ?: (if (isAudio) "audio/*" else "*/*")
             } else {
                 val file = File(uriOrPath)
                 if (!file.exists()) return null
@@ -281,7 +297,7 @@ object StorageHelper {
             val mime: String
             if (uriOrPath.startsWith("content://")) {
                 uri = Uri.parse(uriOrPath)
-                mime = context.contentResolver.getType(uri) ?: (if (isAudio) "audio/*" else "video/*")
+                mime = context.contentResolver.getType(uri) ?: (if (isAudio) "audio/*" else "*/*")
             } else {
                 val file = File(uriOrPath)
                 if (!file.exists()) return false

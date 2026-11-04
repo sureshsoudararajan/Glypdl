@@ -59,6 +59,47 @@ class StorageHelperTest {
     }
 
     @Test
+    fun `getMediaCategory properly categorizes extensions and mime types`() {
+        // Videos
+        assertEquals(StorageHelper.MediaCategory.VIDEOS, StorageHelper.getMediaCategory("mp4"))
+        assertEquals(StorageHelper.MediaCategory.VIDEOS, StorageHelper.getMediaCategory("mkv"))
+        assertEquals(StorageHelper.MediaCategory.VIDEOS, StorageHelper.getMediaCategory("webm", isAudio = false))
+        assertEquals(StorageHelper.MediaCategory.VIDEOS, StorageHelper.getMediaCategory("avi"))
+        assertEquals(StorageHelper.MediaCategory.VIDEOS, StorageHelper.getMediaCategory("mov"))
+
+        // Music
+        assertEquals(StorageHelper.MediaCategory.MUSIC, StorageHelper.getMediaCategory("mp3"))
+        assertEquals(StorageHelper.MediaCategory.MUSIC, StorageHelper.getMediaCategory("m4a"))
+        assertEquals(StorageHelper.MediaCategory.MUSIC, StorageHelper.getMediaCategory("flac"))
+        assertEquals(StorageHelper.MediaCategory.MUSIC, StorageHelper.getMediaCategory("opus"))
+        assertEquals(StorageHelper.MediaCategory.MUSIC, StorageHelper.getMediaCategory("wav"))
+        assertEquals(StorageHelper.MediaCategory.MUSIC, StorageHelper.getMediaCategory("webm", isAudio = true))
+        assertEquals(StorageHelper.MediaCategory.MUSIC, StorageHelper.getMediaCategory("mp4", mimeType = "audio/mp4"))
+
+        // Images
+        assertEquals(StorageHelper.MediaCategory.IMAGES, StorageHelper.getMediaCategory("jpg"))
+        assertEquals(StorageHelper.MediaCategory.IMAGES, StorageHelper.getMediaCategory("jpeg"))
+        assertEquals(StorageHelper.MediaCategory.IMAGES, StorageHelper.getMediaCategory("png"))
+        assertEquals(StorageHelper.MediaCategory.IMAGES, StorageHelper.getMediaCategory("webp"))
+        assertEquals(StorageHelper.MediaCategory.IMAGES, StorageHelper.getMediaCategory("gif"))
+        assertEquals(StorageHelper.MediaCategory.IMAGES, StorageHelper.getMediaCategory("", mimeType = "image/png"))
+
+        // Others
+        assertEquals(StorageHelper.MediaCategory.OTHERS, StorageHelper.getMediaCategory("srt"))
+        assertEquals(StorageHelper.MediaCategory.OTHERS, StorageHelper.getMediaCategory("vtt"))
+        assertEquals(StorageHelper.MediaCategory.OTHERS, StorageHelper.getMediaCategory("txt"))
+        assertEquals(StorageHelper.MediaCategory.OTHERS, StorageHelper.getMediaCategory("pdf"))
+        assertEquals(StorageHelper.MediaCategory.OTHERS, StorageHelper.getMediaCategory("unknown_ext"))
+    }
+
+    @Test
+    fun `getReadableStorageName returns formatted storage description`() {
+        val context = mockk<Context>(relaxed = true)
+        val defaultName = StorageHelper.getReadableStorageName(context, null)
+        assertEquals("Internal Storage: Download/Glypdl (videos, music, images, others)", defaultName)
+    }
+
+    @Test
     fun `exportToPermanentStorage fails immediately for non-existent staging file`() {
         val nonExistent = File("/tmp/non_existent_file_${System.currentTimeMillis()}.webm")
         val context = mockk<Context>(relaxed = true)

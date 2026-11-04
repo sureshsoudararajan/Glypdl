@@ -58,6 +58,7 @@ class YtDlpManager @Inject constructor(
 
     companion object {
         const val DEFAULT_USER_AGENT = "Mozilla/5.0 (Linux; Android 14; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36"
+        const val DESKTOP_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
     }
 
     private var ffmpegInitialized = false
@@ -269,16 +270,27 @@ class YtDlpManager @Inject constructor(
         val installed = getInstalledVersion()
         val pId = processId ?: ("playlist_" + System.currentTimeMillis())
         val isInstagram = UrlValidator.isInstagramUrl(url)
+        val isFacebook = UrlValidator.isFacebookUrl(url)
+        val targetUrl = if (isFacebook) UrlValidator.canonicalizeFacebookUrl(url) else url
         try {
-            val request = YoutubeDLRequest(url)
+            val request = YoutubeDLRequest(targetUrl)
             request.addOption("-J")
             request.addOption("--flat-playlist")
             request.addOption("--no-warnings")
             request.addOption("--no-check-certificates")
-            request.addOption("--user-agent", DEFAULT_USER_AGENT)
-            request.addOption("--referer", if (isInstagram) "https://www.instagram.com/" else url)
+            request.addOption("--user-agent", if (isFacebook) DESKTOP_USER_AGENT else DEFAULT_USER_AGENT)
+            request.addOption("--referer", when {
+                isInstagram -> "https://www.instagram.com/"
+                isFacebook -> "https://www.facebook.com/"
+                else -> targetUrl
+            })
+            if (isFacebook) {
+                request.addOption("--add-header", "Sec-Fetch-Mode:navigate")
+                request.addOption("--add-header", "Sec-Fetch-Site:none")
+                request.addOption("--add-header", "Sec-Fetch-Dest:document")
+            }
 
-            val cookieFile = authCookieManager.getCookieFile(url)
+            val cookieFile = authCookieManager.getCookieFile(targetUrl)
             if (cookieFile != null) {
                 request.addOption("--cookies", cookieFile.absolutePath)
             }
@@ -380,19 +392,29 @@ class YtDlpManager @Inject constructor(
     ): Result<MediaInfo> = withContext(Dispatchers.IO) {
         val installed = getInstalledVersion()
         val isInstagram = UrlValidator.isInstagramUrl(url)
+        val isFacebook = UrlValidator.isFacebookUrl(url)
         val isStory = UrlValidator.isInstagramStory(url)
-        val targetUrl = if (isStory) {
-            UrlValidator.canonicalizeInstagramStoryUrl(url)
-        } else {
-            UrlValidator.sanitizeUrl(url)
+        val targetUrl = when {
+            isStory -> UrlValidator.canonicalizeInstagramStoryUrl(url)
+            isFacebook -> UrlValidator.canonicalizeFacebookUrl(url)
+            else -> UrlValidator.sanitizeUrl(url)
         }
         try {
             val request = YoutubeDLRequest(targetUrl)
             request.addOption("-J")
             request.addOption("--no-playlist")
             request.addOption("--no-check-certificates")
-            request.addOption("--user-agent", DEFAULT_USER_AGENT)
-            request.addOption("--referer", if (isInstagram) "https://www.instagram.com/" else targetUrl)
+            request.addOption("--user-agent", if (isFacebook) DESKTOP_USER_AGENT else DEFAULT_USER_AGENT)
+            request.addOption("--referer", when {
+                isInstagram -> "https://www.instagram.com/"
+                isFacebook -> "https://www.facebook.com/"
+                else -> targetUrl
+            })
+            if (isFacebook) {
+                request.addOption("--add-header", "Sec-Fetch-Mode:navigate")
+                request.addOption("--add-header", "Sec-Fetch-Site:none")
+                request.addOption("--add-header", "Sec-Fetch-Dest:document")
+            }
 
             val cookieFile = authCookieManager.getCookieFile(targetUrl)
             if (cookieFile != null) {
@@ -536,18 +558,23 @@ class YtDlpManager @Inject constructor(
             val isStory = UrlValidator.isInstagramStory(request.url)
             val requestedStoryId = if (isStory) UrlValidator.extractInstagramStoryId(request.url) else null
 
-            val targetUrl = if (isStory) {
-                UrlValidator.canonicalizeInstagramStoryUrl(request.url)
-            } else {
-                request.url
+            val targetUrl = when {
+                isStory -> UrlValidator.canonicalizeInstagramStoryUrl(request.url)
+                isFacebook -> UrlValidator.canonicalizeFacebookUrl(request.url)
+                else -> request.url
             }
 
             val dlRequest = YoutubeDLRequest(targetUrl)
             dlRequest.addOption("--no-playlist")
             dlRequest.addOption("--verbose")
-            dlRequest.addOption("--user-agent", DEFAULT_USER_AGENT)
+            dlRequest.addOption("--user-agent", if (isFacebook) DESKTOP_USER_AGENT else DEFAULT_USER_AGENT)
             if (isInstagram) {
                 dlRequest.addOption("--referer", "https://www.instagram.com/")
+            } else if (isFacebook) {
+                dlRequest.addOption("--referer", "https://www.facebook.com/")
+                dlRequest.addOption("--add-header", "Sec-Fetch-Mode:navigate")
+                dlRequest.addOption("--add-header", "Sec-Fetch-Site:none")
+                dlRequest.addOption("--add-header", "Sec-Fetch-Dest:document")
             }
 
             val cookieFile = authCookieManager.getCookieFile(targetUrl)
@@ -564,8 +591,8 @@ class YtDlpManager @Inject constructor(
                             "bestaudio/best"
                         }
                     }
-                    request.formatId.contains("bestaudio") || request.formatId.contains("+") || request.formatId.isBlank() -> "bestvideo+bestaudio/best"
-                    else -> request.formatId.ifBlank { "bestvideo+bestaudio/best" }
+                    request.formatId.isNotBlank() -> request.formatId
+                    else -> "bestvideo+bestaudio/best"
                 }
             } else if (request.isAudioOnly) {
                 if (request.formatId.isNotBlank() && !request.formatId.contains("/")) {
@@ -705,7 +732,17 @@ class YtDlpManager @Inject constructor(
                             try {
                                 val retryRequest = YoutubeDLRequest(targetUrl).apply {
                                     addOption("-f", effectiveFormat)
-                                    addOption("--referer", targetUrl)
+                                    addOption("--user-agent", if (isFacebook) DESKTOP_USER_AGENT else DEFAULT_USER_AGENT)
+                                    if (isInstagram) {
+                                        addOption("--referer", "https://www.instagram.com/")
+                                    } else if (isFacebook) {
+                                        addOption("--referer", "https://www.facebook.com/")
+                                        addOption("--add-header", "Sec-Fetch-Mode:navigate")
+                                        addOption("--add-header", "Sec-Fetch-Site:none")
+                                        addOption("--add-header", "Sec-Fetch-Dest:document")
+                                    } else {
+                                        addOption("--referer", targetUrl)
+                                    }
                                     addOption("--no-check-certificates")
                                     addOption("--no-restrict-filenames")
                                     addOption("--postprocessor-args", "Merger:-threads 4")

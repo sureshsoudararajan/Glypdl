@@ -82,8 +82,50 @@ class UrlValidatorTest {
         assertTrue(UrlValidator.isFacebookUrl("https://www.facebook.com/watch/?v=123456789"))
         assertTrue(UrlValidator.isFacebookUrl("https://fb.watch/abcd1234/"))
         assertTrue(UrlValidator.isFacebookUrl("https://facebook.com/reel/987654321"))
+        assertTrue(UrlValidator.isFacebookUrl("https://m.facebook.com/watch/?v=123"))
+        assertTrue(UrlValidator.isFacebookUrl("https://fb.com/123"))
+        assertTrue(UrlValidator.isFacebookUrl("https://fb.gg/v/123"))
         assertFalse(UrlValidator.isFacebookUrl("https://instagram.com/p/123"))
         assertFalse(UrlValidator.isFacebookUrl("https://youtube.com/watch?v=123"))
+    }
+
+    @Test
+    fun `canonicalizeFacebookUrl normalizes various share and mobile URLs`() {
+        // Reel share
+        assertEquals(
+            "https://www.facebook.com/reel/1450193639775620",
+            UrlValidator.canonicalizeFacebookUrl("https://www.facebook.com/share/r/1450193639775620/?mibextid=wwXIfr")
+        )
+        // Video share
+        assertEquals(
+            "https://www.facebook.com/watch/?v=1450193639775620",
+            UrlValidator.canonicalizeFacebookUrl("https://www.facebook.com/share/v/1450193639775620/?mibextid=wwXIfr")
+        )
+        // Post share with digit ID
+        assertEquals(
+            "https://www.facebook.com/watch/?v=1450193639775620",
+            UrlValidator.canonicalizeFacebookUrl("https://www.facebook.com/share/p/1450193639775620/?mibextid=wwXIfr")
+        )
+        // Story.php
+        assertEquals(
+            "https://www.facebook.com/watch/?v=1450193639775620",
+            UrlValidator.canonicalizeFacebookUrl("https://www.facebook.com/story.php?story_fbid=1450193639775620&id=1000123")
+        )
+        // User video URL
+        assertEquals(
+            "https://www.facebook.com/watch/?v=1450193639775620",
+            UrlValidator.canonicalizeFacebookUrl("https://www.facebook.com/someuser/videos/1450193639775620/")
+        )
+        // User post URL
+        assertEquals(
+            "https://www.facebook.com/watch/?v=1450193639775620",
+            UrlValidator.canonicalizeFacebookUrl("https://www.facebook.com/someuser/posts/1450193639775620/")
+        )
+        // Mobile domain conversion
+        assertEquals(
+            "https://www.facebook.com/watch/?v=1450193639775620",
+            UrlValidator.canonicalizeFacebookUrl("https://m.facebook.com/watch?v=1450193639775620")
+        )
     }
 
     @Test

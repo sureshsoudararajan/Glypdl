@@ -47,7 +47,111 @@ object UrlValidator {
     fun isFacebookUrl(url: String): Boolean {
         if (url.isBlank()) return false
         val lower = url.lowercase()
-        return lower.contains("facebook.com") || lower.contains("fb.watch") || lower.contains("fb.com")
+        return lower.contains("facebook.com") ||
+               lower.contains("fb.watch") ||
+               lower.contains("fb.com") ||
+               lower.contains("fb.gg")
+    }
+
+    fun resolveRedirect(url: String): String {
+        if (!url.contains("fb.watch") && !url.contains("/flx/warn")) return url
+        return try {
+            var current = url
+            for (i in 0 until 5) {
+                val conn = (java.net.URL(current).openConnection() as java.net.HttpURLConnection).apply {
+                    instanceFollowRedirects = false
+                    requestMethod = "GET"
+                    setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
+                    setRequestProperty("Sec-Fetch-Mode", "navigate")
+                    setRequestProperty("Sec-Fetch-Site", "none")
+                    connectTimeout = 4000
+                    readTimeout = 4000
+                }
+                val code = conn.responseCode
+                if (code in 300..399) {
+                    val loc = conn.getHeaderField("Location") ?: break
+                    current = if (loc.startsWith("http")) loc else java.net.URL(java.net.URL(current), loc).toString()
+                    conn.disconnect()
+                } else {
+                    conn.disconnect()
+                    break
+                }
+            }
+            current
+        } catch (e: Exception) {
+            url
+        }
+    }
+
+    fun canonicalizeFacebookUrl(url: String): String {
+        var cleanUrl = sanitizeUrl(url)
+
+        if (cleanUrl.contains("fb.watch") || cleanUrl.contains("/flx/warn")) {
+            cleanUrl = resolveRedirect(cleanUrl)
+        }
+
+        // Normalize mobile subdomains (m.facebook.com, touch.facebook.com, mbasic.facebook.com) to www.facebook.com
+        cleanUrl = cleanUrl
+            .replace("://m.facebook.com", "://www.facebook.com")
+            .replace("://touch.facebook.com", "://www.facebook.com")
+            .replace("://mobile.facebook.com", "://www.facebook.com")
+            .replace("://mbasic.facebook.com", "://www.facebook.com")
+            .replace("://web.facebook.com", "://www.facebook.com")
+            .replace("://fb.com", "://www.facebook.com")
+            .replace("://www.fb.com", "://www.facebook.com")
+
+        // 1. Match story.php?story_fbid=<id> or fbid=<id>
+        val storyPhpMatch = Regex("""story\.php\?.*(?:story_fbid|fbid)=([0-9]+)""").find(cleanUrl)
+        if (storyPhpMatch != null) {
+            val id = storyPhpMatch.groupValues[1]
+            return "https://www.facebook.com/watch/?v=$id"
+        }
+
+        // 2. Match /share/r/<id> -> /reel/<id>
+        val reelShareMatch = Regex("""facebook\.com/share/r/([^/?#]+)""").find(cleanUrl)
+        if (reelShareMatch != null) {
+            val id = reelShareMatch.groupValues[1]
+            return "https://www.facebook.com/reel/$id"
+        }
+
+        // 3. Match /share/v/<id> -> /watch/?v=<id>
+        val videoShareMatch = Regex("""facebook\.com/share/v/([^/?#]+)""").find(cleanUrl)
+        if (videoShareMatch != null) {
+            val id = videoShareMatch.groupValues[1]
+            return "https://www.facebook.com/watch/?v=$id"
+        }
+
+        // 4. Match /share/p/<id> or /share/<id>
+        val postShareMatch = Regex("""facebook\.com/share/(?:p/)?([^/?#]+)""").find(cleanUrl)
+        if (postShareMatch != null) {
+            val id = postShareMatch.groupValues[1]
+            return if (id.all { it.isDigit() }) {
+                "https://www.facebook.com/watch/?v=$id"
+            } else {
+                "https://www.facebook.com/$id"
+            }
+        }
+
+        // 5. Match /<user>/videos/<id> -> /watch/?v=<id>
+        val userVideoMatch = Regex("""facebook\.com/[^/?#]+/videos/([0-9]+)""").find(cleanUrl)
+        if (userVideoMatch != null) {
+            val id = userVideoMatch.groupValues[1]
+            return "https://www.facebook.com/watch/?v=$id"
+        }
+
+        // 6. Match /<user>/posts/<id> -> /watch/?v=<id>
+        val userPostMatch = Regex("""facebook\.com/[^/?#]+/posts/([0-9]+)""").find(cleanUrl)
+        if (userPostMatch != null) {
+            val id = userPostMatch.groupValues[1]
+            return "https://www.facebook.com/watch/?v=$id"
+        }
+
+        // 7. Normalize /watch?v= to /watch/?v=
+        if (cleanUrl.contains("/watch?v=") && !cleanUrl.contains("/watch/?v=")) {
+            cleanUrl = cleanUrl.replace("/watch?v=", "/watch/?v=")
+        }
+
+        return cleanUrl
     }
 
     fun pkToShortcode(mediaId: String): String? {
@@ -115,7 +219,13 @@ object UrlValidator {
                         key != "igsh" &&
                         key != "si" &&
                         key != "ref" &&
-                        key != "mibextid"
+                        key != "mibextid" &&
+                        key != "rdid" &&
+                        key != "paipv" &&
+                        !key.startsWith("__cft__") &&
+                        !key.startsWith("__tn__") &&
+                        key != "fs" &&
+                        key != "focus_composer"
                     }.joinToString("&")
                 URI(
                     uri.scheme,
