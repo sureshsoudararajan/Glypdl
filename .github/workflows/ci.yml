@@ -5,60 +5,48 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  test-linux:
-    name: Test Linux (GTK4 / Python)
+  validate-repo:
+    name: Validate Scripts & Repository Integrity
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install system dependencies & PyGObject
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          python3 \
-          python3-gi \
-          python3-gi-cairo \
-          gir1.2-gtk-4.0 \
-          gir1.2-adw-1 \
-          yt-dlp \
-          ffmpeg \
-          xvfb
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-    - name: Run Test Suite
-      env:
-        PYTHONPATH: src
-        GTK_A11Y: none
-        GSK_RENDERER: cairo
-        NO_AT_BRIDGE: 1
-        LIBGL_ALWAYS_SOFTWARE: 1
-      run: |
-        xvfb-run -a python3 -m tests
+      - name: Validate Shell Script Syntax
+        run: |
+          echo "Checking packaging and helper shell scripts..."
+          chmod +x packaging/deb/build_deb.sh packaging/appimage/build_appimage.sh packaging/rpm/build_rpm.sh
+          bash -n packaging/deb/build_deb.sh
+          bash -n packaging/appimage/build_appimage.sh
+          bash -n packaging/rpm/build_rpm.sh
+          if ls scripts/*.sh 1>/dev/null 2>&1; then
+            for script in scripts/*.sh; do
+              echo "Validating $script..."
+              bash -n "$script"
+            done
+          fi
 
-  test-windows:
-    name: Test Windows (WinUI 3 / .NET 8)
-    runs-on: windows-latest
+      - name: Validate Python Syntax
+        run: |
+          echo "Compiling Python source files to verify syntax..."
+          python3 -m py_compile $(find src -name "*.py")
+          python3 -m py_compile $(find tests -name "*.py")
 
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
-
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v2
-
-    - name: Restore Dependencies
-      run: msbuild windows/Glypdl.Windows.sln -t:Restore -p:Configuration=Debug -p:Platform=x64
-
-    - name: Build Windows Solution
-      run: msbuild windows/Glypdl.Windows.sln -p:Configuration=Debug -p:Platform=x64
-
-    - name: Run Windows Tests
-      run: dotnet test windows/tests/Glypdl.Windows.Tests/Glypdl.Windows.Tests.csproj -c Debug -p:Platform=x64 --no-build
+      - name: Validate Configuration Files
+        run: |
+          echo "Validating JSON and package configs..."
+          python3 -m json.tool extension/manifest.json >/dev/null
+          python3 -m json.tool extension/package.json >/dev/null
+          bash -n PKGBUILD

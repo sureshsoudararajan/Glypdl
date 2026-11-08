@@ -6,14 +6,28 @@ on:
     paths:
       - 'windows/**'
       - '.github/workflows/windows.yml'
-    tags:
-      - 'v*'
   pull_request:
     branches: [ main ]
     paths:
       - 'windows/**'
       - '.github/workflows/windows.yml'
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version string (e.g. 3.3.0)'
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version string (e.g. 3.3.0)'
+        required: false
+        type: string
+        default: '3.2.0'
+
+permissions:
+  contents: read
 
 jobs:
   build-windows:
@@ -47,14 +61,19 @@ jobs:
       - name: Install Inno Setup
         run: choco install innosetup -y
 
-      - name: Build Windows Installer (Setup.exe)
+      - name: Build Windows Setup.exe
         shell: powershell
         run: |
+          $ver = "${{ inputs.version }}"
+          if (-not $ver) {
+              $tag = "${{ github.ref_name }}"
+              if ($tag -match '^v?(.+)$') { $ver = $matches[1] } else { $ver = "3.2.0" }
+          }
           New-Item -ItemType Directory -Path windows\dist -Force
-          iscc windows/packaging/inno/setup.iss
+          iscc /DMyAppVersion="$ver" windows/packaging/inno/setup.iss
 
       - name: Upload Windows Setup Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Glypdl-Windows-Setup
+          name: glypdl-windows
           path: windows/dist/*.exe
