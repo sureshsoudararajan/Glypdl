@@ -14,11 +14,14 @@ src_dir = bin_dir.parent / "src"
 search_paths = [
     str(src_dir),
     str(prefix_share),
+    str(Path.home() / "Glypdl" / "src"),
+    str(Path.home() / ".local" / "share" / "glypdl"),
     "/usr/share/glypdl",
     "/usr/share/glypdl/glypdl",
     "/app/share/glypdl",
     "/usr/local/share/glypdl",
     "/usr/lib/python3/dist-packages",
+    "/usr/local/lib/python3/dist-packages",
 ]
 
 # Add any python3.X/site-packages in /usr/lib or /usr/lib64 for multi-python EL/Fedora compatibility

@@ -360,11 +360,14 @@ def get_manifest_content(host_binary_path: Optional[str] = None) -> Dict[str, An
 
 
 def get_target_manifest_paths() -> List[Path]:
-    """Return all target directory paths where Firefox, LibreWolf, and Flatpak Firefox look for manifests."""
+    """Return all target directory paths where Firefox, LibreWolf, Snap/Flatpak Firefox, and Chromium look for manifests."""
     home = Path.home()
     paths = [
         # Standard Firefox
         home / ".mozilla" / "native-messaging-hosts" / f"{HOST_NAME}.json",
+        # Snap Firefox (Ubuntu default)
+        home / "snap" / "firefox" / "common" / ".mozilla" / "native-messaging-hosts" / f"{HOST_NAME}.json",
+        home / "snap" / "firefox" / "current" / ".mozilla" / "native-messaging-hosts" / f"{HOST_NAME}.json",
         # Flatpak Firefox
         home / ".var" / "app" / "org.mozilla.firefox" / ".mozilla" / "native-messaging-hosts" / f"{HOST_NAME}.json",
         # LibreWolf Standard & Dot-LibreWolf
@@ -372,6 +375,11 @@ def get_target_manifest_paths() -> List[Path]:
         home / ".librewolf" / "native-messaging-hosts" / f"{HOST_NAME}.json",
         # Flatpak LibreWolf
         home / ".var" / "app" / "io.gitlab.librewolf-community" / ".librewolf" / "native-messaging-hosts" / f"{HOST_NAME}.json",
+        # Chromium / Chrome / Brave / Edge
+        home / ".config" / "google-chrome" / "NativeMessagingHosts" / f"{HOST_NAME}.json",
+        home / ".config" / "chromium" / "NativeMessagingHosts" / f"{HOST_NAME}.json",
+        home / ".config" / "BraveSoftware" / "Brave-Browser" / "NativeMessagingHosts" / f"{HOST_NAME}.json",
+        home / ".config" / "microsoft-edge" / "NativeMessagingHosts" / f"{HOST_NAME}.json",
     ]
     return paths
 

@@ -33,14 +33,25 @@ if command -v flatpak >/dev/null 2>&1; then
     fi
 fi
 
-# 2. Native package paths (Debian / Arch / RPM / /usr/local)
-for bin in /usr/bin/glypdl-host /usr/local/bin/glypdl-host "$HOME/.local/share/glypdl/bin/glypdl-host"; do
+# 2. Native package paths (Debian / Arch / RPM / /usr/local / Dev tree)
+for bin in /usr/bin/glypdl-host /usr/local/bin/glypdl-host "$HOME/.local/share/glypdl/bin/glypdl-host" "$HOME/Glypdl/bin/glypdl-host"; do
     if [ -x "$bin" ]; then
         exec "$bin" "$@"
     fi
 done
 
-echo '{"protocolVersion": 1, "success": false, "error": "Glypdl application executable not found"}'
+# If native binary not found on standard paths, try PATH
+if command -v glypdl-host >/dev/null 2>&1; then
+    exec glypdl-host "$@"
+fi
+
+# Fallback: send 32-bit length-prefixed JSON error to satisfy browser native messaging protocol
+python3 -c '
+import sys, struct, json
+msg = json.dumps({"protocolVersion": 1, "success": False, "error": "Glypdl application executable not found"}).encode("utf-8")
+sys.stdout.buffer.write(struct.pack("@I", len(msg)) + msg)
+sys.stdout.buffer.flush()
+'
 exit 1
 INNER_EOF
 
@@ -50,6 +61,8 @@ echo "✓ Host bridge script installed at $HOST_WRAPPER"
 # 2. Target directories for all major browsers
 BROWSER_DIRS=(
     "$HOME/.mozilla/native-messaging-hosts"
+    "$HOME/snap/firefox/common/.mozilla/native-messaging-hosts"
+    "$HOME/snap/firefox/current/.mozilla/native-messaging-hosts"
     "$HOME/.librewolf/native-messaging-hosts"
     "$HOME/.config/librewolf/native-messaging-hosts"
     "$HOME/.var/app/org.mozilla.firefox/.mozilla/native-messaging-hosts"
@@ -57,6 +70,7 @@ BROWSER_DIRS=(
     "$HOME/.config/google-chrome/NativeMessagingHosts"
     "$HOME/.config/chromium/NativeMessagingHosts"
     "$HOME/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
+    "$HOME/.config/microsoft-edge/NativeMessagingHosts"
 )
 
 MANIFEST_CONTENT=$(cat << INNER_EOF
