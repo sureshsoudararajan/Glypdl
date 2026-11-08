@@ -85,6 +85,22 @@ Description: Native Linux GTK4/libadwaita download manager frontend for yt-dlp
  audio media with real-time metrics, queue management, and history.
 EOF
 
+# Post-installation triggers
+cat << 'EOF' > "$PKG_DIR/DEBIAN/postinst"
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    if which update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database -q /usr/share/applications || true
+    fi
+    if which gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true
+    fi
+fi
+EOF
+chmod 755 "$PKG_DIR/DEBIAN/postinst"
+
 dpkg-deb --build "$PKG_DIR"
 rm -rf "$PKG_DIR"
 echo "Built $PKG_DIR.deb successfully with private bundled latest yt-dlp!"

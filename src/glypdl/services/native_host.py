@@ -384,6 +384,44 @@ def get_target_manifest_paths() -> List[Path]:
     return paths
 
 
+def grant_snap_portal_permission() -> bool:
+    """Grant xdg-desktop-portal WebExtensions permission for Snap/Flatpak Firefox and browsers.
+
+    When Firefox is installed as a Snap package (or Flatpak), native messaging goes through
+    xdg-desktop-portal's WebExtensions interface. The portal uses a PermissionStore
+    to track whether a sandboxed app (snap.firefox, org.mozilla.firefox) is allowed to talk to a given
+    native messaging host. If the user previously denied the dialog or it was never
+    shown, the permission is stored as "no" and all native messaging calls fail with
+    a generic "An unexpected error occurred" message.
+
+    This function sets the permission to "yes" so native messaging works without
+    requiring user interaction with the portal dialog.
+    """
+    targets = ["snap.firefox", "org.mozilla.firefox", "snap.chromium"]
+    success = True
+    for app in targets:
+        try:
+            res = subprocess.run(
+                [
+                    "busctl", "--user", "call",
+                    "org.freedesktop.impl.portal.PermissionStore",
+                    "/org/freedesktop/impl/portal/PermissionStore",
+                    "org.freedesktop.impl.portal.PermissionStore",
+                    "SetPermission", "sbssas",
+                    "webextensions", "true",
+                    HOST_NAME,
+                    app,
+                    "1", "yes"
+                ],
+                capture_output=True, timeout=3
+            )
+            if res.returncode != 0:
+                success = False
+        except Exception:
+            success = False
+    return success
+
+
 def install_manifests(host_binary_path: Optional[str] = None) -> List[str]:
     """Install the Native Messaging Manifest into all discovered browser host directories."""
     manifest = get_manifest_content(host_binary_path)
@@ -397,6 +435,10 @@ def install_manifests(host_binary_path: Optional[str] = None) -> List[str]:
             installed_to.append(str(target))
         except Exception:
             pass
+
+    # Grant portal permission for Snap Firefox so native messaging works
+    # without requiring the user to interact with a portal permission dialog
+    grant_snap_portal_permission()
 
     return installed_to
 

@@ -94,6 +94,27 @@ for dir in "${BROWSER_DIRS[@]}"; do
 done
 
 echo "✓ Registered manifest in $count browser target directories."
+
+# 3. Grant xdg-desktop-portal WebExtensions permission for Snap/Flatpak browsers
+# Sandboxed browsers route native messaging through xdg-desktop-portal. If the user
+# previously denied the portal permission dialog (or it was never shown), the
+# PermissionStore entry is "no" and all native messaging calls fail with
+# "An unexpected error occurred". Setting it to "yes" fixes this silently.
+if command -v busctl >/dev/null 2>&1; then
+    for app in "snap.firefox" "org.mozilla.firefox" "snap.chromium"; do
+        busctl --user call \
+            org.freedesktop.impl.portal.PermissionStore \
+            /org/freedesktop/impl/portal/PermissionStore \
+            org.freedesktop.impl.portal.PermissionStore \
+            SetPermission sbssas \
+            "webextensions" true \
+            "$HOST_NAME" \
+            "$app" \
+            1 "yes" 2>/dev/null || true
+    done
+    echo "✓ Granted xdg-desktop-portal WebExtensions permission for Snap/Flatpak browsers."
+fi
+
 echo ""
 echo "🎉 Setup complete! Restart your browser to activate the connection."
 echo "======================================================"
