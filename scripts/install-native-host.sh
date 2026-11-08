@@ -88,9 +88,22 @@ INNER_EOF
 
 count=0
 for dir in "${BROWSER_DIRS[@]}"; do
-    mkdir -p "$dir"
-    echo "$MANIFEST_CONTENT" > "$dir/$HOST_NAME.json"
-    count=$((count + 1))
+    parent_browser_dir="$(dirname "$dir")"
+    case "$dir" in
+        *mozilla*|*firefox*)
+            mkdir -p "$dir"
+            echo "$MANIFEST_CONTENT" > "$dir/$HOST_NAME.json"
+            count=$((count + 1))
+            ;;
+        *)
+            # Only create directory if parent browser directory already exists
+            if [ -d "$parent_browser_dir" ]; then
+                mkdir -p "$dir"
+                echo "$MANIFEST_CONTENT" > "$dir/$HOST_NAME.json"
+                count=$((count + 1))
+            fi
+            ;;
+    esac
 done
 
 echo "✓ Registered manifest in $count browser target directories."

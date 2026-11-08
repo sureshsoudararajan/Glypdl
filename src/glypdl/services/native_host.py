@@ -429,6 +429,13 @@ def install_manifests(host_binary_path: Optional[str] = None) -> List[str]:
 
     for target in get_target_manifest_paths():
         try:
+            target_str = str(target)
+            # For standard Mozilla/Firefox, always install.
+            # For other browsers, only install if the parent browser directory already exists.
+            if not ("mozilla" in target_str or "firefox" in target_str):
+                if not target.parent.parent.exists():
+                    continue
+
             target.parent.mkdir(parents=True, exist_ok=True)
             with open(target, "w", encoding="utf-8") as f:
                 json.dump(manifest, f, indent=2)
