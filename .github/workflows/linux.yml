@@ -148,7 +148,7 @@ jobs:
           if [ -n "$VERSION" ]; then
             sed -i "s/^pkgver=.*/pkgver=${VERSION}/" PKGBUILD
           fi
-          pacman -Syu --noconfirm base-devel git
+          pacman -Syu --noconfirm base-devel git curl
           useradd -m builder
           chown -R builder:builder "$GITHUB_WORKSPACE"
           su builder -c "makepkg -f --nodeps"

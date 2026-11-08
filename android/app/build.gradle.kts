@@ -1,3 +1,7 @@
+import java.net.HttpURLConnection
+import java.net.URI
+import java.net.URL
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -141,3 +145,39 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }
+
+tasks.register("downloadLatestYtDlp") {
+    description = "Downloads the latest official yt-dlp binary into res/raw/ytdlp"
+    group = "build setup"
+    val rawDir = file("src/main/res/raw")
+    val targetFile = file("src/main/res/raw/ytdlp")
+    outputs.file(targetFile)
+    doLast {
+        rawDir.mkdirs()
+        println("Checking and bundling latest official yt-dlp release from GitHub...")
+        try {
+            val url = URI("https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp").toURL()
+            val conn = url.openConnection() as HttpURLConnection
+            conn.instanceFollowRedirects = true
+            conn.connectTimeout = 15000
+            conn.readTimeout = 30000
+            conn.inputStream.use { input ->
+                targetFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            println("Successfully downloaded latest yt-dlp (${targetFile.length()} bytes)")
+        } catch (e: Exception) {
+            if (targetFile.exists() && targetFile.length() > 0) {
+                println("Using cached/existing yt-dlp binary (${targetFile.length()} bytes): ${e.message}")
+            } else {
+                throw GradleException("Failed to download latest yt-dlp and no cached binary exists: ${e.message}", e)
+            }
+        }
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn("downloadLatestYtDlp")
+}
+

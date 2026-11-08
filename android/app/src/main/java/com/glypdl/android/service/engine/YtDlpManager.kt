@@ -74,6 +74,15 @@ class YtDlpManager @Inject constructor(
                 e.printStackTrace()
             }
 
+            // Sync bundled R.raw.ytdlp if app was upgraded or binary is missing/outdated
+            syncBundledYtDlpIfNeeded()
+
+            // Ensure installed version is queried and cached
+            val currentInstalled = getInstalledVersion()
+            if (currentInstalled != "Unknown" && currentInstalled != "Ready") {
+                settingsRepository.setCachedLatestVersion(currentInstalled)
+            }
+
             // Auto-update check if enabled
             val autoUpdate = settingsRepository.autoUpdateYtDlp.first()
             val lastCheck = settingsRepository.lastUpdateCheck.first()
@@ -99,11 +108,65 @@ class YtDlpManager @Inject constructor(
         }
     }
 
+    private fun syncBundledYtDlpIfNeeded() {
+        try {
+            val ytdlpDir = File(File(context.noBackupFilesDir, YoutubeDL.baseName), YoutubeDL.ytdlpDirName)
+            val ytdlpBinary = File(ytdlpDir, YoutubeDL.ytdlpBin)
+            val rawResId = context.resources.getIdentifier("ytdlp", "raw", context.packageName)
+            if (rawResId != 0) {
+                val appInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                val currentVersionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                    appInfo.longVersionCode
+                } else {
+                    @Suppress("DEPRECATION")
+                    appInfo.versionCode.toLong()
+                }
+                val prefs = context.getSharedPreferences("youtubedl-android", Context.MODE_PRIVATE)
+                val lastSyncedCode = prefs.getString("glypdl_bundled_ytdlp_app_ver", null)?.toLongOrNull() ?: 0L
+
+                if (!ytdlpBinary.exists() || currentVersionCode > lastSyncedCode) {
+                    ytdlpDir.mkdirs()
+                    context.resources.openRawResource(rawResId).use { input ->
+                        val tempFile = File(ytdlpDir, "yt-dlp.tmp")
+                        tempFile.outputStream().use { output -> input.copyTo(output) }
+                        if (ytdlpBinary.exists()) ytdlpBinary.delete()
+                        tempFile.renameTo(ytdlpBinary)
+                    }
+                    prefs.edit().putString("glypdl_bundled_ytdlp_app_ver", currentVersionCode.toString()).apply()
+                    queryInstalledVersion()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun queryInstalledVersion(): String? {
+        return try {
+            val req = YoutubeDLRequest(emptyList())
+            req.addOption("--version")
+            val resp = YoutubeDL.getInstance().execute(req)
+            val ver = resp.out.trim()
+            if (ver.isNotEmpty() && ver.matches(Regex("""\d{4}\.\d{2}\.\d{2}(\.\d+)?"""))) {
+                val prefs = context.getSharedPreferences("youtubedl-android", Context.MODE_PRIVATE)
+                prefs.edit().putString("dlpVersion", ver).putString("dlpVersionName", ver).apply()
+                ver
+            } else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     fun getInstalledVersion(): String {
         return try {
-            YoutubeDL.getInstance().version(context) ?: "Unknown"
+            val v = YoutubeDL.getInstance().version(context)
+            if (!v.isNullOrBlank() && !v.equals("Unknown", ignoreCase = true)) {
+                v
+            } else {
+                queryInstalledVersion() ?: "Ready"
+            }
         } catch (e: Exception) {
-            "Unknown"
+            "Ready"
         }
     }
 

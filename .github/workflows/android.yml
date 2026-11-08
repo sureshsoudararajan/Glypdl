@@ -60,6 +60,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Fetch Latest Official yt-dlp Binary
+        run: |
+          mkdir -p android/app/src/main/res/raw
+          echo "Downloading latest official yt-dlp binary..."
+          curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o android/app/src/main/res/raw/ytdlp
+          chmod 644 android/app/src/main/res/raw/ytdlp
+          echo "Bundled yt-dlp size: $(ls -lh android/app/src/main/res/raw/ytdlp | awk '{print $5}')"
+
       - name: Run Unit Tests
         run: |
           cd android
@@ -82,6 +90,14 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+
+      - name: Fetch Latest Official yt-dlp Binary
+        run: |
+          mkdir -p android/app/src/main/res/raw
+          echo "Downloading latest official yt-dlp binary..."
+          curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o android/app/src/main/res/raw/ytdlp
+          chmod 644 android/app/src/main/res/raw/ytdlp
+          echo "Bundled yt-dlp size: $(ls -lh android/app/src/main/res/raw/ytdlp | awk '{print $5}')"
 
       - name: Determine Build Type
         id: build_type

@@ -58,6 +58,14 @@ jobs:
       - name: Publish Windows App (win-x64 Self-Contained)
         run: msbuild windows/src/Glypdl.Windows/Glypdl.Windows.csproj -t:Publish -p:Configuration=Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64 -p:SelfContained=true -p:PublishSelfContained=true -p:PublishDir=..\..\publish\
 
+      - name: Bundle Latest Official yt-dlp Executable
+        shell: powershell
+        run: |
+          Write-Host "Downloading latest official yt-dlp.exe from GitHub..."
+          Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile "windows\publish\yt-dlp.exe"
+          $size = (Get-Item "windows\publish\yt-dlp.exe").Length
+          Write-Host "Successfully bundled yt-dlp.exe ($size bytes) into Windows app package"
+
       - name: Install Inno Setup
         run: choco install innosetup -y
 
