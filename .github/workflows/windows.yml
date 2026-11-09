@@ -56,13 +56,17 @@ jobs:
         run: dotnet test windows/tests/Glypdl.Windows.Tests/Glypdl.Windows.Tests.csproj -c Release -p:Platform=x64 --no-build
 
       - name: Publish Windows App (win-x64 Self-Contained)
-        run: msbuild windows/src/Glypdl.Windows/Glypdl.Windows.csproj -t:Publish -p:Configuration=Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64 -p:SelfContained=true -p:PublishSelfContained=true -p:PublishDir=..\..\publish\
+        run: msbuild windows/src/Glypdl.Windows/Glypdl.Windows.csproj -t:Publish -p:Configuration=Release -p:Platform=x64 -p:RuntimeIdentifier=win-x64 -p:SelfContained=true -p:PublishSelfContained=true -p:PublishDir="${{ github.workspace }}\windows\publish\"
 
       - name: Bundle Latest Official yt-dlp Executable
         shell: powershell
         run: |
+          New-Item -ItemType Directory -Path windows\publish -Force
           Write-Host "Downloading latest official yt-dlp.exe from GitHub..."
-          Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile "windows\publish\yt-dlp.exe"
+          curl.exe -L -s -S -o "windows\publish\yt-dlp.exe" "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+          if (-not (Test-Path "windows\publish\yt-dlp.exe")) {
+              throw "Failed to download yt-dlp.exe"
+          }
           $size = (Get-Item "windows\publish\yt-dlp.exe").Length
           Write-Host "Successfully bundled yt-dlp.exe ($size bytes) into Windows app package"
 
@@ -73,9 +77,13 @@ jobs:
         shell: powershell
         run: |
           $ver = "${{ inputs.version }}"
-          if (-not $ver) {
+          if (-not $ver -or $ver -like "*/*" -or $ver -eq "main" -or $ver -notmatch '^\d') {
               $tag = "${{ github.ref_name }}"
-              if ($tag -match '^v?(.+)$') { $ver = $matches[1] } else { $ver = "4.0.0" }
+              if ($tag -match '^v?(\d+\.\d+\.\d+.*)$' -and $tag -notlike "*/*") {
+                  $ver = $matches[1]
+              } else {
+                  $ver = "4.0.0"
+              }
           }
           New-Item -ItemType Directory -Path windows\dist -Force
           iscc /DMyAppVersion="$ver" windows/packaging/inno/setup.iss
