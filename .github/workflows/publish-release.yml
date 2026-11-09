@@ -151,6 +151,7 @@ jobs:
     uses: ./.github/workflows/android.yml
     with:
       version: ${{ needs.detect-changes.outputs.version }}
+      build_release: true
     secrets: inherit
 
   build-windows:

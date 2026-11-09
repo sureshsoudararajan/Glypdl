@@ -18,6 +18,11 @@ on:
         required: false
         type: string
         default: ''
+      build_release:
+        description: 'Build signed release APKs instead of debug'
+        required: false
+        type: boolean
+        default: true
     secrets:
       RELEASE_KEYSTORE_BASE64:
         required: false
@@ -102,7 +107,7 @@ jobs:
       - name: Determine Build Type
         id: build_type
         run: |
-          if [ "${{ github.event_name }}" = "workflow_call" ] || [ "${{ inputs.build_release }}" = "true" ]; then
+          if [ "${{ inputs.build_release }}" = "true" ] || [ -n "${{ inputs.version }}" ] || [[ "${GITHUB_REF_NAME}" =~ ^v[0-9] ]]; then
             echo "is_release=true" >> "$GITHUB_OUTPUT"
           else
             echo "is_release=false" >> "$GITHUB_OUTPUT"
