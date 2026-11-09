@@ -326,6 +326,44 @@ class YtDlpManager @Inject constructor(
         }
     }
 
+    /**
+     * Applies platform-specific networking headers, User-Agent, referer, and authentication cookies.
+     * Ensures parity between Linux CLI and Android runtime for Instagram, Facebook, YouTube, etc.
+     */
+    fun applyPlatformOptions(
+        request: YoutubeDLRequest,
+        url: String,
+        cookieFile: File? = null
+    ) {
+        val isInstagram = UrlValidator.isInstagramUrl(url)
+        val isFacebook = UrlValidator.isFacebookUrl(url)
+
+        request.addOption("--no-check-certificates")
+
+        // Instagram and Facebook extractors require desktop browser User-Agent to return
+        // web GraphQL / RelayPrefetchedStreamCache responses instead of mobile app redirects.
+        if (isInstagram || isFacebook) {
+            request.addOption("--user-agent", DESKTOP_USER_AGENT)
+        } else {
+            request.addOption("--user-agent", DEFAULT_USER_AGENT)
+        }
+
+        if (isInstagram) {
+            request.addOption("--referer", "https://www.instagram.com/")
+        } else if (isFacebook) {
+            request.addOption("--referer", "https://www.facebook.com/")
+            request.addOption("--add-header", "Sec-Fetch-Mode:navigate")
+            request.addOption("--add-header", "Sec-Fetch-Site:none")
+            request.addOption("--add-header", "Sec-Fetch-Dest:document")
+        } else {
+            request.addOption("--referer", url)
+        }
+
+        if (cookieFile != null && authCookieManager.isValidCookieFile(cookieFile)) {
+            request.addOption("--cookies", cookieFile.absolutePath)
+        }
+    }
+
     suspend fun extractPlaylistInfo(
         url: String,
         processId: String? = null,
@@ -333,7 +371,6 @@ class YtDlpManager @Inject constructor(
     ): Result<PlaylistInfo> = withContext(Dispatchers.IO) {
         val installed = getInstalledVersion()
         val pId = processId ?: ("playlist_" + System.currentTimeMillis())
-        val isInstagram = UrlValidator.isInstagramUrl(url)
         val isFacebook = UrlValidator.isFacebookUrl(url)
         val targetUrl = if (isFacebook) UrlValidator.canonicalizeFacebookUrl(url) else url
         try {
@@ -341,26 +378,25 @@ class YtDlpManager @Inject constructor(
             request.addOption("-J")
             request.addOption("--flat-playlist")
             request.addOption("--no-warnings")
-            request.addOption("--no-check-certificates")
-            request.addOption("--user-agent", if (isFacebook) DESKTOP_USER_AGENT else DEFAULT_USER_AGENT)
-            request.addOption("--referer", when {
-                isInstagram -> "https://www.instagram.com/"
-                isFacebook -> "https://www.facebook.com/"
-                else -> targetUrl
-            })
-            if (isFacebook) {
-                request.addOption("--add-header", "Sec-Fetch-Mode:navigate")
-                request.addOption("--add-header", "Sec-Fetch-Site:none")
-                request.addOption("--add-header", "Sec-Fetch-Dest:document")
-            }
+            applyPlatformOptions(request, targetUrl, cookieFile = null)
 
-            val cookieFile = authCookieManager.getCookieFile(targetUrl)
-            if (cookieFile != null) {
-                request.addOption("--cookies", cookieFile.absolutePath)
-            }
-
-            val response = withTimeoutOrNull(timeoutMs) {
+            var response = withTimeoutOrNull(timeoutMs) {
                 YoutubeDL.getInstance().execute(request, pId)
+            }
+
+            // Retry with authentication cookies if anonymous extraction failed and cookies exist
+            val savedCookieFile = authCookieManager.getCookieFile(targetUrl)
+            if (response == null || !response.out.trim().startsWith("{")) {
+                if (savedCookieFile != null && authCookieManager.isValidCookieFile(savedCookieFile)) {
+                    val authRequest = YoutubeDLRequest(targetUrl)
+                    authRequest.addOption("-J")
+                    authRequest.addOption("--flat-playlist")
+                    authRequest.addOption("--no-warnings")
+                    applyPlatformOptions(authRequest, targetUrl, cookieFile = savedCookieFile)
+                    response = withTimeoutOrNull(timeoutMs) {
+                        YoutubeDL.getInstance().execute(authRequest, pId)
+                    }
+                }
             }
 
             if (response == null) {
@@ -455,42 +491,59 @@ class YtDlpManager @Inject constructor(
         timeoutMs: Long = 90_000L
     ): Result<MediaInfo> = withContext(Dispatchers.IO) {
         val installed = getInstalledVersion()
-        val isInstagram = UrlValidator.isInstagramUrl(url)
-        val isFacebook = UrlValidator.isFacebookUrl(url)
         val isStory = UrlValidator.isInstagramStory(url)
         val targetUrl = when {
             isStory -> UrlValidator.canonicalizeInstagramStoryUrl(url)
-            isFacebook -> UrlValidator.canonicalizeFacebookUrl(url)
+            UrlValidator.isFacebookUrl(url) -> UrlValidator.canonicalizeFacebookUrl(url)
             else -> UrlValidator.sanitizeUrl(url)
         }
+
+        // Phase 1: Always attempt anonymous extraction first (NO cookies attached)
+        val anonymousResult = executeExtractInfo(targetUrl, url, cookieFile = null, timeoutMs = timeoutMs, installed = installed)
+        if (anonymousResult.isSuccess) {
+            return@withContext anonymousResult
+        }
+
+        // Phase 2: If anonymous extraction failed, evaluate if user authentication is required
+        val error = (anonymousResult.exceptionOrNull() as? GlypdlException)?.error
+        val shouldRetryWithAuth = error is GlypdlError.AuthenticationRequired ||
+                error is GlypdlError.PrivateContent ||
+                error is GlypdlError.EmptyMediaResponse ||
+                (isStory && error is GlypdlError.ExtractorError)
+
+        if (shouldRetryWithAuth) {
+            val savedCookieFile = authCookieManager.getCookieFile(targetUrl)
+            if (savedCookieFile != null && authCookieManager.isValidCookieFile(savedCookieFile)) {
+                val authResult = executeExtractInfo(targetUrl, url, cookieFile = savedCookieFile, timeoutMs = timeoutMs, installed = installed)
+                if (authResult.isSuccess) {
+                    val mediaInfo = authResult.getOrThrow().copy(requiresAuth = true)
+                    return@withContext Result.success(mediaInfo)
+                }
+            }
+        }
+
+        return@withContext anonymousResult
+    }
+
+    private suspend fun executeExtractInfo(
+        targetUrl: String,
+        originalUrl: String,
+        cookieFile: File?,
+        timeoutMs: Long,
+        installed: String?
+    ): Result<MediaInfo> {
         try {
             val request = YoutubeDLRequest(targetUrl)
             request.addOption("-J")
             request.addOption("--no-playlist")
-            request.addOption("--no-check-certificates")
-            request.addOption("--user-agent", if (isFacebook) DESKTOP_USER_AGENT else DEFAULT_USER_AGENT)
-            request.addOption("--referer", when {
-                isInstagram -> "https://www.instagram.com/"
-                isFacebook -> "https://www.facebook.com/"
-                else -> targetUrl
-            })
-            if (isFacebook) {
-                request.addOption("--add-header", "Sec-Fetch-Mode:navigate")
-                request.addOption("--add-header", "Sec-Fetch-Site:none")
-                request.addOption("--add-header", "Sec-Fetch-Dest:document")
-            }
-
-            val cookieFile = authCookieManager.getCookieFile(targetUrl)
-            if (cookieFile != null) {
-                request.addOption("--cookies", cookieFile.absolutePath)
-            }
+            applyPlatformOptions(request, targetUrl, cookieFile)
 
             val response = withTimeoutOrNull(timeoutMs) {
                 YoutubeDL.getInstance().execute(request)
             }
 
             if (response == null) {
-                return@withContext Result.failure(
+                return Result.failure(
                     GlypdlException(
                         GlypdlError.TimedOut(
                             userMessage = "Media analysis timed out after ${timeoutMs / 1000}s. The website may be slow, rate-limiting, or requiring authentication."
@@ -514,7 +567,7 @@ class YtDlpManager @Inject constructor(
                     thumbnail = lastThumb?.optString("url")?.takeIf { it.isNotBlank() }
                 }
             }
-            if (thumbnail == null && id.isNotBlank() && (url.contains("youtube.com") || url.contains("youtu.be") || id.length == 11)) {
+            if (thumbnail == null && id.isNotBlank() && (originalUrl.contains("youtube.com") || originalUrl.contains("youtu.be") || id.length == 11)) {
                 thumbnail = "https://i.ytimg.com/vi/$id/hqdefault.jpg"
             }
 
@@ -583,11 +636,11 @@ class YtDlpManager @Inject constructor(
             val manualSubs = SubtitleParser.parseManualSubtitles(json)
             val autoSubs = SubtitleParser.parseAutomaticCaptions(json)
 
-            val (ytAudioTracks, ytAudioLanguages) = YouTubeAudioTrackParser.parse(json, url, extractor)
+            val (ytAudioTracks, ytAudioLanguages) = YouTubeAudioTrackParser.parse(json, originalUrl, extractor)
 
             val mediaInfo = MediaInfo(
                 id = id,
-                url = url,
+                url = originalUrl,
                 title = title,
                 thumbnail = thumbnail,
                 duration = duration,
@@ -599,14 +652,15 @@ class YtDlpManager @Inject constructor(
                 manualSubtitles = manualSubs,
                 automaticSubtitles = autoSubs,
                 youtubeAudioTracks = ytAudioTracks,
-                youtubeAudioLanguages = ytAudioLanguages
+                youtubeAudioLanguages = ytAudioLanguages,
+                requiresAuth = cookieFile != null
             )
 
-            Result.success(mediaInfo)
+            return Result.success(mediaInfo)
         } catch (e: Exception) {
             e.printStackTrace()
             val parsedError = YtDlpErrorParser.parse(e.message, installed)
-            Result.failure(GlypdlException(parsedError))
+            return Result.failure(GlypdlException(parsedError))
         }
     }
 
@@ -700,20 +754,13 @@ class YtDlpManager @Inject constructor(
             val dlRequest = YoutubeDLRequest(targetUrl)
             dlRequest.addOption("--no-playlist")
             dlRequest.addOption("--verbose")
-            dlRequest.addOption("--user-agent", if (isFacebook) DESKTOP_USER_AGENT else DEFAULT_USER_AGENT)
-            if (isInstagram) {
-                dlRequest.addOption("--referer", "https://www.instagram.com/")
-            } else if (isFacebook) {
-                dlRequest.addOption("--referer", "https://www.facebook.com/")
-                dlRequest.addOption("--add-header", "Sec-Fetch-Mode:navigate")
-                dlRequest.addOption("--add-header", "Sec-Fetch-Site:none")
-                dlRequest.addOption("--add-header", "Sec-Fetch-Dest:document")
-            }
 
-            val cookieFile = authCookieManager.getCookieFile(targetUrl)
-            if (cookieFile != null) {
-                dlRequest.addOption("--cookies", cookieFile.absolutePath)
+            val cookieFile = if (request.requiresAuth) {
+                authCookieManager.getCookieFile(targetUrl)
+            } else {
+                null
             }
+            applyPlatformOptions(dlRequest, targetUrl, cookieFile)
 
             val effectiveFormat = if (isInstagram || isFacebook) {
                 when {
@@ -761,12 +808,6 @@ class YtDlpManager @Inject constructor(
                 "bestvideo+bestaudio/best"
             }
             dlRequest.addOption("-f", effectiveFormat)
-
-            // Referer header prevents 403 Forbidden on sites checking request origin (e.g. Instagram, Twitter, Reddit, Streamable, etc.)
-            dlRequest.addOption("--referer", if (isInstagram) "https://www.instagram.com/" else targetUrl)
-
-            // Avoid SSL handshake failures on older/mobile cert stores
-            dlRequest.addOption("--no-check-certificates")
 
             // Preserve non-ASCII / Unicode titles (Tamil, Hindi, Japanese, emoji)
             dlRequest.addOption("--no-restrict-filenames")
@@ -913,18 +954,7 @@ class YtDlpManager @Inject constructor(
                             try {
                                 val retryRequest = YoutubeDLRequest(targetUrl).apply {
                                     addOption("-f", effectiveFormat)
-                                    addOption("--user-agent", if (isFacebook) DESKTOP_USER_AGENT else DEFAULT_USER_AGENT)
-                                    if (isInstagram) {
-                                        addOption("--referer", "https://www.instagram.com/")
-                                    } else if (isFacebook) {
-                                        addOption("--referer", "https://www.facebook.com/")
-                                        addOption("--add-header", "Sec-Fetch-Mode:navigate")
-                                        addOption("--add-header", "Sec-Fetch-Site:none")
-                                        addOption("--add-header", "Sec-Fetch-Dest:document")
-                                    } else {
-                                        addOption("--referer", targetUrl)
-                                    }
-                                    addOption("--no-check-certificates")
+                                    applyPlatformOptions(this, targetUrl, cookieFile)
                                     addOption("--no-restrict-filenames")
                                     addOption("--postprocessor-args", "Merger:-threads 4")
                                     addOption("-o", outputPath)

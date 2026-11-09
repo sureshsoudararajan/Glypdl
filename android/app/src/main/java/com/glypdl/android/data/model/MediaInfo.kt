@@ -45,7 +45,8 @@ data class MediaInfo(
     val manualSubtitles: List<SubtitleTrack> = emptyList(),
     val automaticSubtitles: List<SubtitleTrack> = emptyList(),
     val youtubeAudioTracks: List<YouTubeAudioTrack> = emptyList(),
-    val youtubeAudioLanguages: List<YouTubeAudioLanguage> = emptyList()
+    val youtubeAudioLanguages: List<YouTubeAudioLanguage> = emptyList(),
+    val requiresAuth: Boolean = false
 ) {
     val allSubtitles: List<SubtitleTrack>
         get() = manualSubtitles + automaticSubtitles

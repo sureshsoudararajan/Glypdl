@@ -24,7 +24,7 @@ on:
         description: 'Version string (e.g. 3.3.0)'
         required: false
         type: string
-        default: '3.2.0'
+        default: '4.0.0'
 
 permissions:
   contents: read

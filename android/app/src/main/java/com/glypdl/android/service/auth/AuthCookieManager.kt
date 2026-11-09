@@ -98,8 +98,13 @@ class AuthCookieManager @Inject constructor(
 
         val cookieFile = File(cookiesDir, "${domainKey}.txt")
         try {
+            val trimmedInput = rawCookies.trim()
+            if (trimmedInput.startsWith("# Netscape HTTP Cookie File") || trimmedInput.startsWith("# HTTP Cookie File")) {
+                cookieFile.writeText(trimmedInput)
+                return isValidCookieFile(cookieFile)
+            }
+
             val dotDomain = if (domainKey.startsWith(".")) domainKey else ".$domainKey"
-            val expiry = (System.currentTimeMillis() / 1000) + (10L * 365 * 24 * 3600)
 
             FileWriter(cookieFile, false).use { writer ->
                 writer.write("# Netscape HTTP Cookie File\n")
@@ -113,8 +118,13 @@ class AuthCookieManager @Inject constructor(
                     val name = pair.substringBefore("=").trim()
                     val value = pair.substringAfter("=").trim()
                     if (name.isNotEmpty() && seenKeys.add(name)) {
-                        // In Netscape format, field 4 is 'secure' (TRUE requires HTTPS, matching auth cookies),
-                        // and field 2 is 'include subdomains' (TRUE allows .domain.com to cover www, m, api, i, etc.)
+                        // Standard Netscape format uses expiry 0 for session cookies
+                        val isSession = name.equals("sessionid", ignoreCase = true) ||
+                                       name.equals("c_user", ignoreCase = true) ||
+                                       name.equals("xs", ignoreCase = true) ||
+                                       name.equals("ds_user_id", ignoreCase = true)
+                        val expiry = if (isSession) 0L else (System.currentTimeMillis() / 1000) + (30L * 24 * 3600)
+
                         writer.write("$dotDomain\tTRUE\t/\tTRUE\t$expiry\t$name\t$value\n")
                         if (domainKey.contains("instagram")) {
                             writer.write(".i.instagram.com\tTRUE\t/\tTRUE\t$expiry\t$name\t$value\n")
@@ -125,21 +135,52 @@ class AuthCookieManager @Inject constructor(
                     }
                 }
             }
-            return cookieFile.exists() && cookieFile.length() > 0
+            return isValidCookieFile(cookieFile)
         } catch (e: Exception) {
-            e.printStackTrace()
             return false
+        }
+    }
+
+    fun isValidCookieFile(file: File?): Boolean {
+        if (file == null || !file.exists() || file.length() == 0L) return false
+        return try {
+            file.bufferedReader().use { reader ->
+                var hasHeader = false
+                var hasValidCookie = false
+                var count = 0
+                for (line in reader.lineSequence()) {
+                    count++
+                    if (count > 500) break
+                    val trimmed = line.trim()
+                    if (trimmed.startsWith("# Netscape HTTP Cookie File") || trimmed.startsWith("# HTTP Cookie File")) {
+                        hasHeader = true
+                    }
+                    if (!trimmed.startsWith("#") && trimmed.isNotEmpty()) {
+                        val fields = trimmed.split("\t")
+                        if (fields.size >= 7) {
+                            hasValidCookie = true
+                        }
+                    }
+                }
+                hasHeader && hasValidCookie
+            }
+        } catch (e: Exception) {
+            false
         }
     }
 
     fun getCookieFile(urlOrDomain: String): File? {
         val key = resolveDomainKey(urlOrDomain)
         val file = File(cookiesDir, "${key}.txt")
-        return if (file.exists() && file.length() > 0) file else null
+        return if (isValidCookieFile(file)) file else null
     }
 
     fun hasCookies(domainKey: String): Boolean {
         return getCookieFile(domainKey) != null
+    }
+
+    fun hasValidCookies(domainKey: String): Boolean {
+        return isValidCookieFile(getCookieFile(domainKey))
     }
 
     fun clearCookies(domainKey: String): Boolean {

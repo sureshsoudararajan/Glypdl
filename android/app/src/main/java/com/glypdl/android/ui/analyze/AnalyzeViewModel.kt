@@ -859,7 +859,10 @@ class AnalyzeViewModel @Inject constructor(
             )
         }
 
-        return baseRequest.copy(subtitleOptions = subOptions)
+        return baseRequest.copy(
+            subtitleOptions = subOptions,
+            requiresAuth = mediaInfo.requiresAuth
+        )
     }
 
     fun startDownload() {

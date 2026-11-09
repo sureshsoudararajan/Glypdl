@@ -60,7 +60,7 @@ jobs:
           elif [[ "${GITHUB_REF_NAME}" =~ ^v[0-9] ]]; then
             CURRENT_TAG="${GITHUB_REF_NAME}"
           else
-            CURRENT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v3.2.0")
+            CURRENT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v4.0.0")
           fi
           VERSION="${CURRENT_TAG#v}"
 

@@ -38,6 +38,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -369,6 +370,60 @@ fun DownloadDetailScreen(
                             Button(onClick = viewModel::cancelDownload, modifier = Modifier.weight(1f)) { Text("Cancel") }
                         }
                         DownloadStatus.FAILED, DownloadStatus.CANCELLED -> {
+                            val isAuthRelated = download.errorMessage?.contains("login", ignoreCase = true) == true ||
+                                    download.errorMessage?.contains("authentication", ignoreCase = true) == true ||
+                                    download.errorMessage?.contains("private", ignoreCase = true) == true ||
+                                    download.errorMessage?.contains("empty media", ignoreCase = true) == true ||
+                                    download.technicalLog?.contains("login", ignoreCase = true) == true ||
+                                    download.technicalLog?.contains("empty media", ignoreCase = true) == true
+
+                            if (isAuthRelated) {
+                                val authLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                                    androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+                                ) { res ->
+                                    if (res.resultCode == android.app.Activity.RESULT_OK) {
+                                        viewModel.retryDownload()
+                                    }
+                                }
+
+                                Button(
+                                    onClick = {
+                                        val host = try {
+                                            android.net.Uri.parse(download.url).host?.lowercase() ?: ""
+                                        } catch (e: Exception) {
+                                            ""
+                                        }
+                                        val domain = when {
+                                            host.contains("facebook.com") || host.contains("fb.watch") -> "facebook.com"
+                                            host.contains("youtube.com") || host.contains("youtu.be") -> "youtube.com"
+                                            host.contains("instagram.com") || host.contains("instagr.am") -> "instagram.com"
+                                            host.contains("tiktok.com") -> "tiktok.com"
+                                            host.contains("twitter.com") || host.contains("x.com") -> "twitter.com"
+                                            else -> "instagram.com"
+                                        }
+                                        val loginUrl = when (domain) {
+                                            "facebook.com" -> "https://www.facebook.com/login/"
+                                            "youtube.com" -> "https://accounts.google.com/ServiceLogin?service=youtube"
+                                            "instagram.com" -> "https://www.instagram.com/accounts/login/"
+                                            "tiktok.com" -> "https://www.tiktok.com/login"
+                                            "twitter.com" -> "https://twitter.com/i/flow/login"
+                                            else -> "https://$domain"
+                                        }
+                                        val intent = com.glypdl.android.ui.auth.AuthBrowserActivity.createIntent(
+                                            context,
+                                            loginUrl,
+                                            domain,
+                                            "Log In to $domain"
+                                        )
+                                        authLauncher.launch(intent)
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Log In")
+                                }
+                            }
                             Button(onClick = viewModel::retryDownload, modifier = Modifier.weight(1f)) { Text("Retry") }
                             Button(onClick = { showDeleteDialog = true }, modifier = Modifier.weight(1f)) { Text("Clear") }
                         }

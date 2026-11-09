@@ -20,7 +20,7 @@
                     </Border>
                     <TextBlock Text="Glypdl" Style="{ThemeResource TitleLargeTextBlockStyle}" FontWeight="Bold" HorizontalAlignment="Center" />
                     <TextBlock Text="A lightweight native Windows 11 media downloader powered by yt-dlp" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" TextAlignment="Center" FontSize="13" />
-                    <TextBlock Text="Version 1.0.0" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" FontSize="12" />
+                    <TextBlock Text="Version 4.0.0" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Center" FontSize="12" />
                 </StackPanel>
 
                 <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />

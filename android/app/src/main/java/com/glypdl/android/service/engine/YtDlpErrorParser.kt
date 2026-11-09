@@ -40,7 +40,18 @@ object YtDlpErrorParser {
             )
         }
 
-        // 2. Private Content (Instagram Close Friends / Private Accounts, Facebook Private Groups/Videos)
+        // 2. Empty Media Response (Instagram / Facebook empty response) - check BEFORE generic use --cookies
+        if (lower.contains("empty media response") ||
+            lower.contains("sent an empty media") ||
+            lower.contains("empty response")
+        ) {
+            return GlypdlError.EmptyMediaResponse(
+                userMessage = "The platform returned an empty media response. If this post is private, log in to access it.",
+                technicalDetails = redactedDetails
+            )
+        }
+
+        // 3. Private Content (Instagram Close Friends / Private Accounts, Facebook Private Groups/Videos)
         if (lower.contains("this account is private") ||
             lower.contains("this story is private") ||
             lower.contains("close friends") ||
@@ -57,7 +68,7 @@ object YtDlpErrorParser {
             )
         }
 
-        // 3. Authentication & Login Required (Instagram, Facebook, YouTube, TikTok)
+        // 4. Authentication & Login Required (Instagram, Facebook, YouTube, TikTok)
         if (lower.contains("sign in to confirm") ||
             lower.contains("login required") ||
             lower.contains("log in to view") ||
@@ -77,7 +88,15 @@ object YtDlpErrorParser {
             lower.contains("requires authentication") ||
             lower.contains("sign in to view") ||
             lower.contains("session has expired") ||
-            lower.contains("session expired")
+            lower.contains("session expired") ||
+            lower.contains("cookies are no longer valid") ||
+            lower.contains("provided instagram account cookies are no longer valid") ||
+            lower.contains("facebook.com/login.php") ||
+            lower.contains("facebook.com/login") ||
+            lower.contains("instagram.com/accounts/login") ||
+            lower.contains("/login.php?next=") ||
+            lower.contains("redirected to the login page") ||
+            lower.contains("redirected to login")
         ) {
             return GlypdlError.AuthenticationRequired(technicalDetails = redactedDetails)
         }

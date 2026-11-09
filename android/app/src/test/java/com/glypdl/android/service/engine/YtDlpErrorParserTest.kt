@@ -39,6 +39,15 @@ class YtDlpErrorParserTest {
     }
 
     @Test
+    fun testFacebookStoryLoginRedirect() {
+        val raw = "ERROR: Unsupported URL: https://www.facebook.com/login.php?next=https%3A%2F%2Fwww.facebook.com%2Fstories%2F122100892797427482%2FUzpfSVNDOjE3OTgzNzExMDQ3ODU0NDk%3D%2F%3Fview_single%3D1%26rdid%3DFinXiI2YRRTzLNjD%26share_url%3Dhttps%253A%252F%252Fwww.facebook.com%252Fshare%252F1CQuTQKAtH%252F&rdid=FinXiI2YRRTzLNjD&_fb_noscript=1"
+        val parsed = YtDlpErrorParser.parse(raw)
+
+        assertTrue(parsed is GlypdlError.AuthenticationRequired)
+        assertEquals("Authentication Required", parsed.userTitle)
+    }
+
+    @Test
     fun testRateLimited() {
         val raw = "ERROR: [youtube] Unable to download webpage: HTTP Error 429: Too Many Requests"
         val parsed = YtDlpErrorParser.parse(raw)
@@ -128,6 +137,33 @@ class YtDlpErrorParserTest {
         val parsed = YtDlpErrorParser.parse(raw)
 
         assertTrue(parsed is GlypdlError.StoryMismatch)
+    }
+
+    @Test
+    fun testInstagramEmptyMediaResponse() {
+        val raw = "ERROR: [Instagram] DfgXse5Icb7: Instagram sent an empty media response. Check if this post is accessible in your browser without being logged-in. If it is not, then use --cookies-from-browser or --cookies for the authentication."
+        val parsed = YtDlpErrorParser.parse(raw)
+
+        assertTrue(parsed is GlypdlError.EmptyMediaResponse)
+        assertEquals("Empty Media Response", parsed.userTitle)
+        assertTrue(parsed.canRetry)
+    }
+
+    @Test
+    fun testFacebookCannotParseData() {
+        val raw = "ERROR: [facebook] 1: Cannot parse data; please report this issue on https://github.com/yt-dlp/yt-dlp/issues?q="
+        val parsed = YtDlpErrorParser.parse(raw)
+
+        assertTrue(parsed is GlypdlError.ExtractorError)
+        assertEquals("Extractor Limitation", parsed.userTitle)
+    }
+
+    @Test
+    fun testInstagramExpiredCookies() {
+        val raw = "WARNING: [Instagram] The provided Instagram account cookies are no longer valid"
+        val parsed = YtDlpErrorParser.parse(raw)
+
+        assertTrue(parsed is GlypdlError.AuthenticationRequired)
     }
 
     @Test

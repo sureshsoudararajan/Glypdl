@@ -24,7 +24,7 @@ on:
         description: 'Version string (e.g. 3.3.0)'
         required: false
         type: string
-        default: '3.2.0'
+        default: '4.0.0'
 
 permissions:
   contents: read
@@ -75,7 +75,7 @@ jobs:
           $ver = "${{ inputs.version }}"
           if (-not $ver) {
               $tag = "${{ github.ref_name }}"
-              if ($tag -match '^v?(.+)$') { $ver = $matches[1] } else { $ver = "3.2.0" }
+              if ($tag -match '^v?(.+)$') { $ver = $matches[1] } else { $ver = "4.0.0" }
           }
           New-Item -ItemType Directory -Path windows\dist -Force
           iscc /DMyAppVersion="$ver" windows/packaging/inno/setup.iss

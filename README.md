@@ -2,11 +2,11 @@
 
 <div align="center">
   <img src="data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg" width="128" height="128" alt="Glypdl Logo" />
-  <h3>A modern, blazing-fast cross-platform media downloader for yt-dlp</h3>
-  <p>Native <b>Android (Jetpack Compose / Kotlin)</b>, <b>Windows 11 (WinUI 3 / C# / .NET 8)</b>, and <b>Linux (GTK4 / libadwaita / Python)</b>.</p>
+  <h3>A modern, blazing-fast cross-platform media downloader powered by yt-dlp and FFmpeg</h3>
+  <p>Native applications built with <b>Android (Jetpack Compose / Kotlin)</b>, <b>Windows 11 (WinUI 3 / C# / .NET 8)</b>, and <b>Linux (GTK4 / libadwaita / Python)</b>.</p>
 
   <p>
-    <a href="https://github.com/sureshsoudararajan/Glypdl/releases"><img src="https://img.shields.io/github/v/release/sureshsoudararajan/Glypdl?style=flat-square&color=3584e4" alt="Latest Release" /></a>
+    <a href="https://github.com/sureshsoudararajan/Glypdl/releases/latest"><img src="https://img.shields.io/github/v/release/sureshsoudararajan/Glypdl?style=flat-square&color=3584e4" alt="Latest Release" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%20v3.0-blue.svg?style=flat-square" alt="License: GPL v3" /></a>
     <img src="https://img.shields.io/badge/Android-8.0+_(API_26+)-3DDC84.svg?style=flat-square&logo=android" alt="Android 8.0+" />
     <img src="https://img.shields.io/badge/Kotlin-2.0-7F52FF.svg?style=flat-square&logo=kotlin" alt="Kotlin 2.0" />
@@ -21,17 +21,17 @@
 
 ## 🌟 Overview
 
-**Glypdl** is an ultra-fast, modern, cross-platform media downloader powered by **yt-dlp** and **FFmpeg**. Built from the ground up to provide native, high-performance experiences on **Android**, **Windows**, and **Linux**:
+**Glypdl** is an ultra-fast, modern, fully open-source cross-platform media downloader powered by **yt-dlp** and **FFmpeg**. Designed from the ground up to feel completely native on every operating system, Glypdl avoids slow web wrappers in favor of first-class native UI frameworks:
 
-* **Android Edition**: Native **Kotlin**, **Jetpack Compose**, and **Material 3** application featuring foreground background service, built-in in-app authenticated browser with cookie preservation, multi-quality format selection, and Android system share/intent handling.
-* **Windows Edition**: Native **WinUI 3**, **C#**, and **.NET 8** application featuring Windows 11 Fluent 2 design, translucent Mica material backdrops, automatic system dark/light theming, and an Inno Setup installer.
-* **Linux Edition**: Native **GTK4**, **libadwaita**, and **Python** application conforming to the GNOME Human Interface Guidelines (HIG) with standalone AppImage, Flatpak, Deb, RPM, and Arch Linux packages.
+* 📱 **Android Edition**: 100% native **Kotlin** and **Jetpack Compose (Material 3)**. Features background foreground service with persistent notifications, built-in in-app authenticated browser with cookie preservation, YouTube multi-language audio track selection, subtitles support, and Android system share sheet integration.
+* 🪟 **Windows Edition**: Native **WinUI 3**, **C#**, and **.NET 8** with Windows 11 Fluent 2 design, translucent Mica material backdrops, automatic dark/light theme switching, and an Inno Setup installer.
+* 🐧 **Linux Edition**: Native **GTK4**, **libadwaita**, and **Python 3.10+** adhering to the GNOME Human Interface Guidelines (HIG), packaged as standalone AppImage, Flatpak, Deb, RPM, and Arch Linux packages, complete with a Firefox/LibreWolf companion extension.
 
 ---
 
 ## 📸 Screenshots
 
-### 📱 Android Application
+### 📱 Android Application (Jetpack Compose & Material 3)
 <div align="center">
   <table>
     <tr>
@@ -43,7 +43,7 @@
   </table>
 </div>
 
-### 🐧 Linux Desktop Application (GTK4 / libadwaita)
+### 🐧 Linux Desktop Application (GTK4 & libadwaita)
 <div align="center">
   <table>
     <tr>
@@ -57,7 +57,7 @@
   </table>
 </div>
 
-### 🪟 Windows Desktop Application (WinUI 3 / Windows App SDK)
+### 🪟 Windows Desktop Application (WinUI 3 & Windows App SDK)
 <div align="center">
   <table>
     <tr>
@@ -75,160 +75,148 @@
 
 ## 🚀 Key Features
 
-### 🎨 1. Native Desktop Experiences
-* **Windows 11 (WinUI 3 & Mica)**:
-  - Translucent Mica backdrop integrated seamlessly into the Windows 11 desktop.
-  - Automatic system Dark/Light theme synchronization.
-  - Custom frameless title bar with integrated caption controls.
-  - Persistent window size and maximized state preservation across launches.
-* **Linux (GTK4 & libadwaita)**:
-  - Responsive GNOME HIG-compliant interface with pure native performance.
-  - Seamless desktop theme integration across GNOME, KDE Plasma, Cinnamon, XFCE, COSMIC, and tiling window managers (Hyprland, Sway, i3).
+### 🎬 1. Multi-Format Audio & Video Extraction
+* **Video + Audio Mode**: Download in full quality up to **4K (2160p)**, **1440p**, **1080p**, **720p**, **480p**, **360p**, **240p**, **144p**, or **Best available**.
+* **Audio-Only Extraction**: Direct extraction and conversion into **MP3**, **AAC**, **M4A**, **FLAC**, **WAV**, or **OPUS**.
+* **Selectable Audio Bitrates**: `320 kbps (Best)`, `256 kbps (High)`, `192 kbps (Medium)`, `128 kbps (Standard)`, `96 kbps (Low)`.
+* **YouTube Multi-Language Audio Streams**: Select your preferred spoken audio language (e.g. Tamil, English, Hindi, Spanish, French) from multi-track videos.
+* **Subtitles & Closed Captions**: Download video subtitles in multiple languages (`ta`, `en`, `es`, etc.) with automatic fallback.
 
-### 📋 2. Smart URL Input & Instant Metadata Fetch
-* **Clipboard Auto-Detection**: Pressing `Ctrl+V` or pasting any supported URL automatically inputs the link and fetches metadata.
-* **Metadata Preview Card**: Displays high-resolution thumbnail preview, title, channel/uploader name, duration badge, platform source, and previous download history reminders.
-* **Static Content Detection**: Identifies photo/image-only posts (e.g., Instagram static posts) and provides clear guidance that Glypdl downloads video and audio streams.
+### 📋 2. Smart URL Input & Instant Metadata Analysis
+* **Clipboard Auto-Detection**: Automatically detects video URLs from your clipboard on launch or upon pasting (`Ctrl+V` on desktop).
+* **System Share Sheet Integration (Android)**: Tap "Share" from YouTube, Instagram, Facebook, TikTok, or browser apps and send links directly to Glypdl.
+* **High-Resolution Metadata Preview**: Displays thumbnail artwork, title, channel/creator name, duration badge, source platform, and format selectors.
+* **Non-Negotiable Anonymous Extraction**: Public videos and reels analyze and download anonymously by default without requiring user login.
 
-### 🍪 3. Comprehensive Browser Cookies & Authentication
-* **Three Authentication Modes**:
-  1. **Disabled**: Downloads without session cookies.
-  2. **Direct Web Browser (`--cookies-from-browser`)**: Extracts session cookies directly from installed browsers (**Microsoft Edge**, **Google Chrome**, **Mozilla Firefox**, **LibreWolf**, **Brave Browser**, **Opera**, **Vivaldi**, and **Chromium**) with automatic profile and keyring discovery.
-  3. **Cookie File (`--cookies`)**: Uses imported Netscape `cookies.txt` files for maximum reliability.
-* **Per-Download Cookie Selector**: Choose between direct browser extraction, specific `cookies.txt` profiles, or no cookies directly from the format selector before starting a download.
-* **Advanced Chromium Direct Extraction Guide (In Settings)**:
-  - Dynamically generates the required Windows Enterprise Policy command matching the currently selected Chromium browser with a **1-Click Copy** button.
-  - Step-by-step guidance on clearing previous cookies, re-logging into accounts under standard DPAPI protection, and closing background browser processes in Task Manager.
-  - Includes a 1-click restore command to re-enable strict App-Bound Encryption at any time.
-* **Intelligent Authentication Recovery**:
-  - Automatically detects DPAPI errors (yt-dlp issue #10927), locked database handles (issue #7271), login walls, and private post checkpoints.
-  - Replaces raw CLI error traces with user-friendly recovery guidance and displays an interactive modal dialog allowing users to choose an authentication profile or import a `cookies.txt` file and retry immediately.
+### 🍪 3. In-App Authentication & Browser Cookie Support
+* **Android In-App Session Browser**: Log in securely to Instagram, Facebook, YouTube/Google, TikTok, or Twitter/X via an isolated in-app WebView that automatically captures and saves session cookies in standard Netscape format.
+* **Two-Phase Smart Extraction**: Tries anonymous download first. If a video is private, members-only, or age-restricted, it seamlessly retries using your saved session cookies.
+* **Desktop Browser Cookie Extraction (Windows & Linux)**: Extracts cookies directly from installed browsers (**Chrome**, **Edge**, **Firefox**, **Brave**, **Opera**, **Vivaldi**, **Chromium**) with automatic profile and keyring detection.
+* **Cookie File (`--cookies`)**: Full support for importing standard Netscape `cookies.txt` files across all platforms.
+* **Strict Privacy Guarantee**: Cookies remain strictly local to your device and are never uploaded or transmitted to third-party servers.
 
 ### 📑 4. Visual Playlist Downloader
-* **Interactive Track List**: Displays 16:9 thumbnails, track numbers (`#1`, `#2`...), titles, artists, and durations for all playlist items.
-* **Flexible Batch Selection**:
-  - **Select All (`✓`)** & **Deselect All (`✗`)**
-  - Individual track selection checkboxes
-* **Dynamic Status Counter**: Real-time summary (e.g. `14 of 20 items selected`).
-* **Adaptive Action Button**: Updates dynamically (e.g. *"Download 14 Selected Videos"*).
+* **Interactive Playlist Inspector**: Displays full track lists with 16:9 thumbnail previews, index numbering, titles, uploaders, and durations.
+* **Flexible Batch Control**:
+  - One-tap **Select All (`✓`)** and **Deselect All (`✗`)**.
+  - Individual item checkboxes for selective downloading.
+  - Real-time status counter (e.g. `12 of 20 items selected`).
+  - Batch action button (e.g. *"Download 12 Selected Videos"*).
 
-### 🎵 5. Multi-Format Audio & Video Extraction
-* **Video + Audio Mode**: Quality options up to **4K (2160p)**, **1440p**, **1080p**, **720p**, **480p**, **360p**, **240p**, **144p**, or **Best**.
-* **Video Only Mode**: Stream extraction without audio track.
-* **Audio Only Mode**: High-quality audio extraction with direct conversion into **MP3**, **AAC**, **M4A**, **FLAC**, **WAV**, or **OPUS**.
-* **Audio Bitrates**: `320 kbps (Best)`, `256 kbps (High)`, `192 kbps (Medium)`, `128 kbps (Standard)`, `96 kbps (Low)`.
-* **Safe Overwrite Protection**: Uses `--no-overwrites` to prevent accidental file loss.
+### ⚡ 5. Real-Time Download Queue & Explorer Integration
+* **Live Telemetry**: Real-time progress bar, transfer speed (MB/s), ETA countdown, downloaded and total file sizes.
+* **Background Foreground Service (Android)**: Downloads continue reliably in the background with persistent status notifications even when the app is minimized.
+* **Direct Player Launch (`▶`)**: Plays downloaded media immediately in your default media player.
+* **Open Containing Folder (`📁`)**: Opens file manager with the exact downloaded file highlighted and selected.
+* **Safe Overwrite Protection**: Uses `--no-overwrites` to prevent accidental data loss.
 
-### ⚡ 6. Real-Time Download Queue & Explorer Integration
-* **Auto-Navigation**: Enqueuing a download automatically switches view to the **Downloads Queue**.
-* **Live Telemetry**: Real-time progress bar, transfer speed (MB/s), ETA countdown, downloaded/total size.
-* **Direct Player Launch (`▶`)**: Plays the completed audio or video file instantly in your default media player.
-* **Open Folder & Select (`📁`)**: Opens Windows Explorer / file manager with the **exact downloaded file highlighted and selected**.
-* **Accurate Disk Size**: Measures exact post-conversion file size directly from disk.
+### 📜 6. SQLite History & Instant Search
+* **Search-as-you-Type**: Filter download history instantly by title, channel, or URL.
+* **One-Tap Re-download**: Re-download past media in different formats or quality levels directly from history.
+* **Local SQLite Database**: Room DB on Android, SQLite on Windows and Linux for completely private offline record-keeping.
 
-### 🔔 7. Native Desktop Toast Notifications
-* System toast notifications with audio chimes when downloads complete or fail, displaying media title, format, and final size.
+### ⚙️ 7. Automated Engine Provisioning & One-Click Updates
+* **Zero Configuration**: Bundled with official `yt-dlp` and `FFmpeg` binaries. On Android, QuickJS (`libqjs.so`) and FFmpeg (`libffmpeg.so`) are packaged natively into architecture splits.
+* **In-App Engine Updates**: Check for and install the latest `yt-dlp` stable releases directly from Settings with one tap.
 
-### 📜 8. SQLite History & Instant Search
-* **Search-as-you-Type**: Filter download history by title or URL instantly.
-* **Redownload Format Picker**: Re-download previously saved media in a different format or quality.
-* **Local Database**: All history stored locally for complete privacy.
-
-### ⚙️ 9. Automated Dependency Management & First-Run Provisioning
-* **Automatic Engine Download**: If dependencies (`yt-dlp`, `ffmpeg`, `ffprobe`) are missing on first run, Glypdl displays an informative progress dialog showing real-time download status, percentages, and component names.
-* **Zero System Bloat**: Binaries are installed locally into application data directories without polluting system PATH or modifying global environment variables.
-* **One-Click Engine Updates**: Check and update `yt-dlp` and engine components anytime from Settings or the About page.
-
-### 🦊 10. Firefox & LibreWolf Companion Extension *(Linux Only)*
-* **Real-Time Media Detection**: Automatically detects streaming media across websites including HTML5 `<video>` / `<audio>`, HLS (`.m3u8`), DASH (`.mpd`), YouTube, Instagram Stories & Reels, and TikTok.
-* **Dual Action Triggers**:
-  - **Download**: Enqueues media directly into Glypdl's native download queue.
-  - **🍪 Using Cookie**: One-click extraction of your active browser session cookies sent securely with the download request for authenticated, private, or age-gated media.
-* **LibreWolf & Multi-Account Container Compatibility**: Full support for Total Cookie Protection / Dynamic First-Party Isolation (dFPI) and isolated container tabs.
-* **Native Linux IPC**: Communicates directly with Glypdl desktop over secure local Unix domain sockets via Native Messaging (`io.github.sureshsoudararajan.glypdl`). Supports both native package installs and Flatpak sandboxes (`io.github.sureshsoudararajan.Glypdl`).
-* **Zero Disk Cookie Exposure**: Extracted cookies are handled as in-memory ephemeral temporary files that automatically self-delete upon download completion or dismissal.
-
-> **Note**: The browser companion extension currently requires the Linux desktop client and is not supported on Windows.
+### 🦊 8. Firefox & LibreWolf Companion Extension *(Linux)*
+* **Real-Time Stream Detection**: Automatically detects HTML5 `<video>`, HLS (`.m3u8`), DASH (`.mpd`), YouTube, and TikTok streams as you browse.
+* **One-Click Hand-off**: Send video URLs or active browser session cookies directly into Glypdl over secure native messaging IPC (`io.github.sureshsoudararajan.glypdl`).
 
 ---
 
 ## 📥 Installation
 
-Choose the package format best suited for your operating system from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases/latest):
+Choose the package suited for your operating system from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases/latest):
 
 ### 📱 Android (`.apk`)
-Download the APK corresponding to your device architecture from [GitHub Releases (v3.2.0)](https://github.com/sureshsoudararajan/Glypdl/releases/latest):
-* **`Glypdl-3.2.0-arm64-v8a.apk`** &mdash; **Recommended for 90%+ modern Android phones & tablets** (64-bit ARM)
-* **`Glypdl-3.2.0-armeabi-v7a.apk`** &mdash; For older 32-bit ARM legacy devices
-* **`Glypdl-3.2.0-x86_64.apk`** &mdash; For Android Studio emulators and ChromeOS
+Download the APK corresponding to your device architecture from [GitHub Releases (v4.0.0)](https://github.com/sureshsoudararajan/Glypdl/releases/latest):
+* **`Glypdl-4.0.0-arm64-v8a.apk`** &mdash; **Recommended for modern phones & tablets** (64-bit ARM)
+* **`Glypdl-4.0.0-armeabi-v7a.apk`** &mdash; For legacy 32-bit ARM devices
+* **`Glypdl-4.0.0-x86_64.apk`** &mdash; For Android Studio emulators and ChromeOS
 
-Open the downloaded `.apk` file on your device (ensure "Install unknown apps" permission is granted) and follow the installation prompts!
+*Open the `.apk` file on your device and follow the installation prompt (ensure "Install unknown apps" permission is granted).*
+
+---
 
 ### 🪟 Windows 11 / 10 Installer (`.exe`)
-1. Download **`Glypdl-3.2.0-Setup-x64.exe`** from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases/latest).
-2. Run the installer to set up Start Menu and Desktop shortcuts.
+1. Download **`Glypdl-4.0.0-Setup-x64.exe`** from [GitHub Releases](https://github.com/sureshsoudararajan/Glypdl/releases/latest).
+2. Run the installer to create Start Menu and Desktop shortcuts.
 3. Launch **Glypdl** from your Start Menu!
+
+---
 
 ### 🐧 Linux Packages
 
-#### 1. 🚀 Universal Standalone AppImage
+#### 1. Universal Standalone AppImage
 ```bash
-wget -O Glypdl-x86_64.AppImage https://github.com/sureshsoudararajan/Glypdl/releases/download/v3.2.0/Glypdl-x86_64.AppImage
+wget -O Glypdl-x86_64.AppImage https://github.com/sureshsoudararajan/Glypdl/releases/download/v4.0.0/Glypdl-x86_64.AppImage
 chmod +x Glypdl-x86_64.AppImage
 ./Glypdl-x86_64.AppImage
 ```
 
-#### 2. 📦 Debian / Ubuntu / Linux Mint / Pop!_OS (`.deb`)
+#### 2. Debian / Ubuntu / Linux Mint / Pop!_OS (`.deb`)
 ```bash
-wget -O glypdl.deb https://github.com/sureshsoudararajan/Glypdl/releases/download/v3.2.0/glypdl_3.2.0_all.deb
+wget -O glypdl.deb https://github.com/sureshsoudararajan/Glypdl/releases/download/v4.0.0/glypdl_4.0.0_all.deb
 sudo apt install -y ./glypdl.deb
 glypdl
 ```
 
-#### 3. 📦 Fedora / Rocky Linux / RHEL / AlmaLinux (`.rpm`)
+#### 3. Fedora / Rocky Linux / RHEL / AlmaLinux (`.rpm`)
 ```bash
-wget -O glypdl.rpm https://github.com/sureshsoudararajan/Glypdl/releases/download/v3.2.0/glypdl-3.2.0-1.fc44.noarch.rpm
+wget -O glypdl.rpm https://github.com/sureshsoudararajan/Glypdl/releases/download/v4.0.0/glypdl-4.0.0-1.fc44.noarch.rpm
 sudo dnf install -y ./glypdl.rpm
 glypdl
 ```
 
-#### 4. 📦 Arch Linux / Manjaro / EndeavourOS
+#### 4. Arch Linux / Manjaro / EndeavourOS
 ```bash
-wget https://github.com/sureshsoudararajan/Glypdl/releases/download/v3.2.0/glypdl-3.2.0-1-any.pkg.tar.zst
-sudo pacman -U ./glypdl-3.2.0-1-any.pkg.tar.zst
+wget https://github.com/sureshsoudararajan/Glypdl/releases/download/v4.0.0/glypdl-4.0.0-1-any.pkg.tar.zst
+sudo pacman -U ./glypdl-4.0.0-1-any.pkg.tar.zst
 glypdl
 ```
 
-#### 5. 🛍️ Flatpak (Sandboxed Container)
+#### 5. Flatpak (Sandboxed Container)
 ```bash
-cd Glypdl
 flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 flatpak install -y flathub org.gnome.Platform//50 org.gnome.Sdk//50
 
-# Build and run
+# Build and run locally
 flatpak-builder --user --install --force-clean build-dir packaging/flatpak/io.github.sureshsoudararajan.Glypdl.local.yaml
 flatpak run io.github.sureshsoudararajan.Glypdl
 ```
-
-### 🦊 Firefox / LibreWolf Companion Extension (`.xpi`) *(Linux)*
-1. Download **`glypdl-firefox-extension.xpi`** from the [Latest Release](https://github.com/sureshsoudararajan/Glypdl/releases).
-2. In Firefox or LibreWolf, navigate to `about:addons`.
-3. Click the gear icon (`⚙️`) in the top right and select **Install Add-on From File...**.
-4. Select the downloaded `glypdl-firefox-extension.xpi` file and confirm installation.
-5. The extension will automatically connect to your installed Glypdl desktop app!
 
 ---
 
 ## 🛠️ Building from Source
 
-### Windows Build (.NET 8 & WinUI 3)
+### Android Build (Kotlin & Jetpack Compose)
+#### Prerequisites
+1. Android SDK (API 34, Min SDK 26)
+2. JDK 17+
 
+```bash
+cd android
+
+# Run unit tests
+./gradlew testReleaseUnitTest
+
+# Assemble Release APKs (per-architecture splits)
+./gradlew assembleRelease
+# Generated APKs:
+# android/app/build/outputs/apk/release/app-arm64-v8a-release.apk
+# android/app/build/outputs/apk/release/app-armeabi-v7a-release.apk
+# android/app/build/outputs/apk/release/app-x86_64-release.apk
+```
+
+---
+
+### Windows Build (.NET 8 & WinUI 3)
 #### Prerequisites
 1. [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 2. [Visual Studio 2022](https://visualstudio.microsoft.com/) with **.NET Desktop Development** and **Windows App SDK C# Templates**
-3. [Inno Setup 6](https://jrsoftware.org/isdl.php) (for installer creation)
+3. [Inno Setup 6](https://jrsoftware.org/isdl.php) (for installer generation)
 
-#### Build & Run
 ```powershell
 # Run unit tests
 dotnet test windows\tests\Glypdl.Windows.Tests\Glypdl.Windows.Tests.csproj -c Release
@@ -242,13 +230,11 @@ dotnet test windows\tests\Glypdl.Windows.Tests\Glypdl.Windows.Tests.csproj -c Re
 
 ---
 
-### Linux Build (Python & GTK4 / Libadwaita)
-
+### Linux Build (Python & GTK4 / libadwaita)
 #### Prerequisites
 1. Python 3.10+
 2. GTK4, libadwaita-1, PyGObject
 
-#### Run Directly from Source
 ```bash
 git clone https://github.com/sureshsoudararajan/Glypdl.git
 cd Glypdl
@@ -262,35 +248,12 @@ PYTHONPATH=src python3 -m glypdl.app
 
 ---
 
-### Android Build (Kotlin & Jetpack Compose)
-
-#### Prerequisites
-1. Android SDK (API 34, Min SDK 26)
-2. JDK 17+
-
-#### Build & Test
-```bash
-cd android
-
-# Run unit tests
-./gradlew testReleaseUnitTest
-
-# Assemble Release APKs (per-architecture splits)
-./gradlew assembleRelease
-# Output APKs generated at:
-# android/app/build/outputs/apk/release/app-arm64-v8a-release.apk
-# android/app/build/outputs/apk/release/app-armeabi-v7a-release.apk
-# android/app/build/outputs/apk/release/app-x86_64-release.apk
-```
-
----
-
-## ⌨️ Keyboard Shortcuts
+## ⌨️ Desktop Keyboard Shortcuts
 
 | Shortcut | Action |
 | :--- | :--- |
 | <kbd>Ctrl</kbd> + <kbd>L</kbd> | Focus URL input field |
-| <kbd>Ctrl</kbd> + <kbd>V</kbd> | Paste URL into input field |
+| <kbd>Ctrl</kbd> + <kbd>V</kbd> | Paste clipboard URL into input field |
 | <kbd>Ctrl</kbd> + <kbd>H</kbd> | Switch to Download History view |
 | <kbd>Ctrl</kbd> + <kbd>,</kbd> | Open Preferences dialog |
 | <kbd>Ctrl</kbd> + <kbd>Q</kbd> | Quit Glypdl |
@@ -304,8 +267,8 @@ cd android
 Glypdl/
 ├── android/                        # Native Android app (Kotlin / Jetpack Compose)
 │   ├── app/                        # Main Android application module
-│   │   ├── src/main/java/          # Compose UI, Hilt DI, Room DB, Background Services
-│   │   ├── src/main/res/           # Vector icons, themes, and layouts
+│   │   ├── src/main/java/          # Compose UI, Hilt DI, Room DB, Engine Services
+│   │   ├── src/main/res/           # Vector icons, themes, layouts, raw assets
 │   │   └── src/test/java/          # Android unit test suite
 │   ├── build.gradle.kts            # Android Gradle project build file
 │   └── settings.gradle.kts         # Android Gradle settings
@@ -319,12 +282,6 @@ Glypdl/
 │   ├── packaging/inno/             # Inno Setup installer script & assets
 │   ├── publish/                    # Published self-contained binaries
 │   ├── src/Glypdl.Windows/         # WinUI 3 / C# application source
-│   │   ├── Assets/                 # WinUI icons and assets
-│   │   ├── Converters/             # XAML state & visibility converters
-│   │   ├── Models/                 # Download, playlist, cookie models
-│   │   ├── Services/               # Engine, cookie, queue, history services
-│   │   ├── ViewModels/             # MVVM ViewModels
-│   │   └── Views/                  # WinUI 3 XAML Pages
 │   └── tests/Glypdl.Windows.Tests/ # xUnit test suite
 ├── CHANGELOG.md                    # Release version history
 ├── LICENSE                         # GNU General Public License v3.0
@@ -349,6 +306,11 @@ Glypdl/
 * **Bundled Binaries**: `~/.local/share/glypdl/bin/`
 * **Thumbnail Cache**: `~/.cache/glypdl/thumbnails/`
 
+### Android
+* **Database**: `/data/user/0/com.glypdl.android/databases/glypdl.db`
+* **Cookies**: `/data/user/0/com.glypdl.android/files/cookies/`
+* **Downloads**: `/storage/emulated/0/Download/Glypdl/`
+
 ---
 
 ## 📄 License
@@ -359,7 +321,8 @@ Copyright © 2026 Suresh S.
 
 ### Third-Party Licenses & Notices
 Glypdl utilizes independent third-party open-source components that retain their respective original licenses:
-* **yt-dlp**: [The Unlicense](https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE) (Public Domain dedication) / [MIT License](https://opensource.org/licenses/MIT)
+* **yt-dlp**: [The Unlicense](https://github.com/yt-dlp/yt-dlp/blob/master/LICENSE) / [MIT License](https://opensource.org/licenses/MIT)
 * **FFmpeg**: [GNU Lesser General Public License (LGPL) v2.1+](https://www.ffmpeg.org/legal.html) / [GNU General Public License (GPL) v2+](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
+* **Jetpack Compose & AndroidX**: [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0)
 * **Windows App SDK & WinUI 3**: [MIT License](https://github.com/microsoft/WindowsAppSDK/blob/main/LICENSE)
-* **CommunityToolkit.Mvvm**: [MIT License](https://github.com/CommunityToolkit/dotnet/blob/main/License.md)
+* **libadwaita / GTK4**: [GNU LGPL v2.1+](https://gitlab.gnome.org/GNOME/libadwaita/-/blob/main/COPYING)

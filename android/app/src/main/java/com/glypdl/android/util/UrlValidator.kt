@@ -113,49 +113,23 @@ object UrlValidator {
             return "https://www.facebook.com/watch/?v=$id"
         }
 
-        // 2. Match /share/r/<id> -> /reel/<id>
-        val reelShareMatch = Regex("""facebook\.com/share/r/([^/?#]+)""").find(cleanUrl)
-        if (reelShareMatch != null) {
-            val id = reelShareMatch.groupValues[1]
-            return "https://www.facebook.com/reel/$id"
-        }
-
-        // 3. Match /share/v/<id> -> /watch/?v=<id>
-        val videoShareMatch = Regex("""facebook\.com/share/v/([^/?#]+)""").find(cleanUrl)
-        if (videoShareMatch != null) {
-            val id = videoShareMatch.groupValues[1]
-            return "https://www.facebook.com/watch/?v=$id"
-        }
-
-        // 4. Match /share/p/<id> or /share/<id>
-        val postShareMatch = Regex("""facebook\.com/share/(?:p/)?([^/?#]+)""").find(cleanUrl)
-        if (postShareMatch != null) {
-            val id = postShareMatch.groupValues[1]
-            return if (id.all { it.isDigit() }) {
-                "https://www.facebook.com/watch/?v=$id"
-            } else {
-                "https://www.facebook.com/$id"
-            }
-        }
-
-        // 5. Match /<user>/videos/<id> -> /watch/?v=<id>
+        // 2. Match /<user>/videos/<id> -> /watch/?v=<id> (numeric video ID only)
         val userVideoMatch = Regex("""facebook\.com/[^/?#]+/videos/([0-9]+)""").find(cleanUrl)
         if (userVideoMatch != null) {
             val id = userVideoMatch.groupValues[1]
             return "https://www.facebook.com/watch/?v=$id"
         }
 
-        // 6. Match /<user>/posts/<id> -> /watch/?v=<id>
-        val userPostMatch = Regex("""facebook\.com/[^/?#]+/posts/([0-9]+)""").find(cleanUrl)
-        if (userPostMatch != null) {
-            val id = userPostMatch.groupValues[1]
-            return "https://www.facebook.com/watch/?v=$id"
-        }
-
-        // 7. Normalize /watch?v= to /watch/?v=
+        // 3. Normalize /watch?v= to /watch/?v=
         if (cleanUrl.contains("/watch?v=") && !cleanUrl.contains("/watch/?v=")) {
             cleanUrl = cleanUrl.replace("/watch?v=", "/watch/?v=")
         }
+
+        // NOTE: Facebook /share/ URLs (e.g. /share/r/1TLQtRtVQW/, /share/v/..., /share/p/...) must NOT
+        // be rewritten to /reel/... or /watch/ because share tokens are opaque identifiers, NOT video IDs.
+        // Rewriting /share/r/1TLQtRtVQW to /reel/1TLQtRtVQW causes yt-dlp to extract video ID "1" and fail
+        // with "ERROR: [facebook] 1: Cannot parse data". Leaving it untouched allows yt-dlp to follow the
+        // HTTP redirect to the canonical video URL with the true numeric ID.
 
         return cleanUrl
     }

@@ -100,4 +100,35 @@ class AuthCookieManagerTest {
         authCookieManager.clearCookies("facebook.com")
         assertFalse(authCookieManager.hasCookies("facebook.com"))
     }
+
+    @Test
+    fun testSessionCookieExpiryIsZero() {
+        val rawCookies = "sessionid=12345abcd; regular_cookie=regular_val"
+        val success = authCookieManager.saveCookies("instagram.com", rawCookies)
+        assertTrue(success)
+
+        val file = authCookieManager.getCookieFile("instagram.com")
+        assertNotNull(file)
+        val lines = file!!.readLines()
+        val sessionLine = lines.first { it.contains("sessionid") }
+        val sessionFields = sessionLine.split("\t")
+        assertEquals(7, sessionFields.size)
+        // Session cookie field 4 (0-indexed) is expiry, should be 0
+        assertEquals("0", sessionFields[4])
+
+        val regularLine = lines.first { it.contains("regular_cookie") }
+        val regularFields = regularLine.split("\t")
+        assertNotEquals("0", regularFields[4])
+    }
+
+    @Test
+    fun testPreformattedNetscapeFileSavedDirectly() {
+        val netscapeContent = "# Netscape HTTP Cookie File\n.example.com\tTRUE\t/\tTRUE\t0\tcustom_cookie\tval123\n"
+        val success = authCookieManager.saveCookies("example.com", netscapeContent)
+        assertTrue(success)
+
+        val file = authCookieManager.getCookieFile("example.com")
+        assertNotNull(file)
+        assertTrue(file!!.readText().contains("custom_cookie\tval123"))
+    }
 }

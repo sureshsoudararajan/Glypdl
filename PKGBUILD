@@ -1,6 +1,6 @@
 # Maintainer: Suresh Soundararajan <sureshsoundararajan18@gmail.com>
 pkgname=glypdl
-pkgver=2.1.0
+pkgver=4.0.0
 pkgrel=1
 pkgdesc="A lightweight native Linux graphical frontend for yt-dlp"
 arch=('any')

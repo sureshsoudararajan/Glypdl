@@ -49,6 +49,18 @@ sealed class GlypdlError(
         requiresUpdate = false
     )
 
+    /** The platform returned an empty media or empty container response (e.g. anonymous Instagram restriction). */
+    class EmptyMediaResponse(
+        userMessage: String = "The website returned an empty media response. If this post is private, log in to access it.",
+        technicalDetails: String? = null
+    ) : GlypdlError(
+        userTitle = "Empty Media Response",
+        userMessage = userMessage,
+        technicalDetails = technicalDetails,
+        canRetry = true,
+        requiresUpdate = false
+    )
+
     /** The video was deleted by the uploader, made private, or no longer exists on the platform. */
     class ContentUnavailable(
         technicalDetails: String? = null

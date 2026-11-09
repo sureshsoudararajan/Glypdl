@@ -38,5 +38,6 @@ data class DownloadRequest(
     val destinationUri: String?,
     val subtitleOptions: SubtitleDownloadOptions = SubtitleDownloadOptions(),
     val selectedAudioLanguage: String? = null,
-    val selectedAudioTrack: YouTubeAudioTrack? = null
+    val selectedAudioTrack: YouTubeAudioTrack? = null,
+    val requiresAuth: Boolean = false
 )

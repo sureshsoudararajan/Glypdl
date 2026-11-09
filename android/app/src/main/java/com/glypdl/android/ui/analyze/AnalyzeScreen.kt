@@ -598,7 +598,9 @@ private fun ErrorContent(
     val error = state.error
 
     val errorIcon: ImageVector = when (error) {
-        is GlypdlError.AuthenticationRequired -> Icons.Default.Lock
+        is GlypdlError.AuthenticationRequired,
+        is GlypdlError.PrivateContent,
+        is GlypdlError.EmptyMediaResponse -> Icons.Default.Lock
         is GlypdlError.RateLimited -> Icons.Default.HourglassEmpty
         is GlypdlError.EngineOutdated, is GlypdlError.EngineMissing -> Icons.Default.SystemUpdate
         is GlypdlError.ContentUnavailable -> Icons.Default.VideocamOff
@@ -673,7 +675,11 @@ private fun ErrorContent(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (error is GlypdlError.AuthenticationRequired) {
+                    val isAuthRelated = error is GlypdlError.AuthenticationRequired ||
+                            error is GlypdlError.PrivateContent ||
+                            error is GlypdlError.EmptyMediaResponse
+
+                    if (isAuthRelated) {
                         val authContext = androidx.compose.ui.platform.LocalContext.current
                         val authLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
                             androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
@@ -693,7 +699,7 @@ private fun ErrorContent(
                                 val domain = when {
                                     host.contains("facebook.com") || host.contains("fb.watch") || error.userMessage.contains("Facebook", ignoreCase = true) -> "facebook.com"
                                     host.contains("youtube.com") || host.contains("youtu.be") || error.userMessage.contains("YouTube", ignoreCase = true) -> "youtube.com"
-                                    host.contains("instagram.com") || error.userMessage.contains("Instagram", ignoreCase = true) -> "instagram.com"
+                                    host.contains("instagram.com") || host.contains("instagr.am") || error.userMessage.contains("Instagram", ignoreCase = true) -> "instagram.com"
                                     host.contains("tiktok.com") || error.userMessage.contains("TikTok", ignoreCase = true) -> "tiktok.com"
                                     host.contains("twitter.com") || host.contains("x.com") -> "twitter.com"
                                     host.isNotEmpty() -> {

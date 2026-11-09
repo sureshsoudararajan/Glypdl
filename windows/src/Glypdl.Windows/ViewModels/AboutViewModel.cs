@@ -99,7 +99,7 @@ public partial class AboutViewModel : ObservableObject
             }
             else
             {
-                UpdateStatus = "You are on the latest version (1.0.0)";
+                UpdateStatus = "You are on the latest version (4.0.0)";
             }
         }
         catch (Exception ex)

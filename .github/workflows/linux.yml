@@ -36,7 +36,7 @@ on:
         description: 'Version string (e.g. 3.3.0)'
         required: false
         type: string
-        default: '3.2.0'
+        default: '4.0.0'
 
 permissions:
   contents: read
@@ -78,7 +78,7 @@ jobs:
             VERSION="${GITHUB_REF_NAME#v}"
           fi
           if [ -z "$VERSION" ] || [ "$VERSION" = "main" ]; then
-            VERSION="3.2.0"
+            VERSION="4.0.0"
           fi
           export VERSION
           chmod +x packaging/deb/build_deb.sh
@@ -114,7 +114,7 @@ jobs:
             VERSION="${GITHUB_REF_NAME#v}"
           fi
           if [ -z "$VERSION" ] || [ "$VERSION" = "main" ]; then
-            VERSION="3.2.0"
+            VERSION="4.0.0"
           fi
           export VERSION
           chmod +x packaging/appimage/build_appimage.sh
@@ -143,7 +143,7 @@ jobs:
             VERSION="${GITHUB_REF_NAME#v}"
           fi
           if [ -z "$VERSION" ] || [ "$VERSION" = "main" ]; then
-            VERSION="3.2.0"
+            VERSION="4.0.0"
           fi
           if [ -n "$VERSION" ]; then
             sed -i "s/^pkgver=.*/pkgver=${VERSION}/" PKGBUILD
@@ -176,7 +176,7 @@ jobs:
             VERSION="${GITHUB_REF_NAME#v}"
           fi
           if [ -z "$VERSION" ] || [ "$VERSION" = "main" ]; then
-            VERSION="3.2.0"
+            VERSION="4.0.0"
           fi
           export VERSION
           dnf install -y rpm-build python3-devel python3-pip python3-wheel python3-setuptools pyproject-rpm-macros

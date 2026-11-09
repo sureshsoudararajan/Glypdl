@@ -33,7 +33,7 @@ on:
         description: 'Version string (e.g. 3.3.0)'
         required: false
         type: string
-        default: '3.2.0'
+        default: '4.0.0'
       build_release:
         description: 'Build release APKs instead of debug'
         required: false
@@ -137,7 +137,7 @@ jobs:
             VERSION="${GITHUB_REF_NAME#v}"
           fi
           if [ -z "$VERSION" ] || [ "$VERSION" = "main" ]; then
-            VERSION="3.2.0"
+            VERSION="4.0.0"
           fi
           cp app/build/outputs/apk/release/app-arm64-v8a-release.apk "../dist-android/Glypdl-${VERSION}-arm64-v8a.apk"
           cp app/build/outputs/apk/release/app-armeabi-v7a-release.apk "../dist-android/Glypdl-${VERSION}-armeabi-v7a.apk"
