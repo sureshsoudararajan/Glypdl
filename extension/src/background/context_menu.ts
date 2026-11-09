@@ -27,7 +27,6 @@ export function setupContextMenus(conn: ConnectionManager): void {
     });
   });
 
-  // @ts-expect-error browser contextMenus
   browserApi.contextMenus.onClicked.addListener(async (info: any, tab: any) => {
     const pageUrl = tab?.url || info.pageUrl || '';
     let targetUrl = '';

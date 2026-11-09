@@ -78,15 +78,17 @@ class TestCookieService(unittest.TestCase):
         self.assertEqual(service.build_browser_spec("librewolf", profile="/custom/path/librewolf"), "firefox:/custom/path/librewolf")
 
         # Browser with profile
-        self.assertEqual(service.build_browser_spec("chrome", profile="Default"), "chrome:Default")
+        self.assertEqual(service.build_browser_spec("chrome", profile="Profile 1"), "chrome:Profile 1")
+        self.assertEqual(service.build_browser_spec("chrome", profile="Default"), "chrome")
         self.assertEqual(service.build_browser_spec("firefox", profile="default-release"), "firefox:default-release")
 
         # Browser with keyring
         self.assertEqual(service.build_browser_spec("brave", keyring="gnomekeyring"), "brave+gnomekeyring")
         self.assertEqual(service.build_browser_spec("edge", keyring="kwallet", profile="Profile 1"), "edge+kwallet:Profile 1")
 
-        # Automatic keyring ignored from spec string
-        self.assertEqual(service.build_browser_spec("chromium", keyring="auto", profile="Default"), "chromium:Default")
+        # Automatic keyring ignored from spec string; Default profile omitted per yt-dlp spec
+        self.assertEqual(service.build_browser_spec("chromium", keyring="auto", profile="Default"), "chromium")
+        self.assertEqual(service.build_browser_spec("chromium", keyring="auto", profile="Profile 2"), "chromium:Profile 2")
 
         # Empty / None handling
         self.assertEqual(service.build_browser_spec(""), "")
@@ -104,7 +106,8 @@ class TestCookieService(unittest.TestCase):
             self.assertIn("profiles", b)
             self.assertIn("is_installed", b)
             self.assertIsInstance(b["profiles"], list)
-            self.assertGreater(len(b["profiles"]), 0)
+            if b["is_installed"]:
+                self.assertGreater(len(b["profiles"]), 0)
 
 
 if __name__ == '__main__':

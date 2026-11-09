@@ -111,7 +111,7 @@ export interface ProtocolMessage {
   cookies_txt?: string;
   is_temp_cookie?: boolean;
   use_cookies?: boolean;
-  jobs?: ProtocolMessage[];
+  jobs?: (ProtocolMessage | MediaItem)[];
   [key: string]: unknown;
 }
 
