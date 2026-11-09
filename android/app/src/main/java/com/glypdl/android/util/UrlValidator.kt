@@ -38,6 +38,12 @@ object UrlValidator {
         return lower.contains("instagram.com") || lower.contains("instagr.am")
     }
 
+    fun isYouTubeUrl(url: String): Boolean {
+        if (url.isBlank()) return false
+        val lower = url.lowercase()
+        return lower.contains("youtube.com") || lower.contains("youtu.be")
+    }
+
     fun isInstagramStory(url: String): Boolean {
         if (!isInstagramUrl(url)) return false
         val lower = url.lowercase()

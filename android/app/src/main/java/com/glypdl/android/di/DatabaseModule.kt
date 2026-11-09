@@ -17,6 +17,7 @@ import com.glypdl.android.data.local.GlypdlDatabase
 import com.glypdl.android.data.local.dao.DownloadDao
 import com.glypdl.android.data.local.dao.HistoryDao
 import com.glypdl.android.data.local.dao.SavedStatusDao
+import com.glypdl.android.data.local.dao.SubtitleDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -58,6 +59,33 @@ object DatabaseModule {
         }
     }
 
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `subtitle_files` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `downloadId` TEXT,
+                    `mediaTitle` TEXT NOT NULL,
+                    `mediaUrl` TEXT,
+                    `languageCode` TEXT NOT NULL,
+                    `languageName` TEXT NOT NULL,
+                    `format` TEXT NOT NULL,
+                    `subtitleType` TEXT NOT NULL,
+                    `fileUri` TEXT NOT NULL,
+                    `filePath` TEXT,
+                    `fileName` TEXT NOT NULL,
+                    `sizeBytes` INTEGER NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    `isEmbedded` INTEGER NOT NULL DEFAULT 0
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_subtitle_files_downloadId` ON `subtitle_files` (`downloadId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_subtitle_files_languageCode` ON `subtitle_files` (`languageCode`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_subtitle_files_createdAt` ON `subtitle_files` (`createdAt`)")
+            db.execSQL("ALTER TABLE `downloads` ADD COLUMN `subtitleOptionsJson` TEXT DEFAULT NULL")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): GlypdlDatabase {
@@ -66,7 +94,7 @@ object DatabaseModule {
             GlypdlDatabase::class.java,
             "glypdl_database"
         )
-        .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+        .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
         .fallbackToDestructiveMigration()
         .build()
     }
@@ -87,5 +115,11 @@ object DatabaseModule {
     @Singleton
     fun provideSavedStatusDao(database: GlypdlDatabase): SavedStatusDao {
         return database.savedStatusDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSubtitleDao(database: GlypdlDatabase): SubtitleDao {
+        return database.subtitleDao()
     }
 }

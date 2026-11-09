@@ -84,9 +84,12 @@ class StorageHelperTest {
         assertEquals(StorageHelper.MediaCategory.IMAGES, StorageHelper.getMediaCategory("gif"))
         assertEquals(StorageHelper.MediaCategory.IMAGES, StorageHelper.getMediaCategory("", mimeType = "image/png"))
 
+        // Subtitles
+        assertEquals(StorageHelper.MediaCategory.SUBTITLES, StorageHelper.getMediaCategory("srt"))
+        assertEquals(StorageHelper.MediaCategory.SUBTITLES, StorageHelper.getMediaCategory("vtt"))
+        assertEquals(StorageHelper.MediaCategory.SUBTITLES, StorageHelper.getMediaCategory("ass"))
+
         // Others
-        assertEquals(StorageHelper.MediaCategory.OTHERS, StorageHelper.getMediaCategory("srt"))
-        assertEquals(StorageHelper.MediaCategory.OTHERS, StorageHelper.getMediaCategory("vtt"))
         assertEquals(StorageHelper.MediaCategory.OTHERS, StorageHelper.getMediaCategory("txt"))
         assertEquals(StorageHelper.MediaCategory.OTHERS, StorageHelper.getMediaCategory("pdf"))
         assertEquals(StorageHelper.MediaCategory.OTHERS, StorageHelper.getMediaCategory("unknown_ext"))

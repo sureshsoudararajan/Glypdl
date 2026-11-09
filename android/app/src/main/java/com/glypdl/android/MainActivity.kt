@@ -69,9 +69,28 @@ class MainActivity : ComponentActivity() {
             requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        val startDestination = runBlocking {
+        val (startDestination, initialTheme) = runBlocking {
             val isFirstRunComplete = settingsRepository.firstRunComplete.first()
-            if (isFirstRunComplete) Screen.Home.route else Screen.Welcome.route
+            val theme = settingsRepository.theme.first()
+            (if (isFirstRunComplete) Screen.Home.route else Screen.Welcome.route) to theme
+        }
+
+        // Pre-configure window theme to prevent cold-start flash
+        val isDark = when (initialTheme.trim().lowercase()) {
+            "light" -> false
+            "dark" -> true
+            else -> {
+                val nightModeFlags = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
+                nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES
+            }
+        }
+        val bgColor = if (isDark) 0xFF141218.toInt() else 0xFFFFFBFE.toInt()
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(bgColor))
+        window.statusBarColor = bgColor
+        window.navigationBarColor = bgColor
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !isDark
+            isAppearanceLightNavigationBars = !isDark
         }
 
         val initialUrl = IntentHandler.extractUrlFromIntent(intent)
@@ -81,7 +100,7 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            val themePreference by settingsRepository.theme.collectAsState(initial = "system")
+            val themePreference by settingsRepository.theme.collectAsState(initial = initialTheme)
             val pendingUrl by sharedUrlFlow.collectAsState()
             val pendingDownloadId by navigateToDownloadIdFlow.collectAsState()
 

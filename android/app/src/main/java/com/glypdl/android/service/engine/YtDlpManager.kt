@@ -17,6 +17,7 @@ import com.glypdl.android.data.model.MediaFormat
 import com.glypdl.android.data.model.MediaInfo
 import com.glypdl.android.data.model.PlaylistInfo
 import com.glypdl.android.data.model.PlaylistItem
+import com.glypdl.android.data.model.SubtitleFormatPreference
 import com.glypdl.android.data.repository.SettingsRepository
 import com.glypdl.android.util.UrlValidator
 import com.yausername.youtubedl_android.YoutubeDL
@@ -484,11 +485,11 @@ class YtDlpManager @Inject constructor(
                 request.addOption("--cookies", cookieFile.absolutePath)
             }
 
-            val videoInfo = withTimeoutOrNull(timeoutMs) {
-                YoutubeDL.getInstance().getInfo(request)
+            val response = withTimeoutOrNull(timeoutMs) {
+                YoutubeDL.getInstance().execute(request)
             }
 
-            if (videoInfo == null) {
+            if (response == null) {
                 return@withContext Result.failure(
                     GlypdlException(
                         GlypdlError.TimedOut(
@@ -498,38 +499,107 @@ class YtDlpManager @Inject constructor(
                 )
             }
 
-            val formats = videoInfo.formats?.map { format ->
-                MediaFormat(
-                    formatId = format.formatId ?: "",
-                    ext = format.ext ?: "",
-                    resolution = format.formatNote ?: format.format ?: "",
-                    width = format.width.takeIf { it > 0 },
-                    height = format.height.takeIf { it > 0 },
-                    vcodec = format.vcodec ?: "",
-                    acodec = format.acodec ?: "",
-                    filesize = format.fileSize.takeIf { it > 0 },
-                    filesizeApprox = format.fileSizeApproximate.takeIf { it > 0 },
-                    abr = format.abr.takeIf { it > 0 }?.toFloat(),
-                    tbr = format.tbr.takeIf { it > 0 }?.toFloat(),
-                    isVideoOnly = format.acodec == "none" && format.vcodec != "none",
-                    isAudioOnly = format.vcodec == "none" && format.acodec != "none"
-                )
-            } ?: emptyList()
+            val json = JSONObject(response.out)
+            val id = json.optString("id", "")
+            val title = json.optString("title", "Unknown Title")
+            val uploader = json.optString("uploader").takeIf { it.isNotBlank() }
+            val extractor = json.optString("extractor").takeIf { it.isNotBlank() }
+            val duration = json.optLong("duration", 0L)
+
+            var thumbnail = json.optString("thumbnail").takeIf { it.isNotBlank() }
+            if (thumbnail == null) {
+                val thumbs = json.optJSONArray("thumbnails")
+                if (thumbs != null && thumbs.length() > 0) {
+                    val lastThumb = thumbs.optJSONObject(thumbs.length() - 1)
+                    thumbnail = lastThumb?.optString("url")?.takeIf { it.isNotBlank() }
+                }
+            }
+            if (thumbnail == null && id.isNotBlank() && (url.contains("youtube.com") || url.contains("youtu.be") || id.length == 11)) {
+                thumbnail = "https://i.ytimg.com/vi/$id/hqdefault.jpg"
+            }
+
+            val formats = mutableListOf<MediaFormat>()
+            val formatsArray = json.optJSONArray("formats")
+            if (formatsArray != null) {
+                for (i in 0 until formatsArray.length()) {
+                    val f = formatsArray.optJSONObject(i) ?: continue
+                    val vcodec = f.optString("vcodec", "none")
+                    val acodec = f.optString("acodec", "none")
+                    val formatNote = f.optString("format_note").ifBlank { f.optString("format", "") }
+                    formats.add(
+                        MediaFormat(
+                            formatId = f.optString("format_id", ""),
+                            ext = f.optString("ext", ""),
+                            resolution = formatNote,
+                            width = f.optInt("width").takeIf { it > 0 },
+                            height = f.optInt("height").takeIf { it > 0 },
+                            vcodec = vcodec,
+                            acodec = acodec,
+                            filesize = f.optLong("filesize").takeIf { it > 0 },
+                            filesizeApprox = f.optLong("filesize_approx").takeIf { it > 0 },
+                            abr = f.optDouble("abr").takeIf { it > 0 }?.toFloat(),
+                            tbr = f.optDouble("tbr").takeIf { it > 0 }?.toFloat(),
+                            isVideoOnly = acodec == "none" && vcodec != "none",
+                            isAudioOnly = vcodec == "none" && acodec != "none",
+                            language = f.optString("language").trim().takeIf { it.isNotBlank() },
+                            languagePreference = if (f.has("language_preference")) f.optInt("language_preference") else null,
+                            formatNote = f.optString("format_note").trim().takeIf { it.isNotBlank() },
+                            audioChannels = f.optInt("audio_channels").takeIf { it > 0 }
+                        )
+                    )
+                }
+            }
+
+            if (formats.isEmpty()) {
+                val singleExt = json.optString("ext", "")
+                if (singleExt.isNotBlank()) {
+                    formats.add(
+                        MediaFormat(
+                            formatId = json.optString("format_id", "0"),
+                            ext = singleExt,
+                            resolution = json.optString("format_note", json.optString("format", "")),
+                            width = json.optInt("width").takeIf { it > 0 },
+                            height = json.optInt("height").takeIf { it > 0 },
+                            vcodec = json.optString("vcodec", ""),
+                            acodec = json.optString("acodec", ""),
+                            filesize = json.optLong("filesize").takeIf { it > 0 },
+                            filesizeApprox = json.optLong("filesize_approx").takeIf { it > 0 },
+                            abr = json.optDouble("abr").takeIf { it > 0 }?.toFloat(),
+                            tbr = json.optDouble("tbr").takeIf { it > 0 }?.toFloat(),
+                            isVideoOnly = false,
+                            isAudioOnly = json.optString("vcodec") == "none",
+                            language = json.optString("language").trim().takeIf { it.isNotBlank() },
+                            languagePreference = if (json.has("language_preference")) json.optInt("language_preference") else null,
+                            formatNote = json.optString("format_note").trim().takeIf { it.isNotBlank() },
+                            audioChannels = json.optInt("audio_channels").takeIf { it > 0 }
+                        )
+                    )
+                }
+            }
 
             val normalizedVideo = FormatNormalizer.normalizeVideoQualities(formats)
             val normalizedAudio = FormatNormalizer.normalizeAudioQualities(formats)
 
+            val manualSubs = SubtitleParser.parseManualSubtitles(json)
+            val autoSubs = SubtitleParser.parseAutomaticCaptions(json)
+
+            val (ytAudioTracks, ytAudioLanguages) = YouTubeAudioTrackParser.parse(json, url, extractor)
+
             val mediaInfo = MediaInfo(
-                id = videoInfo.id ?: "",
+                id = id,
                 url = url,
-                title = videoInfo.title ?: "Unknown Title",
-                thumbnail = videoInfo.thumbnail,
-                duration = videoInfo.duration?.toLong() ?: 0L,
-                uploader = videoInfo.uploader,
-                extractor = videoInfo.extractor,
+                title = title,
+                thumbnail = thumbnail,
+                duration = duration,
+                uploader = uploader,
+                extractor = extractor,
                 formats = formats,
                 videoQualities = normalizedVideo,
-                audioQualities = normalizedAudio
+                audioQualities = normalizedAudio,
+                manualSubtitles = manualSubs,
+                automaticSubtitles = autoSubs,
+                youtubeAudioTracks = ytAudioTracks,
+                youtubeAudioLanguages = ytAudioLanguages
             )
 
             Result.success(mediaInfo)
@@ -658,7 +728,12 @@ class YtDlpManager @Inject constructor(
                     else -> "bestvideo+bestaudio/best"
                 }
             } else if (request.isAudioOnly) {
-                if (request.formatId.isNotBlank() && !request.formatId.contains("/")) {
+                val isExplicitYouTubeAudio = UrlValidator.isYouTubeUrl(targetUrl) &&
+                        (request.selectedAudioLanguage != null || request.selectedAudioTrack != null ||
+                                (request.formatId.isNotBlank() && !request.formatId.contains("/") && !request.formatId.contains("best")))
+                if (isExplicitYouTubeAudio) {
+                    request.formatId
+                } else if (request.formatId.isNotBlank() && !request.formatId.contains("/")) {
                     "${request.formatId}/bestaudio/best"
                 } else if (request.formatId.isNotBlank() && request.formatId != "bestaudio/best") {
                     request.formatId
@@ -674,10 +749,13 @@ class YtDlpManager @Inject constructor(
                     }
                 }
             } else if (request.formatId.isNotBlank()) {
-                if (!request.formatId.contains("/")) {
-                    "${request.formatId}/bestvideo+bestaudio/best"
-                } else {
+                val hasExplicitMergedTrack = UrlValidator.isYouTubeUrl(targetUrl) &&
+                        (request.selectedAudioLanguage != null || request.selectedAudioTrack != null) &&
+                        request.formatId.contains("+")
+                if (hasExplicitMergedTrack || request.formatId.contains("/")) {
                     request.formatId
+                } else {
+                    "${request.formatId}/bestvideo+bestaudio/best"
                 }
             } else {
                 "bestvideo+bestaudio/best"
@@ -723,6 +801,40 @@ class YtDlpManager @Inject constructor(
                 dlRequest.addOption("--merge-output-format", mergeFormat)
             }
 
+            val subOpts = request.subtitleOptions
+            if (subOpts.isEnabled) {
+                // Ensure individual subtitle download/rate-limiting errors do not abort the media download
+                dlRequest.addOption("--no-abort-on-error")
+
+                if (subOpts.includeManual) {
+                    dlRequest.addOption("--write-subs")
+                }
+                if (subOpts.includeAutoGenerated) {
+                    dlRequest.addOption("--write-auto-subs")
+                }
+                val langParam = if (subOpts.downloadAllLanguages) {
+                    "all"
+                } else if (subOpts.selectedLanguages.isNotEmpty()) {
+                    subOpts.selectedLanguages.joinToString(",")
+                } else {
+                    "all"
+                }
+                dlRequest.addOption("--sub-langs", langParam)
+
+                if (subOpts.preferredFormat != SubtitleFormatPreference.BEST) {
+                    dlRequest.addOption("--convert-subs", subOpts.preferredFormat.format)
+                }
+
+                if (subOpts.shouldEmbed && !subOpts.isSubtitlesOnly && !request.isAudioOnly) {
+                    dlRequest.addOption("--embed-subs")
+                }
+
+                if (subOpts.isSubtitlesOnly) {
+                    dlRequest.addOption("--skip-download")
+                }
+            }
+
+            val SUBTITLE_EXTS = setOf("srt", "vtt", "ass", "ssa", "lrc", "ttml", "sbv", "sub", "smi", "dfxp")
             var finalOutputFile = ""
             var detectedMediaId: String? = null
 
@@ -753,12 +865,18 @@ class YtDlpManager @Inject constructor(
                 } else if (trimmed.contains("Destination:")) {
                     val dest = trimmed.substringAfter("Destination:").trim().trim('"', '\'')
                     if (dest.isNotBlank()) {
-                        finalOutputFile = dest
+                        val ext = dest.substringAfterLast('.', "").lowercase()
+                        if (subOpts.isSubtitlesOnly || ext !in SUBTITLE_EXTS) {
+                            finalOutputFile = dest
+                        }
                     }
                 } else if (trimmed.contains("has already been downloaded")) {
                     val dest = trimmed.substringBefore("has already been").removePrefix("[download]").trim().trim('"', '\'')
                     if (dest.isNotBlank()) {
-                        finalOutputFile = dest
+                        val ext = dest.substringAfterLast('.', "").lowercase()
+                        if (subOpts.isSubtitlesOnly || ext !in SUBTITLE_EXTS) {
+                            finalOutputFile = dest
+                        }
                     }
                 }
             }
@@ -836,12 +954,18 @@ class YtDlpManager @Inject constructor(
             finalOutputFile = finalOutputFile.trim('"', '\'')
 
             // If path is missing, unexpanded template, or non-existent, find the output file in downloadDir
-            if (finalOutputFile.isBlank() || finalOutputFile.contains("%(") || !File(finalOutputFile).exists()) {
+            if (finalOutputFile.isBlank() || finalOutputFile.contains("%(") || !File(finalOutputFile).exists() || (!subOpts.isSubtitlesOnly && File(finalOutputFile).extension.lowercase() in SUBTITLE_EXTS)) {
                 val dir = File(downloadDir)
                 if (dir.exists() && dir.isDirectory) {
-                    val candidate = dir.listFiles()
-                        ?.filter { it.isFile && it.length() > 0 && !it.name.endsWith(".part") && !it.name.endsWith(".temp") && !it.name.endsWith(".ytdl") && !Regex("""\.f\w+\.[a-zA-Z0-9]+$""").containsMatchIn(it.name) && (System.currentTimeMillis() - it.lastModified() < 600_000) }
-                        ?.maxByOrNull { it.lastModified() }
+                    val candidate = if (subOpts.isSubtitlesOnly) {
+                        dir.listFiles()
+                            ?.filter { it.isFile && it.length() > 0 && !it.name.endsWith(".part") && !it.name.endsWith(".temp") && !it.name.endsWith(".ytdl") && it.extension.lowercase() in SUBTITLE_EXTS && (System.currentTimeMillis() - it.lastModified() < 600_000) }
+                            ?.maxByOrNull { it.lastModified() }
+                    } else {
+                        dir.listFiles()
+                            ?.filter { it.isFile && it.length() > 0 && !it.name.endsWith(".part") && !it.name.endsWith(".temp") && !it.name.endsWith(".ytdl") && !Regex("""\.f\w+\.[a-zA-Z0-9]+$""").containsMatchIn(it.name) && it.extension.lowercase() !in SUBTITLE_EXTS && (System.currentTimeMillis() - it.lastModified() < 600_000) }
+                            ?.maxByOrNull { it.lastModified() }
+                    }
                     if (candidate != null) {
                         finalOutputFile = candidate.absolutePath
                     }
@@ -883,6 +1007,127 @@ class YtDlpManager @Inject constructor(
             e.printStackTrace()
             val parsedError = YtDlpErrorParser.parse(e.message, installed)
             Result.failure(GlypdlException(parsedError))
+        }
+    }
+
+    suspend fun convertSubtitleFile(
+        inputFile: File,
+        outputFile: File
+    ): Result<File> = withContext(Dispatchers.IO) {
+        if (!inputFile.exists()) {
+            return@withContext Result.failure(IllegalArgumentException("Input subtitle file does not exist: ${inputFile.absolutePath}"))
+        }
+        try {
+            // First attempt native VTT to SRT converter if applicable
+            if (inputFile.extension.equals("vtt", ignoreCase = true) && outputFile.extension.equals("srt", ignoreCase = true)) {
+                if (convertVttToSrt(inputFile, outputFile)) {
+                    return@withContext Result.success(outputFile)
+                }
+            }
+
+            // Next attempt FFmpeg binary from app environment
+            val ffmpegBin = findFFmpegBinary()
+            if (ffmpegBin != null) {
+                val command = listOf(ffmpegBin.absolutePath, "-y", "-i", inputFile.absolutePath, outputFile.absolutePath)
+                val process = ProcessBuilder(command).redirectErrorStream(true).start()
+                val exitCode = process.waitFor()
+                if (exitCode == 0 && outputFile.exists() && outputFile.length() > 0) {
+                    return@withContext Result.success(outputFile)
+                }
+            }
+
+            // Fallback copy if identical format
+            if (inputFile.extension.equals(outputFile.extension, ignoreCase = true)) {
+                inputFile.copyTo(outputFile, overwrite = true)
+                return@withContext Result.success(outputFile)
+            }
+
+            Result.failure(Exception("Subtitle format conversion is not supported for this pair."))
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    suspend fun embedSubtitleIntoVideo(
+        videoFile: File,
+        subtitleFile: File,
+        outputFile: File,
+        languageCode: String = "eng"
+    ): Result<File> = withContext(Dispatchers.IO) {
+        if (!videoFile.exists() || !subtitleFile.exists()) {
+            return@withContext Result.failure(IllegalArgumentException("Input media or subtitle file does not exist"))
+        }
+        try {
+            val ffmpegBin = findFFmpegBinary()
+            if (ffmpegBin != null) {
+                val isMp4 = outputFile.extension.equals("mp4", ignoreCase = true)
+                val subCodec = if (isMp4) "mov_text" else "srt"
+                val command = listOf(
+                    ffmpegBin.absolutePath,
+                    "-y",
+                    "-i", videoFile.absolutePath,
+                    "-i", subtitleFile.absolutePath,
+                    "-c", "copy",
+                    "-c:s", subCodec,
+                    "-metadata:s:s:0", "language=$languageCode",
+                    outputFile.absolutePath
+                )
+                val process = ProcessBuilder(command).redirectErrorStream(true).start()
+                val exitCode = process.waitFor()
+                if (exitCode == 0 && outputFile.exists() && outputFile.length() > 0) {
+                    return@withContext Result.success(outputFile)
+                }
+            }
+
+            Result.failure(Exception("Embedded subtitles require yt-dlp download-time embedding or FFmpeg binary."))
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    private fun findFFmpegBinary(): File? {
+        val candidates = listOf(
+            File(context.applicationInfo.nativeLibraryDir, "libffmpeg.so"),
+            File(context.filesDir, "usr/bin/ffmpeg"),
+            File(File(context.noBackupFilesDir, "packages"), "ffmpeg"),
+            File(File(context.noBackupFilesDir, YoutubeDL.baseName), "ffmpeg")
+        )
+        return candidates.firstOrNull { it.exists() && it.canExecute() }
+    }
+
+    private fun convertVttToSrt(inputFile: File, outputFile: File): Boolean {
+        return try {
+            val lines = inputFile.readLines()
+            val out = StringBuilder()
+            var index = 1
+            var i = 0
+            while (i < lines.size) {
+                val line = lines[i].trim()
+                if (line.startsWith("WEBVTT") || line.startsWith("NOTE") || line.startsWith("STYLE") || line.startsWith("REGION")) {
+                    while (i < lines.size && lines[i].isNotBlank()) i++
+                    i++
+                    continue
+                }
+                if (line.contains("-->")) {
+                    out.append(index++).append("\n")
+                    val formatted = line.replace(Regex("""(\d{2}:\d{2})\.(\d{3})"""), "00:$1,$2")
+                        .replace(Regex("""(\d{2}:\d{2}:\d{2})\.(\d{3})"""), "$1,$2")
+                    out.append(formatted).append("\n")
+                    i++
+                    while (i < lines.size && lines[i].isNotBlank()) {
+                        out.append(lines[i]).append("\n")
+                        i++
+                    }
+                    out.append("\n")
+                }
+                i++
+            }
+            outputFile.writeText(out.toString())
+            outputFile.exists() && outputFile.length() > 0
+        } catch (e: Exception) {
+            false
         }
     }
 }

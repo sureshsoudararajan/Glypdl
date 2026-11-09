@@ -37,12 +37,27 @@ object StorageHelper {
         VIDEOS("videos"),
         MUSIC("music"),
         IMAGES("images"),
+        SUBTITLES("subtitles"),
         OTHERS("others");
+    }
+
+    private val SUBTITLE_EXTENSIONS = setOf(
+        "srt", "vtt", "ass", "ssa", "lrc", "ttml", "sbv", "sub", "smi", "dfxp"
+    )
+
+    fun isSubtitleExtension(ext: String): Boolean {
+        return ext.lowercase().removePrefix(".").trim() in SUBTITLE_EXTENSIONS
     }
 
     fun getMediaCategory(ext: String, mimeType: String = "", isAudio: Boolean = false): MediaCategory {
         val cleanExt = ext.lowercase().removePrefix(".").trim()
         val cleanMime = mimeType.lowercase().trim()
+
+        if (cleanExt in SUBTITLE_EXTENSIONS ||
+            cleanMime in listOf("application/x-subrip", "text/vtt", "text/x-ssa", "text/x-ass", "application/ttml+xml")
+        ) {
+            return MediaCategory.SUBTITLES
+        }
 
         if (isAudio || cleanMime.startsWith("audio/")) {
             return MediaCategory.MUSIC
@@ -61,6 +76,8 @@ object StorageHelper {
             "mp3", "m4a", "opus", "flac", "wav", "aac", "ogg", "oga", "wma", "amr", "mka" -> MediaCategory.MUSIC
             // Images
             "jpg", "jpeg", "png", "webp", "gif", "bmp", "svg", "heic", "heif" -> MediaCategory.IMAGES
+            // Subtitles
+            in SUBTITLE_EXTENSIONS -> MediaCategory.SUBTITLES
             // Others
             else -> MediaCategory.OTHERS
         }
@@ -75,7 +92,7 @@ object StorageHelper {
         return dir
     }
 
-    fun getMimeType(ext: String, isAudio: Boolean): String {
+    fun getMimeType(ext: String, isAudio: Boolean = false): String {
         return when (val cleanExt = ext.lowercase().removePrefix(".").trim()) {
             "mp4", "m4v" -> if (isAudio) "audio/mp4" else "video/mp4"
             "mkv" -> "video/x-matroska"
@@ -97,6 +114,10 @@ object StorageHelper {
             "svg" -> "image/svg+xml"
             "srt" -> "application/x-subrip"
             "vtt" -> "text/vtt"
+            "ass", "ssa" -> "text/x-ssa"
+            "lrc" -> "text/plain"
+            "ttml" -> "application/ttml+xml"
+            "sub", "sbv" -> "text/plain"
             "txt" -> "text/plain"
             "pdf" -> "application/pdf"
             "json" -> "application/json"
@@ -320,6 +341,93 @@ object StorageHelper {
             true
         } catch (e: Exception) {
             Toast.makeText(context, "Unable to share media", Toast.LENGTH_SHORT).show()
+            false
+        }
+    }
+
+    fun openSubtitle(context: Context, uriOrPath: String): Boolean {
+        if (uriOrPath.isBlank()) return false
+        return try {
+            val uri: Uri
+            val mime: String
+            if (uriOrPath.startsWith("content://")) {
+                uri = Uri.parse(uriOrPath)
+                mime = context.contentResolver.getType(uri) ?: "text/plain"
+            } else {
+                val file = File(uriOrPath)
+                if (!file.exists()) return false
+                uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                mime = getMimeType(file.extension)
+            }
+
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mime)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            Toast.makeText(context, "No app found to open subtitle file", Toast.LENGTH_SHORT).show()
+            false
+        }
+    }
+
+    fun shareSubtitle(context: Context, uriOrPath: String, title: String): Boolean {
+        if (uriOrPath.isBlank()) return false
+        return try {
+            val uri: Uri
+            val mime: String
+            if (uriOrPath.startsWith("content://")) {
+                uri = Uri.parse(uriOrPath)
+                mime = context.contentResolver.getType(uri) ?: "text/plain"
+            } else {
+                val file = File(uriOrPath)
+                if (!file.exists()) return false
+                uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                mime = getMimeType(file.extension)
+            }
+
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = mime
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_SUBJECT, title)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
+            val chooser = Intent.createChooser(shareIntent, "Share Subtitle").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(chooser)
+            true
+        } catch (e: Exception) {
+            Toast.makeText(context, "Unable to share subtitle", Toast.LENGTH_SHORT).show()
+            false
+        }
+    }
+
+    fun deleteFileFromStorage(context: Context, uriOrPath: String): Boolean {
+        if (uriOrPath.isBlank()) return false
+        return try {
+            if (uriOrPath.startsWith("content://")) {
+                val uri = Uri.parse(uriOrPath)
+                try {
+                    val doc = DocumentFile.fromSingleUri(context, uri)
+                    if (doc != null && doc.exists()) {
+                        return doc.delete()
+                    }
+                } catch (e: Exception) {
+                    // Fallback to ContentResolver delete
+                }
+                context.contentResolver.delete(uri, null, null) > 0
+            } else {
+                val file = File(uriOrPath)
+                if (file.exists()) {
+                    file.delete()
+                } else false
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
             false
         }
     }

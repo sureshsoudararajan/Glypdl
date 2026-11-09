@@ -148,18 +148,41 @@ object FormatNormalizer {
     /**
      * Normalizes audio formats into standard bitrate tiers (e.g. 320, 256, 192, 160, 128 kbps).
      * Only displays bitrates that are actually available from the source stream.
+     *
+     * For multi-language audio streams, prioritizes the [preferredLanguageCode] if supplied,
+     * or prioritizes the original creator audio stream to avoid defaulting to a dubbed track.
      */
-    fun normalizeAudioQualities(formats: List<MediaFormat>): List<AudioQuality> {
+    fun normalizeAudioQualities(
+        formats: List<MediaFormat>,
+        preferredLanguageCode: String? = null
+    ): List<AudioQuality> {
         val audioFormats = formats.filter {
             it.isAudioOnly || (it.acodec != null && it.acodec != "none" && (it.vcodec == null || it.vcodec == "none")) || (it.abr != null && it.abr > 0f && (it.vcodec == null || it.vcodec == "none"))
         }
         if (audioFormats.isEmpty()) return emptyList()
 
+        // Filter formats for the target language if multiple languages exist
+        val targetFormats = if (!preferredLanguageCode.isNullOrBlank()) {
+            val matching = audioFormats.filter { it.language?.equals(preferredLanguageCode, ignoreCase = true) == true }
+            if (matching.isNotEmpty()) matching else audioFormats
+        } else {
+            val distinctLanguages = audioFormats.mapNotNull { it.language }.filter { it.isNotBlank() && it != "und" }.distinct()
+            if (distinctLanguages.size > 1) {
+                val originalFormats = audioFormats.filter {
+                    (it.languagePreference != null && it.languagePreference > 0) ||
+                            it.formatNote?.contains("original", ignoreCase = true) == true
+                }
+                if (originalFormats.isNotEmpty()) originalFormats else audioFormats
+            } else {
+                audioFormats
+            }
+        }
+
         val result = mutableListOf<AudioQuality>()
         val seenBitrateAndExt = mutableSetOf<String>()
 
         // Sort descending by audio bitrate
-        val sorted = audioFormats.sortedByDescending { it.abr ?: it.tbr ?: 0f }
+        val sorted = targetFormats.sortedByDescending { it.abr ?: it.tbr ?: 0f }
 
         for (fmt in sorted) {
             val rawAbr = (fmt.abr ?: fmt.tbr ?: 0f).toInt()

@@ -83,7 +83,7 @@ object YtDlpErrorParser {
         }
 
         // 4. Rate Limited / Bot Detection / HTTP 429
-        if (lower.contains("429") ||
+        if (Regex("""\b(?:http\s*)?429\b""").containsMatchIn(lower) ||
             lower.contains("too many requests") ||
             lower.contains("rate limit") ||
             lower.contains("rate-limit") ||

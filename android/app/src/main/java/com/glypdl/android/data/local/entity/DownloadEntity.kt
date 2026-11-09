@@ -63,6 +63,7 @@ data class DownloadEntity(
     val filePath: String?,
     val errorMessage: String?,
     val technicalLog: String? = null,
+    val subtitleOptionsJson: String? = null,
     val createdAt: Long,
     val updatedAt: Long
 )

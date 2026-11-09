@@ -105,6 +105,10 @@ data class AudioQuality(
  * @property isVideoOnly True if stream contains only video frames and no audio.
  * @property isAudioOnly True if stream contains only audio and no video frames.
  * @property formatSelector Custom selector if defined.
+ * @property language BCP-47 language tag if specified by provider.
+ * @property languagePreference Explicit language preference priority from extractor.
+ * @property formatNote Format note or descriptive string.
+ * @property audioChannels Number of audio channels.
  */
 data class MediaFormat(
     val formatId: String,
@@ -120,7 +124,11 @@ data class MediaFormat(
     val tbr: Float? = null,
     val isVideoOnly: Boolean = false,
     val isAudioOnly: Boolean = false,
-    val formatSelector: String? = null
+    val formatSelector: String? = null,
+    val language: String? = null,
+    val languagePreference: Int? = null,
+    val formatNote: String? = null,
+    val audioChannels: Int? = null
 ) {
     /** Formats [filesize] or [filesizeApprox] into human-readable string. */
     val displaySize: String

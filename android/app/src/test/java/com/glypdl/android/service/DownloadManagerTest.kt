@@ -28,6 +28,7 @@ class DownloadManagerTest {
 
     private lateinit var downloadRepository: DownloadRepository
     private lateinit var historyRepository: HistoryRepository
+    private lateinit var subtitleRepository: com.glypdl.android.data.repository.SubtitleRepository
     private lateinit var settingsRepository: SettingsRepository
     private lateinit var ytDlpService: YtDlpService
     private lateinit var context: Context
@@ -37,6 +38,7 @@ class DownloadManagerTest {
     fun setup() {
         downloadRepository = mockk(relaxed = true)
         historyRepository = mockk(relaxed = true)
+        subtitleRepository = mockk(relaxed = true)
         settingsRepository = mockk(relaxed = true)
         ytDlpService = mockk(relaxed = true)
         context = mockk(relaxed = true)
@@ -55,6 +57,7 @@ class DownloadManagerTest {
             ytDlpService = ytDlpService,
             downloadRepository = downloadRepository,
             historyRepository = historyRepository,
+            subtitleRepository = subtitleRepository,
             settingsRepository = settingsRepository,
             downloadNotificationManager = downloadNotificationManager,
             networkMonitor = networkMonitor,

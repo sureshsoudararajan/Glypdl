@@ -96,6 +96,12 @@ class SettingsViewModel @Inject constructor(
     val autoUpdateYtDlp: StateFlow<Boolean> = settingsRepository.autoUpdateYtDlp
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    val defaultSubtitleFormat: StateFlow<String> = settingsRepository.defaultSubtitleFormat
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "best")
+
+    val embedSubtitlesDefault: StateFlow<Boolean> = settingsRepository.embedSubtitlesDefault
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     private val _engineStatus = MutableStateFlow<EngineStatus?>(null)
     val engineStatus: StateFlow<EngineStatus?> = _engineStatus.asStateFlow()
 
@@ -297,5 +303,13 @@ class SettingsViewModel @Inject constructor(
             return false
         }
         return true
+    }
+
+    fun setDefaultSubtitleFormat(format: String) {
+        viewModelScope.launch { settingsRepository.setDefaultSubtitleFormat(format) }
+    }
+
+    fun setEmbedSubtitlesDefault(embed: Boolean) {
+        viewModelScope.launch { settingsRepository.setEmbedSubtitlesDefault(embed) }
     }
 }
