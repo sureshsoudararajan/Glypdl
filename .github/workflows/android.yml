@@ -133,11 +133,12 @@ jobs:
           ./gradlew assembleRelease --no-daemon
           mkdir -p ../dist-android
           VERSION="${{ inputs.version }}"
-          if [ -z "$VERSION" ]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          fi
-          if [ -z "$VERSION" ] || [ "$VERSION" = "main" ]; then
-            VERSION="4.0.0"
+          if [ -z "$VERSION" ] || [[ "$VERSION" == *"/"* ]] || [ "$VERSION" = "main" ] || [[ ! "$VERSION" =~ ^[0-9] ]]; then
+            if [[ "${GITHUB_REF_NAME}" =~ ^v?[0-9] && ! "${GITHUB_REF_NAME}" == *"/"* ]]; then
+              VERSION="${GITHUB_REF_NAME#v}"
+            else
+              VERSION="4.0.0"
+            fi
           fi
           cp app/build/outputs/apk/release/app-arm64-v8a-release.apk "../dist-android/Glypdl-${VERSION}-arm64-v8a.apk"
           cp app/build/outputs/apk/release/app-armeabi-v7a-release.apk "../dist-android/Glypdl-${VERSION}-armeabi-v7a.apk"

@@ -73,11 +73,12 @@ jobs:
       - name: Build Debian Package
         run: |
           VERSION="${{ inputs.version }}"
-          if [ -z "$VERSION" ]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          fi
-          if [ -z "$VERSION" ] || [ "$VERSION" = "main" ]; then
-            VERSION="4.0.0"
+          if [ -z "$VERSION" ] || [[ "$VERSION" == *"/"* ]] || [ "$VERSION" = "main" ] || [[ ! "$VERSION" =~ ^[0-9] ]]; then
+            if [[ "${GITHUB_REF_NAME}" =~ ^v?[0-9] && ! "${GITHUB_REF_NAME}" == *"/"* ]]; then
+              VERSION="${GITHUB_REF_NAME#v}"
+            else
+              VERSION="4.0.0"
+            fi
           fi
           export VERSION
           chmod +x packaging/deb/build_deb.sh
@@ -109,11 +110,12 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: 1
         run: |
           VERSION="${{ inputs.version }}"
-          if [ -z "$VERSION" ]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          fi
-          if [ -z "$VERSION" ] || [ "$VERSION" = "main" ]; then
-            VERSION="4.0.0"
+          if [ -z "$VERSION" ] || [[ "$VERSION" == *"/"* ]] || [ "$VERSION" = "main" ] || [[ ! "$VERSION" =~ ^[0-9] ]]; then
+            if [[ "${GITHUB_REF_NAME}" =~ ^v?[0-9] && ! "${GITHUB_REF_NAME}" == *"/"* ]]; then
+              VERSION="${GITHUB_REF_NAME#v}"
+            else
+              VERSION="4.0.0"
+            fi
           fi
           export VERSION
           chmod +x packaging/appimage/build_appimage.sh
@@ -138,14 +140,15 @@ jobs:
       - name: Build Arch Linux Package
         run: |
           VERSION="${{ inputs.version }}"
-          if [ -z "$VERSION" ]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          fi
-          if [ -z "$VERSION" ] || [ "$VERSION" = "main" ]; then
-            VERSION="4.0.0"
+          if [ -z "$VERSION" ] || [[ "$VERSION" == *"/"* ]] || [ "$VERSION" = "main" ] || [[ ! "$VERSION" =~ ^[0-9] ]]; then
+            if [[ "${GITHUB_REF_NAME}" =~ ^v?[0-9] && ! "${GITHUB_REF_NAME}" == *"/"* ]]; then
+              VERSION="${GITHUB_REF_NAME#v}"
+            else
+              VERSION="4.0.0"
+            fi
           fi
           if [ -n "$VERSION" ]; then
-            sed -i "s/^pkgver=.*/pkgver=${VERSION}/" PKGBUILD
+            sed -i "s|^pkgver=.*|pkgver=${VERSION}|" PKGBUILD
           fi
           pacman -Syu --noconfirm base-devel git curl
           useradd -m builder
@@ -171,11 +174,12 @@ jobs:
       - name: Build RPM Package
         run: |
           VERSION="${{ inputs.version }}"
-          if [ -z "$VERSION" ]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          fi
-          if [ -z "$VERSION" ] || [ "$VERSION" = "main" ]; then
-            VERSION="4.0.0"
+          if [ -z "$VERSION" ] || [[ "$VERSION" == *"/"* ]] || [ "$VERSION" = "main" ] || [[ ! "$VERSION" =~ ^[0-9] ]]; then
+            if [[ "${GITHUB_REF_NAME}" =~ ^v?[0-9] && ! "${GITHUB_REF_NAME}" == *"/"* ]]; then
+              VERSION="${GITHUB_REF_NAME#v}"
+            else
+              VERSION="4.0.0"
+            fi
           fi
           export VERSION
           dnf install -y rpm-build python3-devel python3-pip python3-wheel python3-setuptools pyproject-rpm-macros
