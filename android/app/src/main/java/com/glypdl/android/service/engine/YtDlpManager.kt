@@ -337,14 +337,17 @@ class YtDlpManager @Inject constructor(
     ) {
         val isInstagram = UrlValidator.isInstagramUrl(url)
         val isFacebook = UrlValidator.isFacebookUrl(url)
+        val isYouTube = UrlValidator.isYouTubeUrl(url)
 
         request.addOption("--no-check-certificates")
 
         // Instagram and Facebook extractors require desktop browser User-Agent to return
         // web GraphQL / RelayPrefetchedStreamCache responses instead of mobile app redirects.
+        // YouTube extractor manages its own internal client spoofing and user-agents; overriding
+        // global user-agent or referer on YouTube breaks timedtext API and triggers HTTP 429.
         if (isInstagram || isFacebook) {
             request.addOption("--user-agent", DESKTOP_USER_AGENT)
-        } else {
+        } else if (!isYouTube) {
             request.addOption("--user-agent", DEFAULT_USER_AGENT)
         }
 
@@ -355,7 +358,7 @@ class YtDlpManager @Inject constructor(
             request.addOption("--add-header", "Sec-Fetch-Mode:navigate")
             request.addOption("--add-header", "Sec-Fetch-Site:none")
             request.addOption("--add-header", "Sec-Fetch-Dest:document")
-        } else {
+        } else if (!isYouTube) {
             request.addOption("--referer", url)
         }
 
@@ -844,8 +847,13 @@ class YtDlpManager @Inject constructor(
 
             val subOpts = request.subtitleOptions
             if (subOpts.isEnabled) {
-                // Ensure individual subtitle download/rate-limiting errors do not abort the media download
-                dlRequest.addOption("--no-abort-on-error")
+                // Ensure individual subtitle download/rate-limiting errors (e.g. YouTube HTTP 429 on timedtext)
+                // do not abort the media download when downloading media + subtitles.
+                if (!subOpts.isSubtitlesOnly) {
+                    dlRequest.addOption("--ignore-errors")
+                } else {
+                    dlRequest.addOption("--no-abort-on-error")
+                }
 
                 if (subOpts.includeManual) {
                     dlRequest.addOption("--write-subs")

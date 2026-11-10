@@ -122,10 +122,7 @@ class SettingsViewModel @Inject constructor(
     private val _appUpdateMessage = MutableStateFlow<String?>(null)
     val appUpdateMessage: StateFlow<String?> = _appUpdateMessage.asStateFlow()
 
-    private val _appUpdateDownloadState = MutableStateFlow(AppUpdateDownloadState())
-    val appUpdateDownloadState: StateFlow<AppUpdateDownloadState> = _appUpdateDownloadState.asStateFlow()
-
-    private var appUpdateJob: Job? = null
+    val appUpdateDownloadState: StateFlow<AppUpdateDownloadState> = appUpdateManager.downloadState
 
     init {
         refreshEngineStatus(forceOnline = false)
@@ -235,74 +232,17 @@ class SettingsViewModel @Inject constructor(
 
     fun startAppUpdateDownload() {
         val info = _appUpdateInfo.value ?: return
-        val url = info.apkDownloadUrl
-        if (url.isNullOrBlank()) {
-            _appUpdateDownloadState.value = AppUpdateDownloadState(
-                error = "Direct APK download not found for this release architecture. Please use GitHub."
-            )
-            return
-        }
-
-        val fileName = info.apkFileName ?: "glypdl-v${info.latestVersion}.apk"
-
-        appUpdateJob?.cancel()
-        appUpdateJob = viewModelScope.launch {
-            _appUpdateDownloadState.value = AppUpdateDownloadState(
-                isDownloading = true,
-                progress = 0f,
-                downloadedBytes = 0L,
-                totalBytes = info.apkFileSize,
-                speed = "Starting..."
-            )
-
-            val result = appUpdateManager.downloadUpdate(
-                downloadUrl = url,
-                fileName = fileName
-            ) { percent, downloaded, total, speed ->
-                _appUpdateDownloadState.value = AppUpdateDownloadState(
-                    isDownloading = true,
-                    progress = percent,
-                    downloadedBytes = downloaded,
-                    totalBytes = total,
-                    speed = speed
-                )
-            }
-
-            result.onSuccess { apkFile ->
-                _appUpdateDownloadState.value = AppUpdateDownloadState(
-                    isDownloading = false,
-                    progress = 1f,
-                    downloadedBytes = apkFile.length(),
-                    totalBytes = apkFile.length(),
-                    downloadedApkFile = apkFile,
-                    isReadyToInstall = true
-                )
-                // Automatically attempt to install right after download completes
-                installDownloadedAppUpdate()
-            }.onFailure { error ->
-                _appUpdateDownloadState.value = AppUpdateDownloadState(
-                    isDownloading = false,
-                    error = error.localizedMessage ?: "Download failed. Please check your connection."
-                )
-            }
-        }
+        appUpdateManager.startDownload(info)
     }
 
     fun cancelAppUpdateDownload() {
-        appUpdateJob?.cancel()
-        _appUpdateDownloadState.value = AppUpdateDownloadState()
+        appUpdateManager.cancelDownload()
     }
 
     fun installDownloadedAppUpdate(): Boolean {
-        val file = _appUpdateDownloadState.value.downloadedApkFile ?: return false
+        val file = appUpdateDownloadState.value.downloadedApkFile ?: return false
         val result = appUpdateManager.installApk(file)
-        if (result.isFailure) {
-            _appUpdateDownloadState.update {
-                it.copy(error = result.exceptionOrNull()?.localizedMessage ?: "Failed to open package installer")
-            }
-            return false
-        }
-        return true
+        return result.isSuccess
     }
 
     fun setDefaultSubtitleFormat(format: String) {

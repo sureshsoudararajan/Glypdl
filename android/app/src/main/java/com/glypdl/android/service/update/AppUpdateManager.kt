@@ -16,9 +16,20 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.glypdl.android.BuildConfig
+import com.glypdl.android.data.model.AppUpdateDownloadState
 import com.glypdl.android.data.model.AppUpdateInfo
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -42,8 +53,95 @@ class AppUpdateManager @Inject constructor(
             "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
     }
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var downloadJob: Job? = null
+    @Volatile
+    private var activeConnection: HttpURLConnection? = null
+    @Volatile
+    private var activeTempFile: File? = null
+
+    private val _downloadState = MutableStateFlow(AppUpdateDownloadState())
+    val downloadState: StateFlow<AppUpdateDownloadState> = _downloadState.asStateFlow()
+
     init {
         cleanUpOldUpdateApks()
+    }
+
+    /**
+     * Starts downloading the APK update file within an application-scoped background coroutine.
+     * Retains active download state across screen navigations.
+     */
+    fun startDownload(info: AppUpdateInfo) {
+        val url = info.apkDownloadUrl
+        if (url.isNullOrBlank()) {
+            _downloadState.value = AppUpdateDownloadState(
+                error = "Direct APK download not found for this release architecture. Please use GitHub."
+            )
+            return
+        }
+
+        val fileName = info.apkFileName ?: "glypdl-v${info.latestVersion}.apk"
+
+        cancelDownload()
+        downloadJob = scope.launch {
+            _downloadState.value = AppUpdateDownloadState(
+                isDownloading = true,
+                progress = 0f,
+                downloadedBytes = 0L,
+                totalBytes = info.apkFileSize,
+                speed = "Starting..."
+            )
+
+            val result = downloadUpdate(url, fileName) { percent, downloaded, total, speed ->
+                _downloadState.value = AppUpdateDownloadState(
+                    isDownloading = true,
+                    progress = percent,
+                    downloadedBytes = downloaded,
+                    totalBytes = total,
+                    speed = speed
+                )
+            }
+
+            result.onSuccess { apkFile ->
+                _downloadState.value = AppUpdateDownloadState(
+                    isDownloading = false,
+                    progress = 1f,
+                    downloadedBytes = apkFile.length(),
+                    totalBytes = apkFile.length(),
+                    downloadedApkFile = apkFile,
+                    isReadyToInstall = true
+                )
+                // Automatically attempt to install right after download completes
+                installApk(apkFile)
+            }.onFailure { error ->
+                if (error is CancellationException) {
+                    _downloadState.value = AppUpdateDownloadState()
+                } else {
+                    _downloadState.value = AppUpdateDownloadState(
+                        isDownloading = false,
+                        error = error.localizedMessage ?: "Download failed. Please check your connection."
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Immediately cancels any active APK update download, aborting the HTTP connection
+     * and deleting temporary partial files.
+     */
+    fun cancelDownload() {
+        downloadJob?.cancel()
+        downloadJob = null
+        try {
+            activeConnection?.disconnect()
+        } catch (_: Exception) {}
+        activeConnection = null
+        try {
+            activeTempFile?.delete()
+        } catch (_: Exception) {}
+        activeTempFile = null
+        _downloadState.value = AppUpdateDownloadState()
     }
 
     /**
@@ -188,35 +286,40 @@ class AppUpdateManager @Inject constructor(
 
             val tempFile = File(updatesDir, "$fileName.tmp")
             val targetFile = File(updatesDir, fileName)
+            activeTempFile = tempFile
 
             var currentUrl = downloadUrl
-            var connection: HttpURLConnection
+            var connection: HttpURLConnection? = null
             var redirects = 0
             while (true) {
                 val url = URL(currentUrl)
-                connection = (url.openConnection() as HttpURLConnection).apply {
+                val conn = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"
                     setRequestProperty("User-Agent", "Glypdl-Android-App")
                     connectTimeout = 15000
                     readTimeout = 30000
                     instanceFollowRedirects = false
                 }
-                val status = connection.responseCode
+                activeConnection = conn
+                val status = conn.responseCode
                 if (status in 300..399) {
-                    val location = connection.getHeaderField("Location")
+                    val location = conn.getHeaderField("Location")
                         ?: throw Exception("HTTP redirect missing Location header")
-                    connection.disconnect()
+                    conn.disconnect()
+                    activeConnection = null
                     currentUrl = location
                     redirects++
                     if (redirects > 10) throw Exception("Too many HTTP redirects")
                     continue
                 }
+                connection = conn
                 break
             }
 
             if (connection.responseCode !in 200..299) {
                 val code = connection.responseCode
                 connection.disconnect()
+                activeConnection = null
                 return@withContext Result.failure(Exception("Download failed with HTTP $code"))
             }
 
@@ -227,29 +330,36 @@ class AppUpdateManager @Inject constructor(
             var bytesSinceLastProgress = 0L
             var currentSpeed = "0 KB/s"
 
-            connection.inputStream.use { input ->
-                FileOutputStream(tempFile).use { output ->
-                    val buffer = ByteArray(16384)
-                    var bytesRead: Int
-                    while (input.read(buffer).also { bytesRead = it } != -1) {
-                        output.write(buffer, 0, bytesRead)
-                        downloadedBytes += bytesRead
-                        bytesSinceLastProgress += bytesRead
+            try {
+                connection.inputStream.use { input ->
+                    FileOutputStream(tempFile).use { output ->
+                        val buffer = ByteArray(16384)
+                        var bytesRead: Int
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            currentCoroutineContext().ensureActive()
+                            output.write(buffer, 0, bytesRead)
+                            downloadedBytes += bytesRead
+                            bytesSinceLastProgress += bytesRead
 
-                        val now = System.currentTimeMillis()
-                        val elapsed = now - lastProgressTime
-                        if (elapsed >= 300L) {
-                            val speedBps = (bytesSinceLastProgress * 1000f) / elapsed
-                            currentSpeed = formatSpeed(speedBps)
-                            val percent = if (totalBytes > 0) (downloadedBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
-                            onProgress(percent, downloadedBytes, totalBytes, currentSpeed)
-                            lastProgressTime = now
-                            bytesSinceLastProgress = 0L
+                            val now = System.currentTimeMillis()
+                            val elapsed = now - lastProgressTime
+                            if (elapsed >= 300L) {
+                                val speedBps = (bytesSinceLastProgress * 1000f) / elapsed
+                                currentSpeed = formatSpeed(speedBps)
+                                val percent = if (totalBytes > 0) (downloadedBytes.toFloat() / totalBytes).coerceIn(0f, 1f) else 0f
+                                onProgress(percent, downloadedBytes, totalBytes, currentSpeed)
+                                lastProgressTime = now
+                                bytesSinceLastProgress = 0L
+                            }
                         }
                     }
                 }
+            } finally {
+                try {
+                    connection.disconnect()
+                } catch (_: Exception) {}
+                activeConnection = null
             }
-            connection.disconnect()
 
             if (targetFile.exists()) {
                 targetFile.delete()
@@ -262,8 +372,16 @@ class AppUpdateManager @Inject constructor(
             onProgress(1f, downloadedBytes, totalBytes, "")
             Result.success(targetFile)
         } catch (e: Exception) {
+            try {
+                activeTempFile?.delete()
+            } catch (_: Exception) {}
+            if (e is CancellationException) {
+                return@withContext Result.failure(e)
+            }
             e.printStackTrace()
             Result.failure(e)
+        } finally {
+            activeTempFile = null
         }
     }
 
