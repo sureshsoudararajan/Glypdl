@@ -150,4 +150,29 @@ class AppUpdateManagerTest {
         )
         assertEquals("Network timeout", errorState.error)
     }
+
+    @Test
+    fun testStartDownload_missingUrl_setsError() {
+        val info = AppUpdateInfo(
+            currentVersion = "4.0.0",
+            latestVersion = "4.1.0",
+            isUpdateAvailable = true,
+            releaseUrl = "https://github.com/sureshsoudararajan/Glypdl/releases/tag/v4.1.0",
+            apkDownloadUrl = null
+        )
+        appUpdateManager.startDownload(info)
+        val state = appUpdateManager.downloadState.value
+        assertFalse(state.isDownloading)
+        assertTrue(state.error?.contains("Direct APK download not found") == true)
+    }
+
+    @Test
+    fun testCancelDownload_resetsState() {
+        appUpdateManager.cancelDownload()
+        val state = appUpdateManager.downloadState.value
+        assertFalse(state.isDownloading)
+        assertNull(state.downloadedApkFile)
+        assertFalse(state.isReadyToInstall)
+        assertNull(state.error)
+    }
 }

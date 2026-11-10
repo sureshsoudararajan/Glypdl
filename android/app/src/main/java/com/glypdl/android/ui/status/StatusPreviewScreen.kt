@@ -43,7 +43,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -79,12 +78,57 @@ fun StatusPreviewScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = Color.Black,
-        topBar = {
+        containerColor = Color.Black
+    ) { _ ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            // Media Layer (Image / Video) - Full screen, fixed bounds, no layout jumping
+            if (uiState.uri == Uri.EMPTY) {
+                CircularProgressIndicator(color = WhatsAppGreen)
+            } else if (uiState.mediaType == StatusMediaType.VIDEO) {
+                // Video Player
+                BasicStatusVideoPlayer(
+                    uri = uiState.uri,
+                    onToggleControls = { showControls = !showControls },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                // Image Preview - Fixed 1:1 scale (zoom disabled as requested), no crossfade jitter
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = { showControls = !showControls }
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(uiState.uri)
+                            .crossfade(false)
+                            .build(),
+                        contentDescription = uiState.displayName,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+
+            // Top Bar Overlay
             AnimatedVisibility(
                 visible = showControls,
                 enter = fadeIn(),
-                exit = fadeOut()
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .statusBarsPadding()
             ) {
                 TopAppBar(
                     title = {
@@ -189,12 +233,16 @@ fun StatusPreviewScreen(
                     )
                 )
             }
-        },
-        bottomBar = {
+
+            // Bottom Bar Overlay
             AnimatedVisibility(
                 visible = showControls,
                 enter = fadeIn(),
-                exit = fadeOut()
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
             ) {
                 Surface(
                     color = Color.Black.copy(alpha = 0.65f),
@@ -250,53 +298,6 @@ fun StatusPreviewScreen(
                             }
                         }
                     }
-                }
-            }
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentAlignment = Alignment.Center
-        ) {
-            if (uiState.uri == Uri.EMPTY) {
-                CircularProgressIndicator(color = WhatsAppGreen)
-            } else if (uiState.mediaType == StatusMediaType.VIDEO) {
-                // Basic Video Player
-                BasicStatusVideoPlayer(
-                    uri = uiState.uri,
-                    onToggleControls = { showControls = !showControls },
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                // Basic Image Preview
-                var scale by remember { mutableFloatStateOf(1f) }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onTap = { showControls = !showControls },
-                                onDoubleTap = {
-                                    scale = if (scale > 1f) 1f else 2.5f
-                                }
-                            )
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(uiState.uri)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = uiState.displayName,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer(scaleX = scale, scaleY = scale)
-                    )
                 }
             }
         }
