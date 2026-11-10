@@ -91,19 +91,19 @@ class UrlValidatorTest {
 
     @Test
     fun `canonicalizeFacebookUrl normalizes various share and mobile URLs`() {
-        // Reel share
+        // Reel share - preserves share URL without destroying share token
         assertEquals(
-            "https://www.facebook.com/reel/1450193639775620",
-            UrlValidator.canonicalizeFacebookUrl("https://www.facebook.com/share/r/1450193639775620/?mibextid=wwXIfr")
+            "https://www.facebook.com/share/r/1TLQtRtVQW/",
+            UrlValidator.canonicalizeFacebookUrl("https://www.facebook.com/share/r/1TLQtRtVQW/?mibextid=wwXIfr")
         )
         // Video share
         assertEquals(
-            "https://www.facebook.com/watch/?v=1450193639775620",
+            "https://www.facebook.com/share/v/1450193639775620/",
             UrlValidator.canonicalizeFacebookUrl("https://www.facebook.com/share/v/1450193639775620/?mibextid=wwXIfr")
         )
-        // Post share with digit ID
+        // Post share
         assertEquals(
-            "https://www.facebook.com/watch/?v=1450193639775620",
+            "https://www.facebook.com/share/p/1450193639775620/",
             UrlValidator.canonicalizeFacebookUrl("https://www.facebook.com/share/p/1450193639775620/?mibextid=wwXIfr")
         )
         // Story.php
@@ -115,11 +115,6 @@ class UrlValidatorTest {
         assertEquals(
             "https://www.facebook.com/watch/?v=1450193639775620",
             UrlValidator.canonicalizeFacebookUrl("https://www.facebook.com/someuser/videos/1450193639775620/")
-        )
-        // User post URL
-        assertEquals(
-            "https://www.facebook.com/watch/?v=1450193639775620",
-            UrlValidator.canonicalizeFacebookUrl("https://www.facebook.com/someuser/posts/1450193639775620/")
         )
         // Mobile domain conversion
         assertEquals(

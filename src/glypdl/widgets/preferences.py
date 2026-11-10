@@ -354,12 +354,21 @@ class PreferencesDialog(Adw.PreferencesDialog):
 
         selected_browser_id = self.settings.get_browser_name()
         selected_browser_idx = 0
+        found_selected = False
+        first_installed_idx = None
 
         for idx, b in enumerate(self._discovered_browsers):
+            if b.get("is_installed") and first_installed_idx is None:
+                first_installed_idx = idx
             status_suffix = " (Installed)" if b.get("is_installed") else ""
             self.browser_model.append(f"{b['name']}{status_suffix}")
             if b["id"] == selected_browser_id:
                 selected_browser_idx = idx
+                found_selected = True
+
+        if not found_selected and first_installed_idx is not None:
+            selected_browser_idx = first_installed_idx
+            self.settings.set('browser_name', self._discovered_browsers[first_installed_idx]["id"])
 
         self.browser_dd.set_selected(selected_browser_idx)
         self._update_profile_dropdown(selected_browser_idx)

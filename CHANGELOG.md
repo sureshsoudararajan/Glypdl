@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-11-09
+
+### Added
+- **YouTube Multi-Language Audio Streams (`--audio-multistreams`)**:
+  - Ability to inspect and select distinct spoken audio tracks (e.g. Tamil, English, Hindi, Spanish) before downloading.
+  - Interactive selection bottom sheet with active language badge.
+- **Comprehensive Subtitle Management**:
+  - Search, download, and manage video subtitles in multiple languages (`--write-subs`, `--write-auto-subs`, `--sub-langs`).
+  - Room database support with dedicated `subtitle_files` tracking.
+- **In-App Authenticated Session Handling**:
+  - Isolated WebView session login for Instagram, Facebook, TikTok, Twitter/X, and YouTube.
+  - Automatic Netscape cookies export and management.
+  - Two-phase extraction policy: Anonymous extraction by default for public videos, automatic authenticated session retry when required.
+
+### Fixed & Improved
+- **Instagram & Facebook Extraction Parity**:
+  - Added desktop browser User-Agent and navigation headers to prevent empty media responses and mobile landing redirects.
+  - Preserved share URLs and token integrity across platforms.
+- **UI & Theming Polish**:
+  - Fixed dark/light theme switching latency on cold start and app relaunch.
+  - Fixed layout alignment issues in the download history screen.
+  - Synchronized `v4.0.0` across Android, Linux, and Windows clients.
+
 ## [3.2.0] - 2026-11-04
 
 ### Added

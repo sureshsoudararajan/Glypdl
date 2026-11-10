@@ -21,7 +21,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.glypdl.android.data.local.entity.DownloadEntity
 import com.glypdl.android.data.model.DownloadProgress
+import com.glypdl.android.data.model.SubtitleFile
 import com.glypdl.android.data.repository.DownloadRepository
+import com.glypdl.android.data.repository.SubtitleRepository
 import com.glypdl.android.domain.usecase.CancelDownloadUseCase
 import com.glypdl.android.domain.usecase.PauseDownloadUseCase
 import com.glypdl.android.domain.usecase.ResumeDownloadUseCase
@@ -37,13 +39,15 @@ import javax.inject.Inject
 
 data class DownloadDetailUiState(
     val download: DownloadEntity? = null,
-    val progress: DownloadProgress? = null
+    val progress: DownloadProgress? = null,
+    val subtitles: List<SubtitleFile> = emptyList()
 )
 
 @HiltViewModel
 class DownloadDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val downloadRepository: DownloadRepository,
+    private val subtitleRepository: SubtitleRepository,
     private val downloadManager: DownloadManager,
     private val pauseUseCase: PauseDownloadUseCase,
     private val resumeUseCase: ResumeDownloadUseCase,
@@ -56,11 +60,13 @@ class DownloadDetailViewModel @Inject constructor(
 
     val uiState: StateFlow<DownloadDetailUiState> = combine(
         downloadRepository.getDownloadById(downloadId),
-        downloadManager.downloadProgress
-    ) { download, progressMap ->
+        downloadManager.downloadProgress,
+        subtitleRepository.getSubtitlesForDownload(downloadId)
+    ) { download, progressMap, subtitles ->
         DownloadDetailUiState(
             download = download,
-            progress = progressMap[downloadId]
+            progress = progressMap[downloadId],
+            subtitles = subtitles
         )
     }.stateIn(
         scope = viewModelScope,

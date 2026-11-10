@@ -97,6 +97,15 @@ class SettingsRepository @Inject constructor(
 
         /** Cached latest yt-dlp version tag string from GitHub. */
         val CACHED_LATEST_VERSION = stringPreferencesKey("cached_latest_version")
+
+        /** Default preferred subtitle format ("best", "srt", "vtt", "ass"). */
+        val DEFAULT_SUBTITLE_FORMAT = stringPreferencesKey("default_subtitle_format")
+
+        /** Comma-separated preferred subtitle language codes (e.g., "en,es"). */
+        val PREFERRED_SUBTITLE_LANGUAGES = stringPreferencesKey("preferred_subtitle_languages")
+
+        /** Whether to automatically embed subtitles into video when downloading. */
+        val EMBED_SUBTITLES_DEFAULT = booleanPreferencesKey("embed_subtitles_default")
     }
 
     // Reactive Flow Getters
@@ -106,6 +115,15 @@ class SettingsRepository @Inject constructor(
 
     /** Flow emitting preferred default container format (defaults to "mp4"). */
     val defaultFormat: Flow<String> = dataStore.data.map { it[DEFAULT_FORMAT] ?: "mp4" }
+
+    /** Flow emitting preferred subtitle format (defaults to "best"). */
+    val defaultSubtitleFormat: Flow<String> = dataStore.data.map { it[DEFAULT_SUBTITLE_FORMAT] ?: "best" }
+
+    /** Flow emitting preferred subtitle languages. */
+    val preferredSubtitleLanguages: Flow<String> = dataStore.data.map { it[PREFERRED_SUBTITLE_LANGUAGES] ?: "" }
+
+    /** Flow emitting default embed subtitles setting (defaults to false). */
+    val embedSubtitlesDefault: Flow<Boolean> = dataStore.data.map { it[EMBED_SUBTITLES_DEFAULT] ?: false }
 
     /** Flow emitting allowed concurrent downloads, constrained between 1 and 10 (defaults to 8). */
     val concurrentDownloads: Flow<Int> = dataStore.data.map { (it[CONCURRENT_DOWNLOADS] ?: 8).coerceIn(1, 10) }
@@ -225,4 +243,8 @@ class SettingsRepository @Inject constructor(
             else it[WHATSAPP_STATUS_FOLDER_URI] = value
         }
     }
+
+    suspend fun setDefaultSubtitleFormat(value: String) { dataStore.edit { it[DEFAULT_SUBTITLE_FORMAT] = value } }
+    suspend fun setPreferredSubtitleLanguages(value: String) { dataStore.edit { it[PREFERRED_SUBTITLE_LANGUAGES] = value } }
+    suspend fun setEmbedSubtitlesDefault(value: Boolean) { dataStore.edit { it[EMBED_SUBTITLES_DEFAULT] = value } }
 }

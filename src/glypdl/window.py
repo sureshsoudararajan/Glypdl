@@ -494,6 +494,20 @@ class GlypdlWindow(Adw.ApplicationWindow):
         dropdown = Gtk.DropDown(model=combo_model, hexpand=True)
         container.append(dropdown)
 
+        # Select configured browser in preferences or default to first installed browser (preferring Firefox)
+        pref_browser = self.app.settings.get_browser_name()
+        default_idx = 0
+        for idx, opt in enumerate(auth_options):
+            if opt.get("type") == "browser":
+                spec = opt.get("spec", "")
+                if pref_browser and pref_browser != "auto" and (pref_browser in spec or spec == pref_browser):
+                    default_idx = idx
+                    break
+                elif "firefox" in spec:
+                    default_idx = idx
+                    break
+        dropdown.set_selected(default_idx)
+
         dialog.set_extra_child(container)
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("retry", "Authenticate & Retry")

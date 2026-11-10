@@ -90,6 +90,9 @@ fun StatusSaverScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                ),
                 title = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

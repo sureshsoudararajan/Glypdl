@@ -22,6 +22,9 @@ package com.glypdl.android.data.model
  * @property resolution Display resolution or quality preset (e.g., "1080p", "Best").
  * @property isAudioOnly When true, signals that only audio should be extracted/kept.
  * @property destinationUri Optional custom target destination content tree URI (e.g. SAF folder).
+ * @property subtitleOptions Subtitle downloading configuration options.
+ * @property selectedAudioLanguage Optional selected audio language code (e.g. "ta", "hi", "en-US") for YouTube.
+ * @property selectedAudioTrack Optional explicit audio track chosen for YouTube multi-language audio.
  */
 data class DownloadRequest(
     val id: String,
@@ -32,5 +35,9 @@ data class DownloadRequest(
     val ext: String,
     val resolution: String?,
     val isAudioOnly: Boolean,
-    val destinationUri: String?
+    val destinationUri: String?,
+    val subtitleOptions: SubtitleDownloadOptions = SubtitleDownloadOptions(),
+    val selectedAudioLanguage: String? = null,
+    val selectedAudioTrack: YouTubeAudioTrack? = null,
+    val requiresAuth: Boolean = false
 )

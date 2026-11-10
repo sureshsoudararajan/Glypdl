@@ -10,7 +10,13 @@ class TestYtDlpService(unittest.TestCase):
         service = YtDlpService()
         path = service.detect()
         self.assertIsNotNone(path)
-        self.assertEqual(shutil.which('yt-dlp'), path)
+        valid_paths = [
+            shutil.which('yt-dlp'),
+            "/app/bin/yt-dlp",
+            "/usr/share/glypdl/bin/yt-dlp",
+            "/usr/local/share/glypdl/bin/yt-dlp",
+        ]
+        self.assertIn(path, valid_paths)
         self.assertTrue(service.is_available())
 
     def test_ffmpeg_detection(self):

@@ -27,7 +27,13 @@ import com.glypdl.android.data.model.MediaAnalysisResult
 import com.glypdl.android.data.model.MediaFormat
 import com.glypdl.android.data.model.MediaInfo
 import com.glypdl.android.data.model.PlaylistInfo
+import com.glypdl.android.data.model.SubtitleDownloadMode
+import com.glypdl.android.data.model.SubtitleDownloadOptions
+import com.glypdl.android.data.model.SubtitleFormatPreference
+import com.glypdl.android.data.model.SubtitleTrack
 import com.glypdl.android.data.model.VideoQuality
+import com.glypdl.android.data.model.YouTubeAudioLanguage
+import com.glypdl.android.data.model.YouTubeAudioTrack
 import com.glypdl.android.data.repository.SettingsRepository
 import com.glypdl.android.domain.usecase.AnalyzeUrlUseCase
 import com.glypdl.android.domain.usecase.DownloadMediaUseCase
@@ -76,11 +82,34 @@ sealed interface AnalyzeUiState {
         val audioFormats: List<MediaFormat> = emptyList(),
         val isInstagram: Boolean = false,
         val isFacebook: Boolean = false,
-        val instagramChoice: SimplifiedMediaChoice = SimplifiedMediaChoice.VIDEO_AND_AUDIO
+        val instagramChoice: SimplifiedMediaChoice = SimplifiedMediaChoice.VIDEO_AND_AUDIO,
+        val selectedSubtitleLanguages: Set<String> = emptySet(),
+        val subtitleDownloadMode: SubtitleDownloadMode = SubtitleDownloadMode.MEDIA_ONLY,
+        val downloadAllSubtitles: Boolean = false,
+        val includeManualSubtitles: Boolean = true,
+        val includeAutoSubtitles: Boolean = false,
+        val preferredSubtitleFormat: SubtitleFormatPreference = SubtitleFormatPreference.BEST,
+        val subtitleSectionExpanded: Boolean = false,
+        val selectedYouTubeAudioLanguage: YouTubeAudioLanguage? = null,
+        val selectedYouTubeAudioTrack: YouTubeAudioTrack? = null,
+        val isAudioLanguageSheetVisible: Boolean = false
     ) : AnalyzeUiState {
         val isSimplifiedPlatform: Boolean get() = isInstagram || isFacebook
+        val hasSubtitles: Boolean get() = mediaInfo.hasSubtitles
+        val totalSubtitleCount: Int get() = mediaInfo.totalSubtitleCount
+        val hasMultipleAudioLanguages: Boolean get() = mediaInfo.hasMultipleAudioLanguages
+        val youtubeAudioLanguages: List<YouTubeAudioLanguage> get() = mediaInfo.youtubeAudioLanguages
+        val availableSubtitleTracks: List<SubtitleTrack> get() {
+            val list = mutableListOf<SubtitleTrack>()
+            if (includeManualSubtitles) list.addAll(mediaInfo.manualSubtitles)
+            if (includeAutoSubtitles) list.addAll(mediaInfo.automaticSubtitles)
+            return list
+        }
+        val isSubtitlesOnly: Boolean get() = subtitleDownloadMode == SubtitleDownloadMode.SUBS_ONLY
+
         val estimatedTotalBytes: Long?
             get() {
+                if (isSubtitlesOnly) return null
                 if (isSimplifiedPlatform) return null
                 if (isAudioOnly) return selectedAudioQuality?.estimatedSize
                 val vSize = selectedVideoQuality?.estimatedSize
@@ -210,11 +239,23 @@ class AnalyzeViewModel @Inject constructor(
                             codecMatch.firstOrNull() ?: candidateQualities.firstOrNull() ?: mediaInfo.videoQualities.firstOrNull()
                         }
 
+                        val defaultYouTubeLanguage = mediaInfo.originalAudioLanguage ?: mediaInfo.youtubeAudioLanguages.firstOrNull()
+                        val defaultYouTubeTrack = defaultYouTubeLanguage?.selectedTrack
+
                         // Intelligently harmonize default audio: WebM video requires Opus/Vorbis audio.
                         // MP4 video natively pairs with AAC/m4a audio.
                         val isDefaultVideoWebm = defaultVideoQuality?.ext?.equals("webm", ignoreCase = true) == true ||
                                 defaultVideoQuality?.codec?.contains("vp", ignoreCase = true) == true
-                        val defaultAudioQuality = if (isDefaultVideoWebm) {
+                        val defaultAudioQuality = if (defaultYouTubeTrack != null) {
+                            AudioQuality(
+                                bitrateKbps = defaultYouTubeTrack.bitrate?.toInt() ?: 128,
+                                codec = defaultYouTubeTrack.codec,
+                                extension = defaultYouTubeTrack.extension ?: "m4a",
+                                estimatedSize = defaultYouTubeTrack.fileSize,
+                                formatSelector = defaultYouTubeTrack.formatId,
+                                formatId = defaultYouTubeTrack.formatId
+                            )
+                        } else if (isDefaultVideoWebm) {
                             mediaInfo.audioQualities.firstOrNull {
                                 it.extension.equals("opus", ignoreCase = true) ||
                                         it.extension.equals("webm", ignoreCase = true) ||
@@ -255,7 +296,9 @@ class AnalyzeViewModel @Inject constructor(
                                 isAudioOnly = isAudioOnlyPref,
                                 selectedAudioQuality = defaultAudioQuality,
                                 selectedVideoQuality = defaultVideoQuality,
-                                selectedFormat = defaultFormat
+                                selectedFormat = defaultFormat,
+                                selectedYouTubeAudioLanguage = defaultYouTubeLanguage,
+                                selectedYouTubeAudioTrack = defaultYouTubeTrack
                             )
                             viewModelScope.launch {
                                 downloadMediaUseCase(request)
@@ -272,7 +315,9 @@ class AnalyzeViewModel @Inject constructor(
                                 audioFormats = audioFormats,
                                 isInstagram = isInstagram,
                                 isFacebook = isFacebook,
-                                instagramChoice = instagramChoice
+                                instagramChoice = instagramChoice,
+                                selectedYouTubeAudioLanguage = defaultYouTubeLanguage,
+                                selectedYouTubeAudioTrack = defaultYouTubeTrack
                             )
                         }
                     }
@@ -365,7 +410,13 @@ class AnalyzeViewModel @Inject constructor(
     fun onAudioQualitySelected(quality: AudioQuality) {
         _uiState.update { state ->
             if (state is AnalyzeUiState.Success) {
-                state.copy(selectedAudioQuality = quality)
+                val matchingYtTrack = state.selectedYouTubeAudioLanguage?.tracks?.firstOrNull {
+                    it.formatId == quality.formatId || (it.bitrate?.toInt() == quality.bitrateKbps && it.extension.equals(quality.extension, ignoreCase = true))
+                }
+                state.copy(
+                    selectedAudioQuality = quality,
+                    selectedYouTubeAudioTrack = matchingYtTrack ?: state.selectedYouTubeAudioTrack
+                )
             } else state
         }
     }
@@ -476,6 +527,160 @@ class AnalyzeViewModel @Inject constructor(
         }
     }
 
+    fun setSubtitleDownloadMode(mode: SubtitleDownloadMode) {
+        _uiState.update { state ->
+            if (state is AnalyzeUiState.Success) {
+                state.copy(subtitleDownloadMode = mode)
+            } else state
+        }
+    }
+
+    fun toggleSubtitleLanguage(languageCode: String) {
+        _uiState.update { state ->
+            if (state is AnalyzeUiState.Success) {
+                val current = state.selectedSubtitleLanguages.toMutableSet()
+                if (current.contains(languageCode)) {
+                    current.remove(languageCode)
+                } else {
+                    current.add(languageCode)
+                }
+                val newMode = if (current.isNotEmpty() && state.subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY) {
+                    SubtitleDownloadMode.MEDIA_WITH_SUBS
+                } else if (current.isEmpty() && !state.downloadAllSubtitles && state.subtitleDownloadMode != SubtitleDownloadMode.MEDIA_ONLY) {
+                    SubtitleDownloadMode.MEDIA_ONLY
+                } else {
+                    state.subtitleDownloadMode
+                }
+                state.copy(
+                    selectedSubtitleLanguages = current,
+                    downloadAllSubtitles = false,
+                    subtitleDownloadMode = newMode
+                )
+            } else state
+        }
+    }
+
+    fun selectAllSubtitles() {
+        _uiState.update { state ->
+            if (state is AnalyzeUiState.Success) {
+                val allLangs = state.availableSubtitleTracks.map { it.languageCode }.toSet()
+                state.copy(
+                    selectedSubtitleLanguages = allLangs,
+                    downloadAllSubtitles = true,
+                    subtitleDownloadMode = if (state.subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY) SubtitleDownloadMode.MEDIA_WITH_SUBS else state.subtitleDownloadMode
+                )
+            } else state
+        }
+    }
+
+    fun deselectAllSubtitles() {
+        _uiState.update { state ->
+            if (state is AnalyzeUiState.Success) {
+                state.copy(
+                    selectedSubtitleLanguages = emptySet(),
+                    downloadAllSubtitles = false,
+                    subtitleDownloadMode = if (state.subtitleDownloadMode == SubtitleDownloadMode.SUBS_ONLY) SubtitleDownloadMode.MEDIA_ONLY else state.subtitleDownloadMode
+                )
+            } else state
+        }
+    }
+
+    fun setDownloadAllSubtitles(downloadAll: Boolean) {
+        _uiState.update { state ->
+            if (state is AnalyzeUiState.Success) {
+                state.copy(
+                    downloadAllSubtitles = downloadAll,
+                    selectedSubtitleLanguages = if (downloadAll) state.availableSubtitleTracks.map { it.languageCode }.toSet() else emptySet(),
+                    subtitleDownloadMode = if (downloadAll && state.subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY) SubtitleDownloadMode.MEDIA_WITH_SUBS else state.subtitleDownloadMode
+                )
+            } else state
+        }
+    }
+
+    fun setIncludeManualSubtitles(include: Boolean) {
+        _uiState.update { state ->
+            if (state is AnalyzeUiState.Success) {
+                state.copy(includeManualSubtitles = include)
+            } else state
+        }
+    }
+
+    fun setIncludeAutoSubtitles(include: Boolean) {
+        _uiState.update { state ->
+            if (state is AnalyzeUiState.Success) {
+                state.copy(includeAutoSubtitles = include)
+            } else state
+        }
+    }
+
+    fun setPreferredSubtitleFormat(format: SubtitleFormatPreference) {
+        _uiState.update { state ->
+            if (state is AnalyzeUiState.Success) {
+                state.copy(preferredSubtitleFormat = format)
+            } else state
+        }
+    }
+
+    fun toggleSubtitleSection() {
+        _uiState.update { state ->
+            if (state is AnalyzeUiState.Success) {
+                state.copy(subtitleSectionExpanded = !state.subtitleSectionExpanded)
+            } else state
+        }
+    }
+
+    fun onYouTubeAudioLanguageSelected(language: YouTubeAudioLanguage) {
+        _uiState.update { state ->
+            if (state is AnalyzeUiState.Success) {
+                val chosenTrack = language.selectedTrack
+                val updatedAudioQuality = AudioQuality(
+                    bitrateKbps = chosenTrack.bitrate?.toInt() ?: 128,
+                    codec = chosenTrack.codec,
+                    extension = chosenTrack.extension ?: "m4a",
+                    estimatedSize = chosenTrack.fileSize,
+                    formatSelector = chosenTrack.formatId,
+                    formatId = chosenTrack.formatId
+                )
+                state.copy(
+                    selectedYouTubeAudioLanguage = language,
+                    selectedYouTubeAudioTrack = chosenTrack,
+                    selectedAudioQuality = updatedAudioQuality
+                )
+            } else state
+        }
+    }
+
+    fun onYouTubeAudioTrackSelected(track: YouTubeAudioTrack) {
+        _uiState.update { state ->
+            if (state is AnalyzeUiState.Success) {
+                val updatedLanguage = state.selectedYouTubeAudioLanguage?.copy(
+                    selectedTrack = track
+                )
+                val updatedAudioQuality = AudioQuality(
+                    bitrateKbps = track.bitrate?.toInt() ?: 128,
+                    codec = track.codec,
+                    extension = track.extension ?: "m4a",
+                    estimatedSize = track.fileSize,
+                    formatSelector = track.formatId,
+                    formatId = track.formatId
+                )
+                state.copy(
+                    selectedYouTubeAudioLanguage = updatedLanguage ?: state.selectedYouTubeAudioLanguage,
+                    selectedYouTubeAudioTrack = track,
+                    selectedAudioQuality = updatedAudioQuality
+                )
+            } else state
+        }
+    }
+
+    fun setAudioLanguageSheetVisible(visible: Boolean) {
+        _uiState.update { state ->
+            if (state is AnalyzeUiState.Success) {
+                state.copy(isAudioLanguageSheetVisible = visible)
+            } else state
+        }
+    }
+
     private fun createDownloadRequest(
         mediaInfo: MediaInfo,
         isSimplifiedPlatform: Boolean,
@@ -483,9 +688,49 @@ class AnalyzeViewModel @Inject constructor(
         isAudioOnly: Boolean,
         selectedAudioQuality: AudioQuality?,
         selectedVideoQuality: VideoQuality?,
-        selectedFormat: MediaFormat?
+        selectedFormat: MediaFormat?,
+        subtitleDownloadMode: SubtitleDownloadMode = SubtitleDownloadMode.MEDIA_ONLY,
+        selectedSubtitleLanguages: Set<String> = emptySet(),
+        downloadAllSubtitles: Boolean = false,
+        includeManualSubtitles: Boolean = true,
+        includeAutoSubtitles: Boolean = false,
+        preferredSubtitleFormat: SubtitleFormatPreference = SubtitleFormatPreference.BEST,
+        selectedYouTubeAudioLanguage: YouTubeAudioLanguage? = null,
+        selectedYouTubeAudioTrack: YouTubeAudioTrack? = null
     ): DownloadRequest {
-        return if (isSimplifiedPlatform) {
+        val hasSubSelections = selectedSubtitleLanguages.isNotEmpty() || downloadAllSubtitles
+        val effectiveSubMode = if (subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY && hasSubSelections) {
+            SubtitleDownloadMode.MEDIA_WITH_SUBS
+        } else {
+            subtitleDownloadMode
+        }
+
+        val subOptions = SubtitleDownloadOptions(
+            mode = effectiveSubMode,
+            selectedLanguages = selectedSubtitleLanguages,
+            downloadAllLanguages = downloadAllSubtitles,
+            includeManual = includeManualSubtitles,
+            includeAutoGenerated = includeAutoSubtitles,
+            preferredFormat = preferredSubtitleFormat,
+            embedInVideo = effectiveSubMode == SubtitleDownloadMode.EMBED_SUBS
+        )
+
+        if (effectiveSubMode == SubtitleDownloadMode.SUBS_ONLY) {
+            return DownloadRequest(
+                id = UUID.randomUUID().toString(),
+                url = mediaInfo.url,
+                title = mediaInfo.title,
+                thumbnailUrl = mediaInfo.thumbnail,
+                formatId = "subtitles",
+                ext = preferredSubtitleFormat.format.ifBlank { "srt" },
+                resolution = "Subtitles (${preferredSubtitleFormat.displayName})",
+                isAudioOnly = false,
+                destinationUri = null,
+                subtitleOptions = subOptions
+            )
+        }
+
+        val baseRequest = if (isSimplifiedPlatform) {
             val isAudio = instagramChoice == SimplifiedMediaChoice.AUDIO_ONLY
             DownloadRequest(
                 id = UUID.randomUUID().toString(),
@@ -500,29 +745,50 @@ class AnalyzeViewModel @Inject constructor(
             )
         } else if (isAudioOnly && selectedAudioQuality != null) {
             val audio = selectedAudioQuality
+            val effectiveFormatId = selectedYouTubeAudioTrack?.formatId ?: audio.formatSelector
+            val effectiveExt = selectedYouTubeAudioTrack?.extension ?: audio.extension
+            val effectiveResolution = if (selectedYouTubeAudioTrack != null && selectedYouTubeAudioLanguage != null) {
+                "${selectedYouTubeAudioTrack.displayBitrate} (${selectedYouTubeAudioLanguage.languageName})"
+            } else {
+                audio.displayBitrate
+            }
+
             DownloadRequest(
                 id = UUID.randomUUID().toString(),
                 url = mediaInfo.url,
                 title = mediaInfo.title,
                 thumbnailUrl = mediaInfo.thumbnail,
-                formatId = audio.formatSelector,
-                ext = audio.extension,
-                resolution = audio.displayBitrate,
+                formatId = effectiveFormatId,
+                ext = effectiveExt,
+                resolution = effectiveResolution,
                 isAudioOnly = true,
-                destinationUri = null
+                destinationUri = null,
+                selectedAudioLanguage = selectedYouTubeAudioLanguage?.languageCode,
+                selectedAudioTrack = selectedYouTubeAudioTrack
             )
         } else if (selectedVideoQuality != null) {
             val video = selectedVideoQuality
             val audio = selectedAudioQuality
-            val formatId = if (!video.hasAudio && audio != null && video.formatId.isNotBlank() && audio.formatId.isNotBlank() && video.formatId != audio.formatId) {
-                "${video.formatId}+${audio.formatId}/${video.formatId}/best"
+            val audioFormatId = selectedYouTubeAudioTrack?.formatId ?: audio?.formatId ?: ""
+            val audioDisplay = if (selectedYouTubeAudioTrack != null && selectedYouTubeAudioLanguage != null) {
+                "${selectedYouTubeAudioTrack.displayBitrate} (${selectedYouTubeAudioLanguage.languageName})"
+            } else {
+                audio?.displayBitrate
+            }
+
+            val formatId = if (!video.hasAudio && audio != null && video.formatId.isNotBlank() && audioFormatId.isNotBlank() && video.formatId != audioFormatId) {
+                if (UrlValidator.isYouTubeUrl(mediaInfo.url) && selectedYouTubeAudioTrack != null) {
+                    "${video.formatId}+${audioFormatId}"
+                } else {
+                    "${video.formatId}+${audioFormatId}/${video.formatId}/best"
+                }
             } else if (video.formatSelector.isNotBlank()) {
                 if (video.formatSelector.contains("/")) video.formatSelector else "${video.formatSelector}/best"
             } else {
                 "bestvideo+bestaudio/best"
             }
-            val resLabel = if (audio != null && !video.hasAudio && video.formatId != audio.formatId) {
-                "${video.label} + ${audio.displayBitrate}"
+            val resLabel = if (audio != null && !video.hasAudio && video.formatId != audioFormatId) {
+                "${video.label} + $audioDisplay"
             } else {
                 video.label
             }
@@ -555,7 +821,9 @@ class AnalyzeViewModel @Inject constructor(
                 ext = resolvedExt,
                 resolution = resLabel,
                 isAudioOnly = false,
-                destinationUri = null
+                destinationUri = null,
+                selectedAudioLanguage = selectedYouTubeAudioLanguage?.languageCode,
+                selectedAudioTrack = selectedYouTubeAudioTrack
             )
         } else if (selectedFormat != null) {
             val format = selectedFormat
@@ -573,7 +841,9 @@ class AnalyzeViewModel @Inject constructor(
                 ext = format.ext.ifBlank { if (format.isAudioOnly) "m4a" else "mp4" },
                 resolution = format.displayResolution.ifBlank { "Best" },
                 isAudioOnly = format.isAudioOnly,
-                destinationUri = null
+                destinationUri = null,
+                selectedAudioLanguage = selectedYouTubeAudioLanguage?.languageCode,
+                selectedAudioTrack = selectedYouTubeAudioTrack
             )
         } else {
             DownloadRequest(
@@ -588,6 +858,11 @@ class AnalyzeViewModel @Inject constructor(
                 destinationUri = null
             )
         }
+
+        return baseRequest.copy(
+            subtitleOptions = subOptions,
+            requiresAuth = mediaInfo.requiresAuth
+        )
     }
 
     fun startDownload() {
@@ -600,7 +875,15 @@ class AnalyzeViewModel @Inject constructor(
                 isAudioOnly = currentState.isAudioOnly,
                 selectedAudioQuality = currentState.selectedAudioQuality,
                 selectedVideoQuality = currentState.selectedVideoQuality,
-                selectedFormat = currentState.selectedFormat
+                selectedFormat = currentState.selectedFormat,
+                subtitleDownloadMode = currentState.subtitleDownloadMode,
+                selectedSubtitleLanguages = currentState.selectedSubtitleLanguages,
+                downloadAllSubtitles = currentState.downloadAllSubtitles,
+                includeManualSubtitles = currentState.includeManualSubtitles,
+                includeAutoSubtitles = currentState.includeAutoSubtitles,
+                preferredSubtitleFormat = currentState.preferredSubtitleFormat,
+                selectedYouTubeAudioLanguage = currentState.selectedYouTubeAudioLanguage,
+                selectedYouTubeAudioTrack = currentState.selectedYouTubeAudioTrack
             )
             viewModelScope.launch {
                 downloadMediaUseCase(request)

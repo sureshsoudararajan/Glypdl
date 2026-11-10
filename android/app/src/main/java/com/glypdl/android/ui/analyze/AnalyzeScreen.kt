@@ -43,9 +43,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.glypdl.android.data.model.GlypdlError
+import com.glypdl.android.data.model.SubtitleDownloadMode
 import com.glypdl.android.ui.components.FormatSelector
 import com.glypdl.android.ui.components.QualitySelector
+import com.glypdl.android.ui.components.SubtitleSelectionCard
 import com.glypdl.android.ui.components.ThumbnailImage
+import com.glypdl.android.ui.components.YouTubeAudioLanguageBottomSheet
+import com.glypdl.android.ui.components.YouTubeAudioLanguageCard
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,6 +72,11 @@ fun AnalyzeScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Analyze") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground
+                ),
                 navigationIcon = {
                     IconButton(onClick = {
                         if (uiState is AnalyzeUiState.Loading) {
@@ -214,6 +223,16 @@ fun AnalyzeScreen(
                         HorizontalDivider()
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        if (state.hasMultipleAudioLanguages) {
+                            YouTubeAudioLanguageCard(
+                                selectedLanguage = state.selectedYouTubeAudioLanguage,
+                                selectedTrack = state.selectedYouTubeAudioTrack,
+                                availableLanguagesCount = state.youtubeAudioLanguages.size,
+                                onOpenSelector = { viewModel.setAudioLanguageSheetVisible(true) },
+                                modifier = Modifier.padding(bottom = 12.dp)
+                            )
+                        }
+
                         if (state.isSimplifiedPlatform) {
                             InstagramFormatSelector(
                                 selectedChoice = state.instagramChoice,
@@ -239,22 +258,70 @@ fun AnalyzeScreen(
                             )
                         }
 
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        SubtitleSelectionCard(
+                            manualSubtitles = state.mediaInfo.manualSubtitles,
+                            automaticSubtitles = state.mediaInfo.automaticSubtitles,
+                            selectedLanguages = state.selectedSubtitleLanguages,
+                            downloadMode = state.subtitleDownloadMode,
+                            preferredFormat = state.preferredSubtitleFormat,
+                            downloadAllLanguages = state.downloadAllSubtitles,
+                            includeManual = state.includeManualSubtitles,
+                            includeAuto = state.includeAutoSubtitles,
+                            isExpanded = state.subtitleSectionExpanded,
+                            onToggleExpand = viewModel::toggleSubtitleSection,
+                            onToggleLanguage = viewModel::toggleSubtitleLanguage,
+                            onSelectAll = viewModel::selectAllSubtitles,
+                            onDeselectAll = viewModel::deselectAllSubtitles,
+                            onDownloadModeChanged = viewModel::setSubtitleDownloadMode,
+                            onPreferredFormatChanged = viewModel::setPreferredSubtitleFormat,
+                            onDownloadAllChanged = viewModel::setDownloadAllSubtitles,
+                            onIncludeManualChanged = viewModel::setIncludeManualSubtitles,
+                            onIncludeAutoChanged = viewModel::setIncludeAutoSubtitles
+                        )
+
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        val canDownload = state.isSimplifiedPlatform ||
+                        val canDownload = state.isSubtitlesOnly ||
+                                state.isSimplifiedPlatform ||
                                 state.selectedVideoQuality != null ||
                                 state.selectedAudioQuality != null ||
                                 state.selectedFormat != null
 
                         val context = androidx.compose.ui.platform.LocalContext.current
                         val (primaryLabel, secondaryLabel) = when {
+                            state.isSubtitlesOnly -> {
+                                val count = if (state.downloadAllSubtitles) state.totalSubtitleCount else state.selectedSubtitleLanguages.size
+                                val countLabel = if (count > 0) "$count track${if (count != 1) "s" else ""}" else "All available"
+                                Pair("Download Subtitles Only", "$countLabel • ${state.preferredSubtitleFormat.displayName}")
+                            }
+                            state.subtitleDownloadMode == SubtitleDownloadMode.MEDIA_WITH_SUBS -> {
+                                val count = if (state.downloadAllSubtitles) state.totalSubtitleCount else state.selectedSubtitleLanguages.size
+                                val subLabel = "$count subtitle${if (count != 1) "s" else ""}"
+                                if (state.isAudioOnly) {
+                                    Pair("Download Audio + Subtitles", subLabel)
+                                } else {
+                                    Pair("Download Video + Subtitles", subLabel)
+                                }
+                            }
+                            state.subtitleDownloadMode == SubtitleDownloadMode.EMBED_SUBS -> {
+                                val count = if (state.downloadAllSubtitles) state.totalSubtitleCount else state.selectedSubtitleLanguages.size
+                                Pair("Download Video (Embedded Subs)", "$count subtitle track${if (count != 1) "s" else ""}")
+                            }
                             state.isSimplifiedPlatform -> {
                                 Pair("Download ${state.instagramChoice.label}", "Best available • ${state.instagramChoice.ext.uppercase()}")
                             }
                             state.isAudioOnly -> {
-                                val aLabel = state.selectedAudioQuality?.displayBitrate ?: "Audio"
+                                val aLabel = if (state.hasMultipleAudioLanguages && state.selectedYouTubeAudioLanguage != null) {
+                                    val lang = state.selectedYouTubeAudioLanguage.languageName
+                                    val track = state.selectedYouTubeAudioTrack
+                                    "${track?.displayBitrate ?: "Audio"} ($lang)"
+                                } else {
+                                    state.selectedAudioQuality?.displayBitrate ?: "Audio"
+                                }
                                 val sizeStr = state.selectedAudioQuality?.displaySize?.takeIf { it.isNotBlank() } ?: ""
-                                Pair("Download Audio", listOf(aLabel, sizeStr).filter { it.isNotBlank() }.joinToString(" • "))
+                                Pair("Download $aLabel", listOf(sizeStr).filter { it.isNotBlank() }.joinToString(" • ").ifBlank { "High quality audio" })
                             }
                             state.selectedVideoQuality != null -> {
                                 val vLabel = state.selectedVideoQuality.label
@@ -306,6 +373,18 @@ fun AnalyzeScreen(
                                     }
                                 }
                             }
+                        }
+
+                        if (state.hasMultipleAudioLanguages && state.isAudioLanguageSheetVisible) {
+                            YouTubeAudioLanguageBottomSheet(
+                                videoTitle = state.mediaInfo.title,
+                                languages = state.youtubeAudioLanguages,
+                                selectedLanguage = state.selectedYouTubeAudioLanguage,
+                                selectedTrack = state.selectedYouTubeAudioTrack,
+                                onLanguageSelected = viewModel::onYouTubeAudioLanguageSelected,
+                                onTrackSelected = viewModel::onYouTubeAudioTrackSelected,
+                                onDismissRequest = { viewModel.setAudioLanguageSheetVisible(false) }
+                            )
                         }
                     }
                 }
@@ -519,7 +598,9 @@ private fun ErrorContent(
     val error = state.error
 
     val errorIcon: ImageVector = when (error) {
-        is GlypdlError.AuthenticationRequired -> Icons.Default.Lock
+        is GlypdlError.AuthenticationRequired,
+        is GlypdlError.PrivateContent,
+        is GlypdlError.EmptyMediaResponse -> Icons.Default.Lock
         is GlypdlError.RateLimited -> Icons.Default.HourglassEmpty
         is GlypdlError.EngineOutdated, is GlypdlError.EngineMissing -> Icons.Default.SystemUpdate
         is GlypdlError.ContentUnavailable -> Icons.Default.VideocamOff
@@ -594,7 +675,11 @@ private fun ErrorContent(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (error is GlypdlError.AuthenticationRequired) {
+                    val isAuthRelated = error is GlypdlError.AuthenticationRequired ||
+                            error is GlypdlError.PrivateContent ||
+                            error is GlypdlError.EmptyMediaResponse
+
+                    if (isAuthRelated) {
                         val authContext = androidx.compose.ui.platform.LocalContext.current
                         val authLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
                             androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
@@ -614,7 +699,7 @@ private fun ErrorContent(
                                 val domain = when {
                                     host.contains("facebook.com") || host.contains("fb.watch") || error.userMessage.contains("Facebook", ignoreCase = true) -> "facebook.com"
                                     host.contains("youtube.com") || host.contains("youtu.be") || error.userMessage.contains("YouTube", ignoreCase = true) -> "youtube.com"
-                                    host.contains("instagram.com") || error.userMessage.contains("Instagram", ignoreCase = true) -> "instagram.com"
+                                    host.contains("instagram.com") || host.contains("instagr.am") || error.userMessage.contains("Instagram", ignoreCase = true) -> "instagram.com"
                                     host.contains("tiktok.com") || error.userMessage.contains("TikTok", ignoreCase = true) -> "tiktok.com"
                                     host.contains("twitter.com") || host.contains("x.com") -> "twitter.com"
                                     host.isNotEmpty() -> {

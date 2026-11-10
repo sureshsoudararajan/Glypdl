@@ -33,14 +33,25 @@ if command -v flatpak >/dev/null 2>&1; then
     fi
 fi
 
-# 2. Native package paths (Debian / Arch / RPM / /usr/local)
-for bin in /usr/bin/glypdl-host /usr/local/bin/glypdl-host "$HOME/.local/share/glypdl/bin/glypdl-host"; do
+# 2. Native package paths (Debian / Arch / RPM / /usr/local / Dev tree)
+for bin in /usr/bin/glypdl-host /usr/local/bin/glypdl-host "$HOME/.local/share/glypdl/bin/glypdl-host" "$HOME/Glypdl/bin/glypdl-host"; do
     if [ -x "$bin" ]; then
         exec "$bin" "$@"
     fi
 done
 
-echo '{"protocolVersion": 1, "success": false, "error": "Glypdl application executable not found"}'
+# If native binary not found on standard paths, try PATH
+if command -v glypdl-host >/dev/null 2>&1; then
+    exec glypdl-host "$@"
+fi
+
+# Fallback: send 32-bit length-prefixed JSON error to satisfy browser native messaging protocol
+python3 -c '
+import sys, struct, json
+msg = json.dumps({"protocolVersion": 1, "success": False, "error": "Glypdl application executable not found"}).encode("utf-8")
+sys.stdout.buffer.write(struct.pack("@I", len(msg)) + msg)
+sys.stdout.buffer.flush()
+'
 exit 1
 INNER_EOF
 
@@ -50,6 +61,8 @@ echo "✓ Host bridge script installed at $HOST_WRAPPER"
 # 2. Target directories for all major browsers
 BROWSER_DIRS=(
     "$HOME/.mozilla/native-messaging-hosts"
+    "$HOME/snap/firefox/common/.mozilla/native-messaging-hosts"
+    "$HOME/snap/firefox/current/.mozilla/native-messaging-hosts"
     "$HOME/.librewolf/native-messaging-hosts"
     "$HOME/.config/librewolf/native-messaging-hosts"
     "$HOME/.var/app/org.mozilla.firefox/.mozilla/native-messaging-hosts"
@@ -57,6 +70,7 @@ BROWSER_DIRS=(
     "$HOME/.config/google-chrome/NativeMessagingHosts"
     "$HOME/.config/chromium/NativeMessagingHosts"
     "$HOME/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
+    "$HOME/.config/microsoft-edge/NativeMessagingHosts"
 )
 
 MANIFEST_CONTENT=$(cat << INNER_EOF
@@ -74,12 +88,46 @@ INNER_EOF
 
 count=0
 for dir in "${BROWSER_DIRS[@]}"; do
-    mkdir -p "$dir"
-    echo "$MANIFEST_CONTENT" > "$dir/$HOST_NAME.json"
-    count=$((count + 1))
+    parent_browser_dir="$(dirname "$dir")"
+    case "$dir" in
+        *mozilla*|*firefox*)
+            mkdir -p "$dir"
+            echo "$MANIFEST_CONTENT" > "$dir/$HOST_NAME.json"
+            count=$((count + 1))
+            ;;
+        *)
+            # Only create directory if parent browser directory already exists
+            if [ -d "$parent_browser_dir" ]; then
+                mkdir -p "$dir"
+                echo "$MANIFEST_CONTENT" > "$dir/$HOST_NAME.json"
+                count=$((count + 1))
+            fi
+            ;;
+    esac
 done
 
 echo "✓ Registered manifest in $count browser target directories."
+
+# 3. Grant xdg-desktop-portal WebExtensions permission for Snap/Flatpak browsers
+# Sandboxed browsers route native messaging through xdg-desktop-portal. If the user
+# previously denied the portal permission dialog (or it was never shown), the
+# PermissionStore entry is "no" and all native messaging calls fail with
+# "An unexpected error occurred". Setting it to "yes" fixes this silently.
+if command -v busctl >/dev/null 2>&1; then
+    for app in "snap.firefox" "org.mozilla.firefox" "snap.chromium"; do
+        busctl --user call \
+            org.freedesktop.impl.portal.PermissionStore \
+            /org/freedesktop/impl/portal/PermissionStore \
+            org.freedesktop.impl.portal.PermissionStore \
+            SetPermission sbssas \
+            "webextensions" true \
+            "$HOST_NAME" \
+            "$app" \
+            1 "yes" 2>/dev/null || true
+    done
+    echo "✓ Granted xdg-desktop-portal WebExtensions permission for Snap/Flatpak browsers."
+fi
+
 echo ""
 echo "🎉 Setup complete! Restart your browser to activate the connection."
 echo "======================================================"

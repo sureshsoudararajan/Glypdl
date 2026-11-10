@@ -47,6 +47,11 @@ fun DownloadsScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Downloads") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    actionIconContentColor = MaterialTheme.colorScheme.onBackground
+                ),
                 actions = {
                     val hasCompleted = uiState.downloads.any { it.status == com.glypdl.android.data.model.DownloadStatus.COMPLETED }
                     if (hasCompleted) {

@@ -43,4 +43,10 @@ sealed class Screen(val route: String) {
     object StatusSaver : Screen("status_saver")
 
     object StatusPreview : Screen("status_preview")
+
+    object Subtitles : Screen("subtitles?downloadId={downloadId}") {
+        fun createRoute(downloadId: String? = null): String {
+            return if (!downloadId.isNullOrBlank()) "subtitles?downloadId=$downloadId" else "subtitles"
+        }
+    }
 }

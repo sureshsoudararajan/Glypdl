@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -48,7 +49,8 @@ fun HomeScreen(
     onNavigateToDownloads: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToDownloadDetail: (String) -> Unit,
-    onNavigateToStatusSaver: () -> Unit = {}
+    onNavigateToStatusSaver: () -> Unit = {},
+    onNavigateToSubtitles: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var downloadToDelete by remember { mutableStateOf<DownloadEntity?>(null) }
@@ -74,7 +76,15 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Glypdl") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    actionIconContentColor = MaterialTheme.colorScheme.onBackground
+                ),
                 actions = {
+                    IconButton(onClick = onNavigateToSubtitles) {
+                        Icon(Icons.Default.Subtitles, contentDescription = "Subtitles")
+                    }
                     IconButton(onClick = onNavigateToStatusSaver) {
                         Icon(
                             painter = painterResource(R.drawable.ic_whatsapp),

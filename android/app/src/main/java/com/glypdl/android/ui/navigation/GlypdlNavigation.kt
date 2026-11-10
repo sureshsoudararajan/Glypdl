@@ -52,6 +52,7 @@ import com.glypdl.android.ui.home.HomeScreen
 import com.glypdl.android.ui.settings.SettingsScreen
 import com.glypdl.android.ui.status.StatusPreviewScreen
 import com.glypdl.android.ui.status.StatusSaverScreen
+import com.glypdl.android.ui.subtitles.SubtitleManagementScreen
 import com.glypdl.android.ui.welcome.WelcomeScreen
 import kotlinx.coroutines.launch
 
@@ -191,6 +192,9 @@ fun GlypdlNavHost(
                 },
                 onNavigateToStatusSaver = {
                     navController.navigate(Screen.StatusSaver.route)
+                },
+                onNavigateToSubtitles = {
+                    navController.navigate(Screen.Subtitles.createRoute())
                 }
             )
         }
@@ -222,6 +226,24 @@ fun GlypdlNavHost(
             arguments = listOf(navArgument("downloadId") { type = NavType.StringType })
         ) {
             DownloadDetailScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToSubtitles = { downloadId ->
+                    navController.navigate(Screen.Subtitles.createRoute(downloadId))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.Subtitles.route,
+            arguments = listOf(
+                navArgument("downloadId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) {
+            SubtitleManagementScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

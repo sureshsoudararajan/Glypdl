@@ -3,7 +3,7 @@ set -e
 
 SPEC_FILE="packaging/rpm/glypdl.spec"
 if [ -n "$VERSION" ]; then
-    sed -i "s/^Version:.*/Version:        $VERSION/" "$SPEC_FILE"
+    sed -i "s|^Version:.*|Version:        $VERSION|" "$SPEC_FILE"
 else
     VERSION="$(grep -i '^Version:' "$SPEC_FILE" | awk '{print $2}')"
     VERSION="${VERSION:-1.2.0}"

@@ -360,11 +360,14 @@ def get_manifest_content(host_binary_path: Optional[str] = None) -> Dict[str, An
 
 
 def get_target_manifest_paths() -> List[Path]:
-    """Return all target directory paths where Firefox, LibreWolf, and Flatpak Firefox look for manifests."""
+    """Return all target directory paths where Firefox, LibreWolf, Snap/Flatpak Firefox, and Chromium look for manifests."""
     home = Path.home()
     paths = [
         # Standard Firefox
         home / ".mozilla" / "native-messaging-hosts" / f"{HOST_NAME}.json",
+        # Snap Firefox (Ubuntu default)
+        home / "snap" / "firefox" / "common" / ".mozilla" / "native-messaging-hosts" / f"{HOST_NAME}.json",
+        home / "snap" / "firefox" / "current" / ".mozilla" / "native-messaging-hosts" / f"{HOST_NAME}.json",
         # Flatpak Firefox
         home / ".var" / "app" / "org.mozilla.firefox" / ".mozilla" / "native-messaging-hosts" / f"{HOST_NAME}.json",
         # LibreWolf Standard & Dot-LibreWolf
@@ -372,8 +375,51 @@ def get_target_manifest_paths() -> List[Path]:
         home / ".librewolf" / "native-messaging-hosts" / f"{HOST_NAME}.json",
         # Flatpak LibreWolf
         home / ".var" / "app" / "io.gitlab.librewolf-community" / ".librewolf" / "native-messaging-hosts" / f"{HOST_NAME}.json",
+        # Chromium / Chrome / Brave / Edge
+        home / ".config" / "google-chrome" / "NativeMessagingHosts" / f"{HOST_NAME}.json",
+        home / ".config" / "chromium" / "NativeMessagingHosts" / f"{HOST_NAME}.json",
+        home / ".config" / "BraveSoftware" / "Brave-Browser" / "NativeMessagingHosts" / f"{HOST_NAME}.json",
+        home / ".config" / "microsoft-edge" / "NativeMessagingHosts" / f"{HOST_NAME}.json",
     ]
     return paths
+
+
+def grant_snap_portal_permission() -> bool:
+    """Grant xdg-desktop-portal WebExtensions permission for Snap/Flatpak Firefox and browsers.
+
+    When Firefox is installed as a Snap package (or Flatpak), native messaging goes through
+    xdg-desktop-portal's WebExtensions interface. The portal uses a PermissionStore
+    to track whether a sandboxed app (snap.firefox, org.mozilla.firefox) is allowed to talk to a given
+    native messaging host. If the user previously denied the dialog or it was never
+    shown, the permission is stored as "no" and all native messaging calls fail with
+    a generic "An unexpected error occurred" message.
+
+    This function sets the permission to "yes" so native messaging works without
+    requiring user interaction with the portal dialog.
+    """
+    targets = ["snap.firefox", "org.mozilla.firefox", "snap.chromium"]
+    success = True
+    for app in targets:
+        try:
+            res = subprocess.run(
+                [
+                    "busctl", "--user", "call",
+                    "org.freedesktop.impl.portal.PermissionStore",
+                    "/org/freedesktop/impl/portal/PermissionStore",
+                    "org.freedesktop.impl.portal.PermissionStore",
+                    "SetPermission", "sbssas",
+                    "webextensions", "true",
+                    HOST_NAME,
+                    app,
+                    "1", "yes"
+                ],
+                capture_output=True, timeout=3
+            )
+            if res.returncode != 0:
+                success = False
+        except Exception:
+            success = False
+    return success
 
 
 def install_manifests(host_binary_path: Optional[str] = None) -> List[str]:
@@ -383,12 +429,23 @@ def install_manifests(host_binary_path: Optional[str] = None) -> List[str]:
 
     for target in get_target_manifest_paths():
         try:
+            target_str = str(target)
+            # For standard Mozilla/Firefox, always install.
+            # For other browsers, only install if the parent browser directory already exists.
+            if not ("mozilla" in target_str or "firefox" in target_str):
+                if not target.parent.parent.exists():
+                    continue
+
             target.parent.mkdir(parents=True, exist_ok=True)
             with open(target, "w", encoding="utf-8") as f:
                 json.dump(manifest, f, indent=2)
             installed_to.append(str(target))
         except Exception:
             pass
+
+    # Grant portal permission for Snap Firefox so native messaging works
+    # without requiring the user to interact with a portal permission dialog
+    grant_snap_portal_permission()
 
     return installed_to
 

@@ -1,0 +1,171 @@
+name: Android Build & Test
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'android/**'
+      - '.github/workflows/android.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'android/**'
+      - '.github/workflows/android.yml'
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version string (e.g. 3.3.0)'
+        required: false
+        type: string
+        default: ''
+      build_release:
+        description: 'Build signed release APKs instead of debug'
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      RELEASE_KEYSTORE_BASE64:
+        required: false
+      RELEASE_KEYSTORE_PASSWORD:
+        required: false
+      RELEASE_KEY_ALIAS:
+        required: false
+      RELEASE_KEY_PASSWORD:
+        required: false
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version string (e.g. 3.3.0)'
+        required: false
+        type: string
+        default: '4.0.0'
+      build_release:
+        description: 'Build release APKs instead of debug'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  test-android:
+    name: Run Android Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Fetch Latest Official yt-dlp Binary
+        run: |
+          mkdir -p android/app/src/main/res/raw
+          echo "Downloading latest official yt-dlp binary..."
+          curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o android/app/src/main/res/raw/ytdlp
+          chmod 644 android/app/src/main/res/raw/ytdlp
+          echo "Bundled yt-dlp size: $(ls -lh android/app/src/main/res/raw/ytdlp | awk '{print $5}')"
+
+      - name: Run Unit Tests
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest --no-daemon
+
+  build-android:
+    name: Build Android APKs
+    needs: test-android
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Fetch Latest Official yt-dlp Binary
+        run: |
+          mkdir -p android/app/src/main/res/raw
+          echo "Downloading latest official yt-dlp binary..."
+          curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o android/app/src/main/res/raw/ytdlp
+          chmod 644 android/app/src/main/res/raw/ytdlp
+          echo "Bundled yt-dlp size: $(ls -lh android/app/src/main/res/raw/ytdlp | awk '{print $5}')"
+
+      - name: Determine Build Type
+        id: build_type
+        run: |
+          if [ "${{ inputs.build_release }}" = "true" ] || [ -n "${{ inputs.version }}" ] || [[ "${GITHUB_REF_NAME}" =~ ^v[0-9] ]]; then
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify and Decode Release Keystore
+        if: steps.build_type.outputs.is_release == 'true'
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$RELEASE_KEYSTORE_BASE64" ]; then
+            echo "::error::RELEASE_KEYSTORE_BASE64 secret is missing. Android release builds require valid signing credentials."
+            exit 1
+          fi
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 --decode > android/glypdl-release.jks
+          echo "Release keystore decoded successfully."
+
+      - name: Build Release APKs
+        if: steps.build_type.outputs.is_release == 'true'
+        env:
+          RELEASE_KEYSTORE_PATH: "../glypdl-release.jks"
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          mkdir -p ../dist-android
+          VERSION="${{ inputs.version }}"
+          if [ -z "$VERSION" ] || [[ "$VERSION" == *"/"* ]] || [ "$VERSION" = "main" ] || [[ ! "$VERSION" =~ ^[0-9] ]]; then
+            if [[ "${GITHUB_REF_NAME}" =~ ^v?[0-9] && ! "${GITHUB_REF_NAME}" == *"/"* ]]; then
+              VERSION="${GITHUB_REF_NAME#v}"
+            else
+              VERSION="4.0.0"
+            fi
+          fi
+          cp app/build/outputs/apk/release/app-arm64-v8a-release.apk "../dist-android/Glypdl-${VERSION}-arm64-v8a.apk"
+          cp app/build/outputs/apk/release/app-armeabi-v7a-release.apk "../dist-android/Glypdl-${VERSION}-armeabi-v7a.apk"
+          cp app/build/outputs/apk/release/app-x86_64-release.apk "../dist-android/Glypdl-${VERSION}-x86_64.apk"
+
+      - name: Upload Android Release Artifacts
+        if: steps.build_type.outputs.is_release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: glypdl-android
+          path: dist-android/*.apk
+
+      - name: Build Debug APK
+        if: steps.build_type.outputs.is_release != 'true'
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Upload Android Debug Artifact
+        if: steps.build_type.outputs.is_release != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: glypdl-android-debug
+          path: android/app/build/outputs/apk/debug/*.apk

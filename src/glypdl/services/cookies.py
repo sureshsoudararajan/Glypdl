@@ -66,9 +66,42 @@ class CookieService:
         """Return the list of supported cookie decryption keyrings."""
         return list(self.SUPPORTED_KEYRINGS)
 
+    @staticmethod
+    def _is_valid_browser_data_dir(path: Path, browser_type: str) -> bool:
+        """Check if a directory actually contains browser profile or user data."""
+        if not path.exists() or not path.is_dir():
+            return False
+
+        # Ignore directories that only contain NativeMessagingHosts manifests
+        try:
+            non_manifest_items = [
+                item.name for item in path.iterdir()
+                if item.name.lower() not in ("nativemessaginghosts", "native-messaging-hosts")
+            ]
+            if not non_manifest_items:
+                return False
+        except Exception:
+            return False
+
+        if browser_type == "chromium":
+            indicators = ("Local State", "Default", "First Run", "Preferences", "Last Version")
+            return any((path / ind).exists() for ind in indicators)
+        elif browser_type == "firefox":
+            if (path / "profiles.ini").exists():
+                return True
+            try:
+                for item in path.iterdir():
+                    if item.is_dir() and ((item / "cookies.sqlite").exists() or (item / "prefs.js").exists()):
+                        return True
+            except Exception:
+                pass
+            return False
+
+        return bool(non_manifest_items)
+
     def discover_installed_browsers(self, force_refresh: bool = False) -> List[Dict]:
         """
-        Discover browsers installed on the host system or in Flatpak packages,
+        Discover browsers installed on the host system or in Flatpak/Snap packages,
         detecting their available user profiles.
         """
         if self._cached_browsers is not None and not force_refresh:
@@ -90,6 +123,8 @@ class CookieService:
                 "binaries": ["chromium", "chromium-browser"],
                 "paths": [
                     home / ".config" / "chromium",
+                    home / "snap" / "chromium" / "current" / ".config" / "chromium",
+                    home / "snap" / "chromium" / "common" / ".config" / "chromium",
                     home / ".var" / "app" / "org.chromium.Chromium" / "config" / "chromium",
                 ],
                 "type": "chromium"
@@ -98,6 +133,8 @@ class CookieService:
                 "binaries": ["firefox", "firefox-esr"],
                 "paths": [
                     home / ".mozilla" / "firefox",
+                    home / "snap" / "firefox" / "common" / ".mozilla" / "firefox",
+                    home / "snap" / "firefox" / "current" / ".mozilla" / "firefox",
                     home / ".var" / "app" / "org.mozilla.firefox" / ".mozilla" / "firefox",
                 ],
                 "type": "firefox"
@@ -119,6 +156,7 @@ class CookieService:
                 "binaries": ["brave-browser", "brave"],
                 "paths": [
                     home / ".config" / "BraveSoftware" / "Brave-Browser",
+                    home / "snap" / "brave" / "current" / ".config" / "BraveSoftware" / "Brave-Browser",
                     home / ".var" / "app" / "com.brave.Browser" / "config" / "BraveSoftware" / "Brave-Browser",
                 ],
                 "type": "chromium"
@@ -128,6 +166,7 @@ class CookieService:
                 "paths": [
                     home / ".config" / "microsoft-edge",
                     home / ".config" / "microsoft-edge-dev",
+                    home / "snap" / "edge" / "current" / ".config" / "microsoft-edge",
                     home / ".var" / "app" / "com.microsoft.Edge" / "config" / "microsoft-edge",
                 ],
                 "type": "chromium"
@@ -136,6 +175,7 @@ class CookieService:
                 "binaries": ["opera"],
                 "paths": [
                     home / ".config" / "opera",
+                    home / "snap" / "opera" / "current" / ".config" / "opera",
                     home / ".var" / "app" / "com.opera.Opera" / "config" / "opera",
                 ],
                 "type": "chromium"
@@ -163,32 +203,31 @@ class CookieService:
             if not spec:
                 continue
 
-            # Check if binary or any config directory exists
+            # Check if binary or valid configuration directory exists
             has_binary = any(bool(shutil.which(b)) for b in spec["binaries"])
-            config_paths = [p for p in spec["paths"] if p.exists() and p.is_dir()]
+            config_paths = [p for p in spec["paths"] if self._is_valid_browser_data_dir(p, spec["type"])]
 
-            # Determine availability
+            # Determine availability: must have executable binary or real profile data
             is_installed = has_binary or bool(config_paths)
 
             # Discover user profiles
-            profiles = ["Default"]
+            profiles = []
             if config_paths:
                 primary_path = config_paths[0]
                 if spec["type"] == "chromium":
-                    detected = self._discover_chromium_profiles(primary_path)
-                    if detected:
-                        profiles = detected
+                    profiles = self._discover_chromium_profiles(primary_path)
                 elif spec["type"] == "firefox":
-                    detected = self._discover_firefox_profiles(primary_path)
-                    if detected:
-                        profiles = detected
+                    profiles = self._discover_firefox_profiles(primary_path)
+
+            if not profiles and is_installed:
+                profiles = ["Default"]
 
             discovered.append({
                 "id": b_id,
                 "name": b_info["name"],
                 "icon": b_info["icon"],
                 "is_installed": is_installed,
-                "profiles": profiles
+                "profiles": profiles if is_installed else []
             })
 
         # Sort: installed browsers first, then by name
@@ -242,32 +281,30 @@ class CookieService:
             if ini_path.exists() and ini_path.is_file():
                 cp = configparser.ConfigParser()
                 cp.read(str(ini_path))
+                named_profiles = []
                 for sec in cp.sections():
                     if sec.startswith("Profile") or sec.startswith("Install"):
                         name = cp.get(sec, "Name", fallback=None)
-                        if name and name not in profiles:
-                            profiles.append(name)
-                        # Also add Path basename
-                        path_val = cp.get(sec, "Path", fallback=None)
-                        if path_val:
-                            base = os.path.basename(path_val)
-                            if base and base not in profiles and not name:
-                                profiles.append(base)
+                        is_default = cp.get(sec, "Default", fallback="0") == "1"
+                        if name:
+                            if name.lower() not in ("default", "default-release") and not is_default:
+                                if name not in named_profiles:
+                                    named_profiles.append(name)
 
-            # Fallback scan directories for profile folders containing cookies.sqlite
-            for item in sorted(target_dir.iterdir()):
-                if item.is_dir() and (item / "cookies.sqlite").exists():
-                    if item.name not in profiles:
+                # Default profile is always the primary option
+                profiles = ["Default"]
+                for p in named_profiles:
+                    if p not in profiles:
+                        profiles.append(p)
+            else:
+                for item in sorted(target_dir.iterdir()):
+                    if item.is_dir() and (item / "cookies.sqlite").exists():
                         profiles.append(item.name)
 
-            if not profiles:
-                for item in target_dir.iterdir():
-                    if item.is_dir() and ("default" in item.name or ".release" in item.name):
-                        profiles.append(item.name)
         except Exception:
             pass
 
-        return profiles if profiles else ["default-release", "default"]
+        return profiles if profiles else ["Default"]
 
     def _resolve_librewolf_profile_path(self, profile: Optional[str] = None) -> Optional[str]:
         """Resolve a physical directory path for a LibreWolf profile."""
@@ -337,6 +374,11 @@ class CookieService:
         # Normalize browser ID
         b_name = browser_name.lower().strip()
 
+        # Handle 'auto': resolve to the first genuinely installed browser, defaulting to firefox
+        if b_name in ('auto', 'auto-detect'):
+            installed = [b for b in self.discover_installed_browsers() if b.get("is_installed")]
+            b_name = installed[0]["id"] if installed else "firefox"
+
         # LibreWolf uses Firefox cookie format via directory path
         if b_name == 'librewolf':
             if profile and ('/' in profile or '\\' in profile):
@@ -344,7 +386,7 @@ class CookieService:
             resolved = self._resolve_librewolf_profile_path(profile)
             if resolved:
                 return f"firefox:{resolved}"
-            if profile and profile != "Default":
+            if profile and profile.strip().lower() not in ("default", "default profile", "default-release", "none"):
                 return f"firefox:{profile}"
             return "firefox"
 
@@ -353,9 +395,13 @@ class CookieService:
         if keyring and keyring.lower() not in ('auto', 'default', ''):
             keyring_suffix = f"+{keyring.lower().strip()}"
 
-        # Append profile if specified and non-empty
+        # Append profile if specified and NOT a generic default profile.
+        # NOTE: Passing ":Default" or ":default" breaks Firefox, LibreWolf, etc.,
+        # because yt-dlp looks for a physical directory literally called "Default".
+        # Omitting the profile argument causes yt-dlp to automatically load the
+        # active default profile from profiles.ini / browser state.
         profile_suffix = ""
-        if profile and profile.strip():
+        if profile and profile.strip() and profile.strip().lower() not in ("default", "default profile", "none"):
             p = profile.strip()
             profile_suffix = f":{p}"
 

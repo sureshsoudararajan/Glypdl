@@ -36,6 +36,38 @@ cp data/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml "$PKG_DIR/usr/
 cp data/icons/hicolor/scalable/apps/io.github.sureshsoudararajan.Glypdl.svg "$PKG_DIR/usr/share/icons/hicolor/scalable/apps/"
 cp data/icons/hicolor/512x512/apps/io.github.sureshsoudararajan.Glypdl.png "$PKG_DIR/usr/share/icons/hicolor/512x512/apps/"
 
+# Native Messaging Host Manifests for Firefox and Chromium browsers
+mkdir -p "$PKG_DIR/usr/lib/mozilla/native-messaging-hosts"
+mkdir -p "$PKG_DIR/etc/opt/chrome/native-messaging-hosts"
+mkdir -p "$PKG_DIR/etc/chromium/native-messaging-hosts"
+
+cat << EOF > "$PKG_DIR/usr/lib/mozilla/native-messaging-hosts/io.github.sureshsoudararajan.glypdl.json"
+{
+  "name": "io.github.sureshsoudararajan.glypdl",
+  "description": "Glypdl Native Messaging Host for Firefox and LibreWolf",
+  "path": "/usr/bin/glypdl-host",
+  "type": "stdio",
+  "allowed_extensions": [
+    "glypdl@suresh.io"
+  ]
+}
+EOF
+
+cat << EOF > "$PKG_DIR/etc/opt/chrome/native-messaging-hosts/io.github.sureshsoudararajan.glypdl.json"
+{
+  "name": "io.github.sureshsoudararajan.glypdl",
+  "description": "Glypdl Native Messaging Host for Google Chrome",
+  "path": "/usr/bin/glypdl-host",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://*/"
+  ]
+}
+EOF
+
+cp "$PKG_DIR/etc/opt/chrome/native-messaging-hosts/io.github.sureshsoudararajan.glypdl.json" \
+   "$PKG_DIR/etc/chromium/native-messaging-hosts/io.github.sureshsoudararajan.glypdl.json"
+
 # Control file
 cat << EOF > "$PKG_DIR/DEBIAN/control"
 Package: glypdl
@@ -52,6 +84,22 @@ Description: Native Linux GTK4/libadwaita download manager frontend for yt-dlp
  bundled with the latest standalone yt-dlp binary to download video and
  audio media with real-time metrics, queue management, and history.
 EOF
+
+# Post-installation triggers
+cat << 'EOF' > "$PKG_DIR/DEBIAN/postinst"
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    if which update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database -q /usr/share/applications || true
+    fi
+    if which gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true
+    fi
+fi
+EOF
+chmod 755 "$PKG_DIR/DEBIAN/postinst"
 
 dpkg-deb --build "$PKG_DIR"
 rm -rf "$PKG_DIR"

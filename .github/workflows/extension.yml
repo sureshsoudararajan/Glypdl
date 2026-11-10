@@ -1,0 +1,69 @@
+name: Firefox Extension Build & Test
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'extension/**'
+      - '.github/workflows/extension.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'extension/**'
+      - '.github/workflows/extension.yml'
+  workflow_call:
+    inputs:
+      version:
+        description: 'Version string (e.g. 3.3.0)'
+        required: false
+        type: string
+        default: ''
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version string (e.g. 3.3.0)'
+        required: false
+        type: string
+        default: '4.0.0'
+
+permissions:
+  contents: read
+
+jobs:
+  build-extension:
+    name: Build & Test Firefox Extension (.xpi)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: |
+          cd extension
+          npm ci
+
+      - name: Typecheck Extension
+        run: |
+          cd extension
+          npm run typecheck
+
+      - name: Run Extension Tests
+        run: |
+          cd extension
+          npm test
+
+      - name: Build Extension XPI
+        run: |
+          cd extension
+          npm run build
+
+      - name: Upload Extension Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: glypdl-firefox-extension
+          path: extension/*.xpi

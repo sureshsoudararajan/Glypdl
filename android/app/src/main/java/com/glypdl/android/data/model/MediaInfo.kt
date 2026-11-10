@@ -41,5 +41,25 @@ data class MediaInfo(
     val extractor: String? = null,
     val formats: List<MediaFormat> = emptyList(),
     val videoQualities: List<VideoQuality> = emptyList(),
-    val audioQualities: List<AudioQuality> = emptyList()
-)
+    val audioQualities: List<AudioQuality> = emptyList(),
+    val manualSubtitles: List<SubtitleTrack> = emptyList(),
+    val automaticSubtitles: List<SubtitleTrack> = emptyList(),
+    val youtubeAudioTracks: List<YouTubeAudioTrack> = emptyList(),
+    val youtubeAudioLanguages: List<YouTubeAudioLanguage> = emptyList(),
+    val requiresAuth: Boolean = false
+) {
+    val allSubtitles: List<SubtitleTrack>
+        get() = manualSubtitles + automaticSubtitles
+
+    val hasSubtitles: Boolean
+        get() = manualSubtitles.isNotEmpty() || automaticSubtitles.isNotEmpty()
+
+    val totalSubtitleCount: Int
+        get() = manualSubtitles.size + automaticSubtitles.size
+
+    val hasMultipleAudioLanguages: Boolean
+        get() = youtubeAudioLanguages.size > 1
+
+    val originalAudioLanguage: YouTubeAudioLanguage?
+        get() = youtubeAudioLanguages.firstOrNull { it.isOriginal } ?: youtubeAudioLanguages.firstOrNull()
+}

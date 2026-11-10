@@ -1,0 +1,400 @@
+name: Publish Multi-Platform Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag to publish (leave empty to use current ref)'
+        required: false
+        type: string
+        default: ''
+      force_build_all:
+        description: 'Force building all platforms regardless of git diff'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  detect-changes:
+    name: Detect Platform Changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      build_android: ${{ steps.detect.outputs.build_android }}
+      build_windows: ${{ steps.detect.outputs.build_windows }}
+      build_linux: ${{ steps.detect.outputs.build_linux }}
+      build_extension: ${{ steps.detect.outputs.build_extension }}
+      tag_name: ${{ steps.detect.outputs.tag_name }}
+      version: ${{ steps.detect.outputs.version }}
+      prev_tag: ${{ steps.detect.outputs.prev_tag }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch All Tags
+        run: |
+          git fetch --prune --tags --unshallow 2>/dev/null || git fetch --tags 2>/dev/null || true
+
+      - name: Detect Changed Platforms
+        id: detect
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Determine CURRENT_TAG and VERSION
+          if [ -n "${{ inputs.tag_name }}" ]; then
+            CURRENT_TAG="${{ inputs.tag_name }}"
+          elif [[ "${GITHUB_REF_NAME}" =~ ^v[0-9] ]]; then
+            CURRENT_TAG="${GITHUB_REF_NAME}"
+          else
+            CURRENT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v4.0.0")
+          fi
+          VERSION="${CURRENT_TAG#v}"
+
+          # Detect previous version tag dynamically
+          PREV_TAG=$(git tag -l 'v*' --sort=-v:refname | grep -v "^${CURRENT_TAG}$" | head -n 1 || true)
+          echo "Target tag: $CURRENT_TAG (Version: $VERSION)"
+          echo "Detected previous tag: $PREV_TAG"
+
+          FORCE_ALL=false
+          if [ "${{ inputs.force_build_all }}" = "true" ]; then
+            echo "Force build all platforms requested via workflow_dispatch input."
+            FORCE_ALL=true
+          elif [ -z "$PREV_TAG" ]; then
+            echo "No previous version tag found. Building all platforms."
+            FORCE_ALL=true
+          else
+            # Check if GitHub Release actually exists for PREV_TAG
+            if ! gh release view "$PREV_TAG" >/dev/null 2>&1; then
+              echo "Previous release $PREV_TAG does not exist on GitHub. Building all platforms."
+              FORCE_ALL=true
+            fi
+          fi
+
+          if [ "$FORCE_ALL" = "true" ]; then
+            BUILD_ANDROID=true
+            BUILD_WINDOWS=true
+            BUILD_LINUX=true
+            BUILD_EXTENSION=true
+          else
+            CHANGED_FILES=$(git diff --name-only "$PREV_TAG...$CURRENT_TAG" 2>/dev/null || true)
+            echo "=== Changed Files between $PREV_TAG and $CURRENT_TAG ==="
+            echo "$CHANGED_FILES"
+            echo "=========================================================="
+
+            BUILD_ANDROID=false
+            BUILD_WINDOWS=false
+            BUILD_LINUX=false
+            BUILD_EXTENSION=false
+
+            # Check Android
+            if echo "$CHANGED_FILES" | grep -qE '^(android/|\.github/workflows/android\.yml)'; then
+              BUILD_ANDROID=true
+            fi
+
+            # Check Windows
+            if echo "$CHANGED_FILES" | grep -qE '^(windows/|\.github/workflows/windows\.yml)'; then
+              BUILD_WINDOWS=true
+            fi
+
+            # Check Linux
+            if echo "$CHANGED_FILES" | grep -qE '^(src/|packaging/|PKGBUILD|pyproject\.toml|tests/|bin/|data/|\.github/workflows/linux\.yml)'; then
+              BUILD_LINUX=true
+            fi
+
+            # Check Firefox Extension
+            if echo "$CHANGED_FILES" | grep -qE '^(extension/|\.github/workflows/extension\.yml)'; then
+              BUILD_EXTENSION=true
+            fi
+
+            # Shared coordinator or build infrastructure change builds all platforms
+            if echo "$CHANGED_FILES" | grep -qE '^\.github/workflows/publish-release\.yml'; then
+              echo "Release coordinator workflow changed; building all platforms."
+              BUILD_ANDROID=true
+              BUILD_WINDOWS=true
+              BUILD_LINUX=true
+              BUILD_EXTENSION=true
+            fi
+          fi
+
+          echo "Execution Plan:"
+          echo "  - Build Android: $BUILD_ANDROID"
+          echo "  - Build Windows: $BUILD_WINDOWS"
+          echo "  - Build Linux: $BUILD_LINUX"
+          echo "  - Build Extension: $BUILD_EXTENSION"
+
+          echo "build_android=$BUILD_ANDROID" >> "$GITHUB_OUTPUT"
+          echo "build_windows=$BUILD_WINDOWS" >> "$GITHUB_OUTPUT"
+          echo "build_linux=$BUILD_LINUX" >> "$GITHUB_OUTPUT"
+          echo "build_extension=$BUILD_EXTENSION" >> "$GITHUB_OUTPUT"
+          echo "tag_name=$CURRENT_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "prev_tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+
+  build-android:
+    name: Android Build
+    needs: detect-changes
+    if: needs.detect-changes.outputs.build_android == 'true'
+    uses: ./.github/workflows/android.yml
+    with:
+      version: ${{ needs.detect-changes.outputs.version }}
+      build_release: true
+    secrets: inherit
+
+  build-windows:
+    name: Windows Build
+    needs: detect-changes
+    if: needs.detect-changes.outputs.build_windows == 'true'
+    uses: ./.github/workflows/windows.yml
+    with:
+      version: ${{ needs.detect-changes.outputs.version }}
+
+  build-linux:
+    name: Linux Build
+    needs: detect-changes
+    if: needs.detect-changes.outputs.build_linux == 'true'
+    uses: ./.github/workflows/linux.yml
+    with:
+      version: ${{ needs.detect-changes.outputs.version }}
+
+  build-extension:
+    name: Extension Build
+    needs: detect-changes
+    if: needs.detect-changes.outputs.build_extension == 'true'
+    uses: ./.github/workflows/extension.yml
+    with:
+      version: ${{ needs.detect-changes.outputs.version }}
+
+  publish:
+    name: Publish Release
+    needs: [detect-changes, build-android, build-windows, build-linux, build-extension]
+    if: |
+      always() &&
+      needs.detect-changes.result == 'success' &&
+      (needs.build-android.result == 'success' || needs.build-android.result == 'skipped') &&
+      (needs.build-windows.result == 'success' || needs.build-windows.result == 'skipped') &&
+      (needs.build-linux.result == 'success' || needs.build-linux.result == 'skipped') &&
+      (needs.build-extension.result == 'success' || needs.build-extension.result == 'skipped') &&
+      !(needs.build-android.result == 'failure' || needs.build-windows.result == 'failure' || needs.build-linux.result == 'failure' || needs.build-extension.result == 'failure') &&
+      !(needs.build-android.result == 'cancelled' || needs.build-windows.result == 'cancelled' || needs.build-linux.result == 'cancelled' || needs.build-extension.result == 'cancelled')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Prepare Release Directory
+        run: |
+          mkdir -p release-assets
+
+      # Download freshly built artifacts for platforms that were built
+      - name: Download Android Artifacts
+        if: needs.detect-changes.outputs.build_android == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: glypdl-android
+          path: release-assets
+
+      - name: Download Windows Artifacts
+        if: needs.detect-changes.outputs.build_windows == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: glypdl-windows
+          path: release-assets
+
+      - name: Download Linux DEB
+        if: needs.detect-changes.outputs.build_linux == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: glypdl-deb
+          path: release-assets
+
+      - name: Download Linux AppImage
+        if: needs.detect-changes.outputs.build_linux == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: glypdl-appimage
+          path: release-assets
+
+      - name: Download Linux Arch
+        if: needs.detect-changes.outputs.build_linux == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: glypdl-arch
+          path: release-assets
+
+      - name: Download Linux RPM
+        if: needs.detect-changes.outputs.build_linux == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: glypdl-rpm
+          path: release-assets
+
+      - name: Download Extension Artifacts
+        if: needs.detect-changes.outputs.build_extension == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: glypdl-firefox-extension
+          path: release-assets
+
+      # Carry forward unchanged assets from the previous GitHub Release
+      - name: Carry forward unchanged assets from previous release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREV_TAG: ${{ needs.detect-changes.outputs.prev_tag }}
+          BUILD_ANDROID: ${{ needs.detect-changes.outputs.build_android }}
+          BUILD_WINDOWS: ${{ needs.detect-changes.outputs.build_windows }}
+          BUILD_LINUX: ${{ needs.detect-changes.outputs.build_linux }}
+          BUILD_EXTENSION: ${{ needs.detect-changes.outputs.build_extension }}
+        run: |
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag available to carry forward from."
+            exit 0
+          fi
+
+          echo "Carrying forward unchanged assets from previous release $PREV_TAG..."
+
+          if [ "$BUILD_ANDROID" != "true" ]; then
+            echo "Downloading Android APKs from $PREV_TAG..."
+            gh release download "$PREV_TAG" --pattern "*.apk" --dir release-assets || {
+              echo "::error::Failed to download Android APKs from previous release $PREV_TAG"
+              exit 1
+            }
+          fi
+
+          if [ "$BUILD_WINDOWS" != "true" ]; then
+            echo "Downloading Windows installer from $PREV_TAG..."
+            gh release download "$PREV_TAG" --pattern "*.exe" --dir release-assets || {
+              echo "::error::Failed to download Windows installer from previous release $PREV_TAG"
+              exit 1
+            }
+          fi
+
+          if [ "$BUILD_LINUX" != "true" ]; then
+            echo "Downloading Linux packages from $PREV_TAG..."
+            gh release download "$PREV_TAG" --pattern "*.deb" --dir release-assets || {
+              echo "::error::Failed to download .deb from previous release $PREV_TAG"
+              exit 1
+            }
+            gh release download "$PREV_TAG" --pattern "*.AppImage" --dir release-assets || {
+              echo "::error::Failed to download .AppImage from previous release $PREV_TAG"
+              exit 1
+            }
+            gh release download "$PREV_TAG" --pattern "*.pkg.tar.zst" --dir release-assets || {
+              echo "::error::Failed to download .pkg.tar.zst from previous release $PREV_TAG"
+              exit 1
+            }
+            gh release download "$PREV_TAG" --pattern "*.rpm" --dir release-assets || {
+              echo "::error::Failed to download .rpm from previous release $PREV_TAG"
+              exit 1
+            }
+          fi
+
+          if [ "$BUILD_EXTENSION" != "true" ]; then
+            echo "Downloading Firefox Extension from $PREV_TAG..."
+            gh release download "$PREV_TAG" --pattern "*.xpi" --dir release-assets || {
+              echo "::error::Failed to download .xpi from previous release $PREV_TAG"
+              exit 1
+            }
+          fi
+
+      # Flatten directory structure in case artifact downloads nested anything
+      - name: Flatten release assets directory
+        run: |
+          find release-assets -mindepth 2 -type f -exec mv -t release-assets {} +
+          find release-assets -mindepth 1 -type d -empty -delete
+
+      # Verify every expected release asset exists before publishing
+      - name: Verify All Required Assets Exist
+        run: |
+          echo "Verifying all release assets in release-assets/..."
+          ls -la release-assets
+
+          MISSING_ASSETS=()
+
+          # Android APKs (arm64-v8a, armeabi-v7a, x86_64)
+          APK_ARM64=$(find release-assets -maxdepth 1 -name "*arm64-v8a*.apk" | head -n 1)
+          APK_ARMV7=$(find release-assets -maxdepth 1 -name "*armeabi-v7a*.apk" | head -n 1)
+          APK_X86_64=$(find release-assets -maxdepth 1 -name "*x86_64*.apk" | head -n 1)
+
+          if [ -z "$APK_ARM64" ]; then
+            MISSING_ASSETS+=("Android arm64-v8a APK (*arm64-v8a*.apk)")
+          fi
+          if [ -z "$APK_ARMV7" ]; then
+            MISSING_ASSETS+=("Android armeabi-v7a APK (*armeabi-v7a*.apk)")
+          fi
+          if [ -z "$APK_X86_64" ]; then
+            MISSING_ASSETS+=("Android x86_64 APK (*x86_64*.apk)")
+          fi
+
+          # Windows installer (.exe)
+          WIN_EXE=$(find release-assets -maxdepth 1 -name "*.exe" | head -n 1)
+          if [ -z "$WIN_EXE" ]; then
+            MISSING_ASSETS+=("Windows Installer (*.exe)")
+          fi
+
+          # Linux packages (.deb, .AppImage, .pkg.tar.zst, .rpm)
+          LINUX_DEB=$(find release-assets -maxdepth 1 -name "*.deb" | head -n 1)
+          if [ -z "$LINUX_DEB" ]; then
+            MISSING_ASSETS+=("Linux DEB package (*.deb)")
+          fi
+
+          LINUX_APPIMAGE=$(find release-assets -maxdepth 1 -name "*.AppImage" | head -n 1)
+          if [ -z "$LINUX_APPIMAGE" ]; then
+            MISSING_ASSETS+=("Linux AppImage (*.AppImage)")
+          fi
+
+          LINUX_ARCH=$(find release-assets -maxdepth 1 -name "*.pkg.tar.zst" | head -n 1)
+          if [ -z "$LINUX_ARCH" ]; then
+            MISSING_ASSETS+=("Arch Linux package (*.pkg.tar.zst)")
+          fi
+
+          LINUX_RPM=$(find release-assets -maxdepth 1 -name "*.rpm" | head -n 1)
+          if [ -z "$LINUX_RPM" ]; then
+            MISSING_ASSETS+=("Fedora RPM package (*.rpm)")
+          fi
+
+          # Firefox extension (.xpi)
+          EXT_XPI=$(find release-assets -maxdepth 1 -name "*.xpi" | head -n 1)
+          if [ -z "$EXT_XPI" ]; then
+            MISSING_ASSETS+=("Firefox Extension (*.xpi)")
+          fi
+
+          if [ ${#MISSING_ASSETS[@]} -gt 0 ]; then
+            echo "::error::Release asset verification failed! The following required assets are missing:"
+            for item in "${MISSING_ASSETS[@]}"; do
+              echo "  - $item"
+            done
+            exit 1
+          fi
+
+          echo "Release asset verification passed! All 7 asset types (and 3 Android architectures) are present:"
+          ls -1 release-assets
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          tag_name: ${{ needs.detect-changes.outputs.tag_name }}
+          name: Glypdl ${{ needs.detect-changes.outputs.tag_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          overwrite: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

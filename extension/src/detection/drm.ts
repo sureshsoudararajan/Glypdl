@@ -11,7 +11,6 @@ export class DrmDetector {
   static isElementDrmProtected(element: HTMLMediaElement): boolean {
     if (!element) return false;
     // Check for mediaKeys property attached to HTMLMediaElement
-    // @ts-expect-error mediaKeys is standard in modern HTMLMediaElement
     if (element.mediaKeys && typeof element.mediaKeys === 'object') {
       return true;
     }

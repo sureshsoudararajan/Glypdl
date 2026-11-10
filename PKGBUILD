@@ -1,6 +1,6 @@
 # Maintainer: Suresh Soundararajan <sureshsoundararajan18@gmail.com>
 pkgname=glypdl
-pkgver=2.1.0
+pkgver=4.0.0
 pkgrel=1
 pkgdesc="A lightweight native Linux graphical frontend for yt-dlp"
 arch=('any')
@@ -15,6 +15,14 @@ depends=(
     'ffmpeg'
 )
 
+prepare() {
+    cd "$startdir"
+    mkdir -p bin
+    echo "Downloading latest official yt-dlp binary into package bundle..."
+    curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o bin/yt-dlp-standalone
+    chmod +x bin/yt-dlp-standalone
+}
+
 package() {
     cd "$startdir"
     
@@ -22,6 +30,9 @@ package() {
     cp -r src/glypdl "$pkgdir/usr/share/glypdl/"
     install -Dm755 bin/glypdl "$pkgdir/usr/bin/glypdl"
     install -Dm755 bin/glypdl-host "$pkgdir/usr/bin/glypdl-host"
+    if [ -f bin/yt-dlp-standalone ]; then
+        install -Dm755 bin/yt-dlp-standalone "$pkgdir/usr/share/glypdl/bin/yt-dlp"
+    fi
 
     install -Dm644 data/desktop/io.github.sureshsoudararajan.Glypdl.desktop "$pkgdir/usr/share/applications/io.github.sureshsoudararajan.Glypdl.desktop"
     install -Dm644 data/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml "$pkgdir/usr/share/metainfo/io.github.sureshsoudararajan.Glypdl.metainfo.xml"
