@@ -71,7 +71,7 @@ class OptionsController {
         if (status && status.connected) {
           resultBox.className = 'status-box ok';
           const glypdlText = status.glypdlRunning
-            ? `Connected to Glypdl Desktop Application (v${status.glypdlVersion || '1.1.0'})`
+            ? `Connected to Glypdl Desktop Application (v${status.glypdlVersion || '4.0.0'})`
             : 'Native Host is active (Glypdl desktop app is not currently open and will launch on demand)';
           resultBox.replaceChildren();
           const bold = document.createElement('b');
