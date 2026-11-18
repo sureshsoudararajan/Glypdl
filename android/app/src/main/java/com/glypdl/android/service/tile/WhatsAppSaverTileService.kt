@@ -9,6 +9,7 @@
  */
 package com.glypdl.android.service.tile
 
+import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
 import android.service.quicksettings.Tile
@@ -39,14 +40,23 @@ class WhatsAppSaverTileService : TileService() {
         val intent = Intent(this, MainActivity::class.java).apply {
             action = Intent.ACTION_MAIN
             addCategory(Intent.CATEGORY_LAUNCHER)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra(EXTRA_NAVIGATE_TO_ROUTE, ROUTE_STATUS_SAVER)
         }
 
-        // On API 34+ startActivityAndCollapse(PendingIntent) is preferred, but for broad
-        // compatibility we use the deprecated single-argument overload with an Intent.
-        @Suppress("DEPRECATION")
-        startActivityAndCollapse(intent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            // API 34+: startActivityAndCollapse(PendingIntent) is the only non-deprecated path.
+            val pi = PendingIntent.getActivity(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            startActivityAndCollapse(pi)
+        } else {
+            @Suppress("DEPRECATION")
+            startActivityAndCollapse(intent)
+        }
     }
 
     companion object {

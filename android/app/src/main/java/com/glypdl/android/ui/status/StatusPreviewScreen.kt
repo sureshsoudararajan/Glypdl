@@ -315,6 +315,9 @@ fun BasicStatusVideoPlayer(
     var isError by remember { mutableStateOf(false) }
     val mediaPlayerRef = remember { mutableStateOf<MediaPlayer?>(null) }
     val pfdRef = remember { mutableStateOf<ParcelFileDescriptor?>(null) }
+    // Track actual video dimensions to preserve original aspect ratio (avoid zoom)
+    var videoWidth by remember { mutableStateOf(0) }
+    var videoHeight by remember { mutableStateOf(0) }
 
     DisposableEffect(uri) {
         val player = MediaPlayer()
@@ -325,7 +328,18 @@ fun BasicStatusVideoPlayer(
             if (pfd != null) {
                 player.setDataSource(pfd.fileDescriptor)
                 player.isLooping = true
+                player.setOnVideoSizeChangedListener { _, w, h ->
+                    if (w > 0 && h > 0) {
+                        videoWidth = w
+                        videoHeight = h
+                    }
+                }
                 player.setOnPreparedListener { mp ->
+                    // Capture dimensions reported by the decoder
+                    if (mp.videoWidth > 0 && mp.videoHeight > 0) {
+                        videoWidth = mp.videoWidth
+                        videoHeight = mp.videoHeight
+                    }
                     mp.start()
                     isPlaying = true
                 }
@@ -406,6 +420,13 @@ fun BasicStatusVideoPlayer(
                 },
             contentAlignment = Alignment.Center
         ) {
+            // Use original aspect ratio when dimensions are known; fall back to fillMaxSize
+            val videoModifier = if (videoWidth > 0 && videoHeight > 0) {
+                Modifier.aspectRatio(videoWidth.toFloat() / videoHeight.toFloat())
+            } else {
+                Modifier.fillMaxSize()
+            }
+
             AndroidView(
                 factory = { ctx ->
                     TextureView(ctx).apply {
@@ -431,7 +452,7 @@ fun BasicStatusVideoPlayer(
                         }
                     }
                 },
-                modifier = Modifier.fillMaxSize()
+                modifier = videoModifier
             )
 
             // Play pause overlay indicator when paused

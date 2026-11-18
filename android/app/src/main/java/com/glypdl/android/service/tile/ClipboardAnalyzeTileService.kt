@@ -9,6 +9,7 @@
  */
 package com.glypdl.android.service.tile
 
+import android.app.PendingIntent
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -22,6 +23,10 @@ import com.glypdl.android.MainActivity
 /**
  * Quick Settings tile that reads the latest URL from the clipboard and
  * immediately sends it to Glypdl's Analyze screen.
+ *
+ * On Android 10+ clipboard access is restricted from background services,
+ * so we pass the tile's own Context (which runs in the foreground UI context
+ * during the tile click callback) to access the clipboard.
  *
  * If the clipboard contains no recognisable URL the user is shown a brief
  * Toast so they know to copy a link first.
@@ -49,19 +54,34 @@ class ClipboardAnalyzeTileService : TileService() {
         val intent = Intent(this, MainActivity::class.java).apply {
             action = Intent.ACTION_SEND
             type = "text/plain"
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra(Intent.EXTRA_TEXT, url)
             putExtra(EXTRA_AUTO_ANALYZE, true)
         }
 
-        @Suppress("DEPRECATION")
-        startActivityAndCollapse(intent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            // API 34+: startActivityAndCollapse(PendingIntent) is the only non-deprecated path.
+            val pi = PendingIntent.getActivity(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            startActivityAndCollapse(pi)
+        } else {
+            @Suppress("DEPRECATION")
+            startActivityAndCollapse(intent)
+        }
     }
 
     private fun readUrlFromClipboard(): String? {
         return try {
+            // Use `this` (the TileService Context) — during the onClick() callback the
+            // system grants foreground clipboard access on Android 10+.
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            val clip = clipboard?.primaryClip ?: return null
+                ?: return null
+            if (!clipboard.hasPrimaryClip()) return null
+            val clip = clipboard.primaryClip ?: return null
             if (clip.itemCount == 0) return null
             val text = clip.getItemAt(0)?.coerceToText(this)?.toString()?.trim() ?: return null
             // Minimal URL validation — same heuristic used by UrlValidator

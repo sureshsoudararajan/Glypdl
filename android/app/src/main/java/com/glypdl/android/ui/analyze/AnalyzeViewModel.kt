@@ -84,7 +84,7 @@ sealed interface AnalyzeUiState {
         val isFacebook: Boolean = false,
         val instagramChoice: SimplifiedMediaChoice = SimplifiedMediaChoice.VIDEO_AND_AUDIO,
         val selectedSubtitleLanguages: Set<String> = emptySet(),
-        val subtitleDownloadMode: SubtitleDownloadMode = SubtitleDownloadMode.MEDIA_ONLY,
+        val subtitleDownloadMode: SubtitleDownloadMode = SubtitleDownloadMode.EMBED_SUBS,
         val downloadAllSubtitles: Boolean = false,
         val includeManualSubtitles: Boolean = true,
         val includeAutoSubtitles: Boolean = false,
@@ -570,8 +570,11 @@ class AnalyzeViewModel @Inject constructor(
                 } else {
                     current.add(languageCode)
                 }
+                // Auto-activate EMBED_SUBS when the user picks a language and no explicit mode
+                // is set yet. EMBED_SUBS is the preferred default: subtitle tracks are baked into
+                // the video container so there is no need to handle separate .srt files.
                 val newMode = if (current.isNotEmpty() && state.subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY) {
-                    SubtitleDownloadMode.MEDIA_WITH_SUBS
+                    SubtitleDownloadMode.EMBED_SUBS
                 } else if (current.isEmpty() && !state.downloadAllSubtitles && state.subtitleDownloadMode != SubtitleDownloadMode.MEDIA_ONLY) {
                     SubtitleDownloadMode.MEDIA_ONLY
                 } else {
@@ -593,7 +596,7 @@ class AnalyzeViewModel @Inject constructor(
                 state.copy(
                     selectedSubtitleLanguages = allLangs,
                     downloadAllSubtitles = true,
-                    subtitleDownloadMode = if (state.subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY) SubtitleDownloadMode.MEDIA_WITH_SUBS else state.subtitleDownloadMode
+                    subtitleDownloadMode = if (state.subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY) SubtitleDownloadMode.EMBED_SUBS else state.subtitleDownloadMode
                 )
             } else state
         }
@@ -617,7 +620,7 @@ class AnalyzeViewModel @Inject constructor(
                 state.copy(
                     downloadAllSubtitles = downloadAll,
                     selectedSubtitleLanguages = if (downloadAll) state.availableSubtitleTracks.map { it.languageCode }.toSet() else emptySet(),
-                    subtitleDownloadMode = if (downloadAll && state.subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY) SubtitleDownloadMode.MEDIA_WITH_SUBS else state.subtitleDownloadMode
+                    subtitleDownloadMode = if (downloadAll && state.subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY) SubtitleDownloadMode.EMBED_SUBS else state.subtitleDownloadMode
                 )
             } else state
         }
