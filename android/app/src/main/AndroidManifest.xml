@@ -74,5 +74,29 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Quick Settings Tile: WhatsApp Saver -->
+        <service
+            android:name=".service.tile.WhatsAppSaverTileService"
+            android:icon="@drawable/ic_whatsapp"
+            android:label="@string/tile_whatsapp_saver"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Quick Settings Tile: Latest Copied Link -> Analyze -->
+        <service
+            android:name=".service.tile.ClipboardAnalyzeTileService"
+            android:icon="@drawable/ic_notification"
+            android:label="@string/tile_analyze_link"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

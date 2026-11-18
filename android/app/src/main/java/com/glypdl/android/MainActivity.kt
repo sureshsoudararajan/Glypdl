@@ -61,6 +61,7 @@ class MainActivity : ComponentActivity() {
 
     private val sharedUrlFlow = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
     private val navigateToDownloadIdFlow = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    private val navigateToRouteFlow = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -98,11 +99,15 @@ class MainActivity : ComponentActivity() {
         intent.getStringExtra(EXTRA_NAVIGATE_TO_DOWNLOAD_ID)?.let {
             navigateToDownloadIdFlow.value = it
         }
+        intent.getStringExtra(EXTRA_NAVIGATE_TO_ROUTE)?.let {
+            navigateToRouteFlow.value = it
+        }
 
         setContent {
             val themePreference by settingsRepository.theme.collectAsState(initial = initialTheme)
             val pendingUrl by sharedUrlFlow.collectAsState()
             val pendingDownloadId by navigateToDownloadIdFlow.collectAsState()
+            val pendingRoute by navigateToRouteFlow.collectAsState()
 
             GlypdlTheme(themeSetting = themePreference, dynamicColor = false) {
                 Surface(
@@ -135,6 +140,18 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    LaunchedEffect(pendingRoute, hasNavGraph) {
+                        if (hasNavGraph) {
+                            pendingRoute?.let { route ->
+                                val target = if (route == "status_saver") Screen.StatusSaver.route else route
+                                navController.navigate(target) {
+                                    launchSingleTop = true
+                                }
+                                navigateToRouteFlow.value = null
+                            }
+                        }
+                    }
+
                     GlypdlRootApp(
                         navController = navController,
                         startDestination = startDestination,
@@ -155,9 +172,13 @@ class MainActivity : ComponentActivity() {
         intent.getStringExtra(EXTRA_NAVIGATE_TO_DOWNLOAD_ID)?.let { downloadId ->
             navigateToDownloadIdFlow.value = downloadId
         }
+        intent.getStringExtra(EXTRA_NAVIGATE_TO_ROUTE)?.let { route ->
+            navigateToRouteFlow.value = route
+        }
     }
 
     companion object {
         const val EXTRA_NAVIGATE_TO_DOWNLOAD_ID = "com.glypdl.android.extra.NAVIGATE_TO_DOWNLOAD_ID"
+        const val EXTRA_NAVIGATE_TO_ROUTE = "com.glypdl.android.extra.NAVIGATE_TO_ROUTE"
     }
 }

@@ -68,4 +68,8 @@
     <string name="error_network">Network error</string>
     <string name="error_storage">Storage error</string>
     <string name="error_unknown">Unknown error occurred</string>
+
+    <!-- Quick Settings Tiles -->
+    <string name="tile_whatsapp_saver">WhatsApp Saver</string>
+    <string name="tile_analyze_link">Analyze Copied Link</string>
 </resources>

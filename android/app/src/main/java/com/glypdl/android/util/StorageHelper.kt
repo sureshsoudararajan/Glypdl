@@ -37,7 +37,7 @@ object StorageHelper {
         VIDEOS("videos"),
         MUSIC("music"),
         IMAGES("images"),
-        SUBTITLES("subtitles"),
+        SUBTITLES("videos"),
         OTHERS("others");
     }
 
@@ -166,7 +166,8 @@ object StorageHelper {
         displayName: String,
         mimeType: String,
         isAudio: Boolean,
-        customTreeUriString: String?
+        customTreeUriString: String?,
+        overrideCategory: MediaCategory? = null
     ): Result<Uri> {
         // 0. Verify staging file exists and has content
         if (!stagingFile.exists() || stagingFile.length() <= 0L) {
@@ -174,7 +175,9 @@ object StorageHelper {
         }
 
         val ext = displayName.substringAfterLast('.', "")
-        val category = getMediaCategory(ext, mimeType, isAudio)
+        // overrideCategory allows callers (e.g. subtitle-alongside-video) to place files
+        // in a specific folder rather than the default category-derived folder.
+        val category = overrideCategory ?: getMediaCategory(ext, mimeType, isAudio)
 
         // 1. Try Custom SAF Tree if configured
         if (!customTreeUriString.isNullOrBlank()) {
