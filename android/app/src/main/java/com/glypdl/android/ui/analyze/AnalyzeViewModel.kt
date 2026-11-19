@@ -718,7 +718,7 @@ class AnalyzeViewModel @Inject constructor(
         selectedAudioQuality: AudioQuality?,
         selectedVideoQuality: VideoQuality?,
         selectedFormat: MediaFormat?,
-        subtitleDownloadMode: SubtitleDownloadMode = SubtitleDownloadMode.MEDIA_ONLY,
+        subtitleDownloadMode: SubtitleDownloadMode = SubtitleDownloadMode.EMBED_SUBS,
         selectedSubtitleLanguages: Set<String> = emptySet(),
         downloadAllSubtitles: Boolean = false,
         includeManualSubtitles: Boolean = true,
@@ -729,18 +729,23 @@ class AnalyzeViewModel @Inject constructor(
     ): DownloadRequest {
         val hasSubSelections = selectedSubtitleLanguages.isNotEmpty() || downloadAllSubtitles
         val effectiveSubMode = if (subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY && hasSubSelections) {
-            SubtitleDownloadMode.MEDIA_WITH_SUBS
+            SubtitleDownloadMode.EMBED_SUBS
         } else {
             subtitleDownloadMode
         }
 
-        // When multiple subtitle languages are chosen, or any selected language is an automatic/translated
+        // When subtitle languages are chosen, or any selected language is an automatic/translated
         // caption, enable auto-captions in yt-dlp options so yt-dlp retrieves all selected languages
-        // rather than only downloading the single original manual subtitle.
+        // (including ASR and translated captions) rather than only looking for manual subtitles.
         val hasSelectedAutoTracks = selectedSubtitleLanguages.any { lang ->
-            mediaInfo.automaticSubtitles.any { it.languageCode.equals(lang, ignoreCase = true) }
+            val base = lang.removeSuffix("-orig").removePrefix("a-")
+            mediaInfo.automaticSubtitles.any {
+                it.languageCode.equals(lang, ignoreCase = true) ||
+                it.languageCode.equals(base, ignoreCase = true) ||
+                it.languageCode.startsWith(base, ignoreCase = true)
+            }
         }
-        val effectiveIncludeAuto = includeAutoSubtitles || hasSelectedAutoTracks || (selectedSubtitleLanguages.size > 1) || downloadAllSubtitles
+        val effectiveIncludeAuto = includeAutoSubtitles || hasSelectedAutoTracks || selectedSubtitleLanguages.isNotEmpty() || downloadAllSubtitles
 
         val subOptions = SubtitleDownloadOptions(
             mode = effectiveSubMode,

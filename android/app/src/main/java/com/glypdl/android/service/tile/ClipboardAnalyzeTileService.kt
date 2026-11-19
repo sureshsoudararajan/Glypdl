@@ -46,16 +46,19 @@ class ClipboardAnalyzeTileService : TileService() {
         super.onClick()
 
         val url = readUrlFromClipboard()
-        if (url.isNullOrBlank()) {
-            Toast.makeText(applicationContext, "No link found in clipboard. Copy a URL first.", Toast.LENGTH_SHORT).show()
-            return
-        }
 
+        // On Android 10+, background services/TileService cannot access clipboard data
+        // while SystemUI has focus. Therefore, we do NOT abort here if url is null.
+        // Instead, we launch MainActivity with EXTRA_AUTO_ANALYZE = true.
+        // Once MainActivity is launched and gains window focus, it reads the clipboard
+        // and navigates directly to the Analyze screen.
         val intent = Intent(this, MainActivity::class.java).apply {
             action = Intent.ACTION_SEND
             type = "text/plain"
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            putExtra(Intent.EXTRA_TEXT, url)
+            if (!url.isNullOrBlank()) {
+                putExtra(Intent.EXTRA_TEXT, url)
+            }
             putExtra(EXTRA_AUTO_ANALYZE, true)
         }
 
