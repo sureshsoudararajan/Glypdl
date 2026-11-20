@@ -95,6 +95,12 @@ interface DownloadDao {
     fun getDownloadsByStatus(status: DownloadStatus): Flow<List<DownloadEntity>>
 
     /**
+     * Retrieves queued downloads in first-in, first-out (FIFO) order for queue processing.
+     */
+    @Query("SELECT * FROM downloads WHERE status = 'QUEUED' ORDER BY createdAt ASC")
+    fun getQueuedDownloadsFifo(): Flow<List<DownloadEntity>>
+
+    /**
      * Observes a single download task by its unique UUID.
      *
      * @param id The download task identifier.

@@ -758,13 +758,14 @@ class AnalyzeViewModel @Inject constructor(
         )
 
         if (effectiveSubMode == SubtitleDownloadMode.SUBS_ONLY) {
+            val subExt = if (preferredSubtitleFormat == SubtitleFormatPreference.BEST) "srt" else preferredSubtitleFormat.format
             return DownloadRequest(
                 id = UUID.randomUUID().toString(),
                 url = mediaInfo.url,
                 title = mediaInfo.title,
                 thumbnailUrl = mediaInfo.thumbnail,
-                formatId = "subtitles",
-                ext = preferredSubtitleFormat.format.ifBlank { "srt" },
+                formatId = "",
+                ext = subExt,
                 resolution = "Subtitles (${preferredSubtitleFormat.displayName})",
                 isAudioOnly = false,
                 destinationUri = null,

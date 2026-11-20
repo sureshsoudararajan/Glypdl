@@ -810,13 +810,18 @@ class YtDlpManager @Inject constructor(
             } else {
                 "bestvideo+bestaudio/best"
             }
-            dlRequest.addOption("-f", effectiveFormat)
+            val subOpts = request.subtitleOptions
+            if (!subOpts.isSubtitlesOnly) {
+                dlRequest.addOption("-f", effectiveFormat)
+            }
 
             // Preserve non-ASCII / Unicode titles (Tamil, Hindi, Japanese, emoji)
             dlRequest.addOption("--no-restrict-filenames")
 
             // Mobile-optimized post-processor args (limit thread contention during remux)
-            dlRequest.addOption("--postprocessor-args", "Merger:-threads 4")
+            if (!subOpts.isSubtitlesOnly) {
+                dlRequest.addOption("--postprocessor-args", "Merger:-threads 4")
+            }
 
             // Safe Unicode truncation to <= 80 bytes in UTF-8 to prevent [Errno 36] File name too long
             val safeTitle = com.glypdl.android.util.FileNameSanitizer.safeFsTitle(request.title, 80)
@@ -829,7 +834,7 @@ class YtDlpManager @Inject constructor(
             val outputPath = File(downloadDir, filenameTemplate).absolutePath
             dlRequest.addOption("-o", outputPath)
 
-            if (!request.isAudioOnly && (effectiveFormat.contains("+") || effectiveFormat.contains("bestvideo"))) {
+            if (!subOpts.isSubtitlesOnly && !request.isAudioOnly && (effectiveFormat.contains("+") || effectiveFormat.contains("bestvideo"))) {
                 // If container is webm or mp4, provide mkv as automatic fallback container
                 // e.g. "webm/mkv" or "mp4/mkv". yt-dlp checks whether the downloaded audio and video
                 // codecs fit into the preferred container (e.g. WebM strictly forbids AAC audio;
@@ -845,7 +850,6 @@ class YtDlpManager @Inject constructor(
                 dlRequest.addOption("--merge-output-format", mergeFormat)
             }
 
-            val subOpts = request.subtitleOptions
             if (subOpts.isEnabled) {
                 // Ensure individual subtitle download/rate-limiting errors (e.g. YouTube HTTP 429 on timedtext)
                 // do not abort the media download when downloading media + subtitles.
@@ -861,17 +865,22 @@ class YtDlpManager @Inject constructor(
                 dlRequest.addOption("--write-subs")
                 dlRequest.addOption("--write-auto-subs")
 
-                // Add a small delay between subtitle requests to avoid triggering YouTube's timedtext 429 rate limit
-                dlRequest.addOption("--sleep-subtitles", "1")
+                // Add delay between subtitle requests to avoid triggering YouTube's timedtext 429 rate limit
+                dlRequest.addOption("--sleep-subtitles", "2")
 
                 val langParam = if (subOpts.downloadAllLanguages) {
                     "all"
                 } else if (subOpts.selectedLanguages.isNotEmpty()) {
-                    subOpts.selectedLanguages.flatMap { lang ->
+                    // Pass specific clean language codes requested by the user.
+                    // DO NOT use regex wildcards (e.g. "en.*") because YouTube matches dozens
+                    // of translated variants, triggering HTTP 429 Too Many Requests rate limits.
+                    val cleanedCodes = linkedSetOf<String>()
+                    subOpts.selectedLanguages.forEach { lang ->
+                        cleanedCodes.add(lang)
                         val base = lang.removeSuffix("-orig").removePrefix("a-")
-                        // Support exact code, base code, and regex prefix (e.g. "ta", "ta-orig", "ta.*")
-                        listOf(lang, base, "$base.*")
-                    }.distinct().joinToString(",")
+                        if (base.isNotBlank()) cleanedCodes.add(base)
+                    }
+                    cleanedCodes.joinToString(",")
                 } else {
                     "all"
                 }

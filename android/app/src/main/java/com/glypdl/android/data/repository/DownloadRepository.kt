@@ -39,6 +39,11 @@ class DownloadRepository @Inject constructor(
     fun getDownloadsByStatus(status: DownloadStatus): Flow<List<DownloadEntity>> = downloadDao.getDownloadsByStatus(status)
 
     /**
+     * Observes queued downloads in FIFO order for deterministic background processing.
+     */
+    fun getQueuedDownloadsFifo(): Flow<List<DownloadEntity>> = downloadDao.getQueuedDownloadsFifo()
+
+    /**
      * Observes a specific download task by its unique UUID.
      */
     fun getDownloadById(id: String): Flow<DownloadEntity?> = downloadDao.getDownloadById(id)

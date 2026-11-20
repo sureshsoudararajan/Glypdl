@@ -23,6 +23,8 @@ import android.text.format.Formatter
 import android.view.Surface
 import android.view.TextureView
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -42,6 +44,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -427,6 +430,12 @@ fun BasicStatusVideoPlayer(
                 Modifier.fillMaxSize()
             }
 
+            val videoAlpha by animateFloatAsState(
+                targetValue = if (isPlaying && videoWidth > 0 && videoHeight > 0) 1f else 0f,
+                animationSpec = tween(250),
+                label = "statusVideoFadeIn"
+            )
+
             AndroidView(
                 factory = { ctx ->
                     TextureView(ctx).apply {
@@ -452,7 +461,7 @@ fun BasicStatusVideoPlayer(
                         }
                     }
                 },
-                modifier = videoModifier
+                modifier = videoModifier.alpha(videoAlpha)
             )
 
             // Play pause overlay indicator when paused
