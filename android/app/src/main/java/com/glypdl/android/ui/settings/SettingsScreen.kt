@@ -18,6 +18,9 @@
 package com.glypdl.android.ui.settings
 
 import android.content.Intent
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -41,11 +44,15 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.glypdl.android.ui.auth.AuthBrowserActivity
 import com.glypdl.android.util.StorageHelper
+import com.glypdl.android.util.LogLevel
+import com.glypdl.android.util.LogEntry
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,6 +64,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val theme by viewModel.theme.collectAsState()
+    val diagnosticLogs by viewModel.diagnosticLogs.collectAsState()
     val wifiOnly by viewModel.wifiOnly.collectAsState()
     val concurrentDownloads by viewModel.concurrentDownloads.collectAsState()
     val defaultQuality by viewModel.defaultQuality.collectAsState()
@@ -1262,6 +1270,178 @@ fun SettingsScreen(
                             }
                         }
                     )
+                }
+            }
+
+            // 9.5 TERMINAL & DIAGNOSTIC LOGS SECTION
+            item {
+                SettingsGroupCard(title = "Diagnostics & Raw Terminal Logs") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Live command-line execution and stream logs. Useful for troubleshooting yt-dlp, FFmpeg, and download errors.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Terminal Container
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFF0D1117),
+                            border = BorderStroke(1.dp, Color(0xFF30363D)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(260.dp)
+                        ) {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                // Terminal Window Title Bar
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(Color(0xFF161B22))
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFFF5F56)))
+                                        Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFFFFBD2E)))
+                                        Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(Color(0xFF27C93F)))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "terminal@glypdl:~",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontFamily = FontFamily.Monospace,
+                                            color = Color(0xFF8B949E)
+                                        )
+                                    }
+                                    Text(
+                                        text = "${diagnosticLogs.size} lines",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        color = Color(0xFF58A6FF)
+                                    )
+                                }
+
+                                // Terminal Log Content
+                                if (diagnosticLogs.isEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "$ Waiting for engine operations...\nCommands, stdout, stderr, and errors will stream here in real time.",
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 12.sp,
+                                            color = Color(0xFF8B949E)
+                                        )
+                                    }
+                                } else {
+                                    val terminalListState = androidx.compose.foundation.lazy.rememberLazyListState()
+                                    LaunchedEffect(diagnosticLogs.size) {
+                                        if (diagnosticLogs.isNotEmpty()) {
+                                            terminalListState.animateScrollToItem(diagnosticLogs.size - 1)
+                                        }
+                                    }
+
+                                    androidx.compose.foundation.lazy.LazyColumn(
+                                        state = terminalListState,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                                    ) {
+                                        items(diagnosticLogs.size) { idx ->
+                                            val entry = diagnosticLogs[idx]
+                                            val (color, prefix) = when (entry.level) {
+                                                LogLevel.CMD -> Color(0xFF00E5FF) to ">"
+                                                LogLevel.ERROR -> Color(0xFFFF5252) to "✗"
+                                                LogLevel.WARN -> Color(0xFFFFD740) to "!"
+                                                LogLevel.STDERR -> Color(0xFFFF8A80) to "err:"
+                                                LogLevel.STDOUT -> Color(0xFF69F0AE) to " "
+                                                LogLevel.INFO -> Color(0xFFC9D1D9) to "ℹ"
+                                            }
+                                            Text(
+                                                text = "$prefix ${entry.toFormattedString()}",
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 11.sp,
+                                                lineHeight = 15.sp,
+                                                color = color,
+                                                modifier = Modifier.padding(vertical = 1.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Terminal Action Buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    val formatted = viewModel.getFormattedLogs()
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                    val clip = ClipData.newPlainText("Glypdl Diagnostics", formatted)
+                                    clipboard?.setPrimaryClip(clip)
+                                    Toast.makeText(context, "Logs copied to clipboard", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Copy Logs", fontSize = 13.sp)
+                            }
+
+                            Button(
+                                onClick = {
+                                    val shareIntent = viewModel.createShareLogsIntent(context)
+                                    if (shareIntent != null) {
+                                        context.startActivity(Intent.createChooser(shareIntent, "Save or Share Diagnostic Logs"))
+                                    } else {
+                                        Toast.makeText(context, "Unable to generate log export", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Save as TXT", fontSize = 13.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.clearDiagnosticLogs()
+                                    Toast.makeText(context, "Logs cleared", Toast.LENGTH_SHORT).show()
+                                },
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Logs older than 24 hours are automatically purged to save storage.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
 

@@ -25,6 +25,8 @@ import com.glypdl.android.data.repository.SettingsRepository
 import com.glypdl.android.data.repository.SubtitleRepository
 import com.glypdl.android.service.engine.SubtitleParser
 import com.glypdl.android.util.StorageHelper
+import com.glypdl.android.util.DiagnosticLogger
+import com.glypdl.android.util.LogLevel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
@@ -62,6 +64,7 @@ class DownloadManager @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     suspend fun enqueueDownload(request: DownloadRequest) {
+        DiagnosticLogger.log("DownloadManager", "Enqueued task: ${request.title} (ID: ${request.id}, mode: ${request.subtitleOptions.mode})", LogLevel.INFO)
         requestMap[request.id] = request
         val subtitleJson = serializeSubtitleOptions(request.subtitleOptions)
         val entity = DownloadEntity(
@@ -125,6 +128,7 @@ class DownloadManager @Inject constructor(
 
     private fun startDownload(entity: DownloadEntity) {
         if (activeJobs.containsKey(entity.id)) return
+        DiagnosticLogger.log("DownloadManager", "Starting download: ${entity.title} (${entity.id})", LogLevel.INFO)
 
         val job = scope.launch {
             try {
@@ -471,6 +475,7 @@ class DownloadManager @Inject constructor(
                         }
                     }
                 }.onFailure { error ->
+                    DiagnosticLogger.logError("DownloadManager", "Task failed: ${entity.title} - ${error.message}", error)
                     if (error !is CancellationException) {
                         val userFriendlyMessage = when (error) {
                             is com.glypdl.android.data.model.GlypdlException -> error.error.userMessage

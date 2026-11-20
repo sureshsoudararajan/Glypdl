@@ -20,6 +20,8 @@ import com.glypdl.android.data.model.PlaylistItem
 import com.glypdl.android.data.model.SubtitleFormatPreference
 import com.glypdl.android.data.repository.SettingsRepository
 import com.glypdl.android.util.UrlValidator
+import com.glypdl.android.util.DiagnosticLogger
+import com.glypdl.android.util.LogLevel
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -536,6 +538,7 @@ class YtDlpManager @Inject constructor(
         installed: String?
     ): Result<MediaInfo> {
         try {
+            DiagnosticLogger.log("yt-dlp", "Analyzing URL: $targetUrl", LogLevel.INFO)
             val request = YoutubeDLRequest(targetUrl)
             request.addOption("-J")
             request.addOption("--no-playlist")
@@ -908,6 +911,7 @@ class YtDlpManager @Inject constructor(
             var detectedMediaId: String? = null
 
             val lineProcessor: (Float, Long, String) -> Unit = { progress, etaInSeconds, line ->
+                DiagnosticLogger.logStdout("yt-dlp", line)
                 val parsed = parseProgressLine(line, progress, etaInSeconds)
                 val isMerging = line.contains("[Merger]") || parsed.speed.contains("Merging", ignoreCase = true)
                 val effectiveSpeed = if (isMerging) "Merging media..." else parsed.speed
@@ -931,6 +935,16 @@ class YtDlpManager @Inject constructor(
                     if (dest.isNotBlank()) {
                         finalOutputFile = dest
                     }
+                } else if (trimmed.contains("[SubtitlesConvertor] Destination:")) {
+                    val dest = trimmed.substringAfter("[SubtitlesConvertor] Destination:").trim().trim('"', '\'')
+                    if (dest.isNotBlank()) {
+                        finalOutputFile = dest
+                    }
+                } else if (trimmed.contains("Writing video subtitles to:")) {
+                    val dest = trimmed.substringAfter("Writing video subtitles to:").trim().trim('"', '\'')
+                    if (dest.isNotBlank()) {
+                        finalOutputFile = dest
+                    }
                 } else if (trimmed.contains("Destination:")) {
                     val dest = trimmed.substringAfter("Destination:").trim().trim('"', '\'')
                     if (dest.isNotBlank()) {
@@ -951,10 +965,13 @@ class YtDlpManager @Inject constructor(
             }
 
             try {
+                val cmdLine = try { dlRequest.buildCommand().joinToString(" ") } catch (_: Exception) { targetUrl }
+                DiagnosticLogger.logCmd("yt-dlp $cmdLine")
                 YoutubeDL.getInstance().execute(dlRequest, request.id) { progress, etaInSeconds, line ->
                     lineProcessor(progress, etaInSeconds, line)
                 }
             } catch (e: Exception) {
+                DiagnosticLogger.logError("yt-dlp", "Execution failed: ${e.message}", e)
                 val errorMsg = e.message ?: ""
                 val isPostProcessingFailure = errorMsg.contains("Conversion failed", ignoreCase = true) ||
                         errorMsg.contains("postprocessing", ignoreCase = true) ||
@@ -1033,8 +1050,22 @@ class YtDlpManager @Inject constructor(
                 }
             }
 
-            if (finalOutputFile.isBlank()) {
-                finalOutputFile = outputPath
+            if (finalOutputFile.isBlank() || (subOpts.isSubtitlesOnly && (finalOutputFile.contains("%(") || !File(finalOutputFile).exists()))) {
+                if (subOpts.isSubtitlesOnly) {
+                    val dir = File(downloadDir)
+                    val anySub = dir.listFiles()?.firstOrNull { it.isFile && it.length() > 0 && it.extension.lowercase() in SUBTITLE_EXTS && (System.currentTimeMillis() - it.lastModified() < 600_000) }
+                    if (anySub != null) {
+                        finalOutputFile = anySub.absolutePath
+                    } else {
+                        val errMsg = "No subtitle files were created. The video may not have captions in the requested language(s), or the server rate-limited subtitle requests."
+                        DiagnosticLogger.logError("yt-dlp", errMsg)
+                        return@withContext Result.failure(
+                            GlypdlException(GlypdlError.UnknownError(userMessage = errMsg))
+                        )
+                    }
+                } else {
+                    finalOutputFile = outputPath
+                }
             }
 
             // CRITICAL VALIDATION: For Instagram Story, verify downloaded story ID matches requested story ID

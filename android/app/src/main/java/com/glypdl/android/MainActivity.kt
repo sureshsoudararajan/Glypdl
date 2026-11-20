@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
     private val sharedUrlFlow = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
     private val navigateToDownloadIdFlow = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
     private val navigateToRouteFlow = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    private var pendingAutoAnalyze = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -96,15 +97,20 @@ class MainActivity : ComponentActivity() {
 
         val initialUrl = IntentHandler.extractUrlFromIntent(intent)
         val isAutoAnalyze = intent.getBooleanExtra(com.glypdl.android.service.tile.ClipboardAnalyzeTileService.EXTRA_AUTO_ANALYZE, false)
-        val resolvedInitialUrl = initialUrl ?: if (isAutoAnalyze) {
-            val clipUrl = com.glypdl.android.util.ClipboardHelper.getUrlFromClipboard(this)
-            if (clipUrl.isNullOrBlank()) {
-                android.widget.Toast.makeText(this, "No link found in clipboard. Copy a URL first.", android.widget.Toast.LENGTH_SHORT).show()
+        if (initialUrl != null) {
+            sharedUrlFlow.value = initialUrl
+        } else if (isAutoAnalyze) {
+            if (hasWindowFocus()) {
+                val clipUrl = com.glypdl.android.util.ClipboardHelper.getUrlFromClipboard(this)
+                if (!clipUrl.isNullOrBlank()) {
+                    sharedUrlFlow.value = clipUrl
+                } else {
+                    android.widget.Toast.makeText(this, "No link found in clipboard. Copy a URL first.", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                pendingAutoAnalyze = true
             }
-            clipUrl
-        } else null
-
-        sharedUrlFlow.value = resolvedInitialUrl
+        }
         intent.getStringExtra(EXTRA_NAVIGATE_TO_DOWNLOAD_ID)?.let {
             navigateToDownloadIdFlow.value = it
         }
@@ -177,22 +183,40 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         val extractedUrl = IntentHandler.extractUrlFromIntent(intent)
         val isAutoAnalyze = intent.getBooleanExtra(com.glypdl.android.service.tile.ClipboardAnalyzeTileService.EXTRA_AUTO_ANALYZE, false)
-        val resolvedUrl = extractedUrl ?: if (isAutoAnalyze) {
-            val clipUrl = com.glypdl.android.util.ClipboardHelper.getUrlFromClipboard(this)
-            if (clipUrl.isNullOrBlank()) {
-                android.widget.Toast.makeText(this, "No link found in clipboard. Copy a URL first.", android.widget.Toast.LENGTH_SHORT).show()
+        if (extractedUrl != null) {
+            sharedUrlFlow.value = extractedUrl
+        } else if (isAutoAnalyze) {
+            if (hasWindowFocus()) {
+                val clipUrl = com.glypdl.android.util.ClipboardHelper.getUrlFromClipboard(this)
+                if (!clipUrl.isNullOrBlank()) {
+                    sharedUrlFlow.value = clipUrl
+                } else {
+                    android.widget.Toast.makeText(this, "No link found in clipboard. Copy a URL first.", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                pendingAutoAnalyze = true
             }
-            clipUrl
-        } else null
-
-        if (resolvedUrl != null) {
-            sharedUrlFlow.value = resolvedUrl
         }
         intent.getStringExtra(EXTRA_NAVIGATE_TO_DOWNLOAD_ID)?.let { downloadId ->
             navigateToDownloadIdFlow.value = downloadId
         }
         intent.getStringExtra(EXTRA_NAVIGATE_TO_ROUTE)?.let { route ->
             navigateToRouteFlow.value = route
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && pendingAutoAnalyze) {
+            pendingAutoAnalyze = false
+            window.decorView.post {
+                val clipUrl = com.glypdl.android.util.ClipboardHelper.getUrlFromClipboard(this)
+                if (!clipUrl.isNullOrBlank()) {
+                    sharedUrlFlow.value = clipUrl
+                } else {
+                    android.widget.Toast.makeText(this, "No link found in clipboard. Copy a URL first.", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 

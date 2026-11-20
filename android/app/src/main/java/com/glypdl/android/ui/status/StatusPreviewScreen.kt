@@ -30,6 +30,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,14 +39,18 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -100,14 +105,32 @@ fun StatusPreviewScreen(
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                // Image Preview - Fixed 1:1 scale (zoom disabled as requested), no crossfade jitter
+                // Interactive Image Preview with smooth pinch-to-zoom, pan, and double-tap reset
+                var scale by remember { mutableFloatStateOf(1f) }
+                var offset by remember { mutableStateOf(Offset.Zero) }
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .pointerInput(Unit) {
                             detectTapGestures(
+                                onDoubleTap = {
+                                    scale = 1f
+                                    offset = Offset.Zero
+                                },
                                 onTap = { showControls = !showControls }
                             )
+                        }
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                val newScale = (scale * zoom).coerceIn(1f, 5f)
+                                scale = newScale
+                                offset = if (newScale > 1f) {
+                                    offset + pan
+                                } else {
+                                    Offset.Zero
+                                }
+                            }
                         },
                     contentAlignment = Alignment.Center
                 ) {
@@ -118,7 +141,14 @@ fun StatusPreviewScreen(
                             .build(),
                         contentDescription = uiState.displayName,
                         contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                translationX = offset.x
+                                translationY = offset.y
+                            }
                     )
                 }
             }
@@ -314,13 +344,37 @@ fun BasicStatusVideoPlayer(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    var isPrepared by remember { mutableStateOf(false) }
     var isPlaying by remember { mutableStateOf(false) }
     var isError by remember { mutableStateOf(false) }
     val mediaPlayerRef = remember { mutableStateOf<MediaPlayer?>(null) }
     val pfdRef = remember { mutableStateOf<ParcelFileDescriptor?>(null) }
+    val surfaceRef = remember { mutableStateOf<Surface?>(null) }
+
     // Track actual video dimensions to preserve original aspect ratio (avoid zoom)
-    var videoWidth by remember { mutableStateOf(0) }
-    var videoHeight by remember { mutableStateOf(0) }
+    var videoWidth by remember { mutableIntStateOf(0) }
+    var videoHeight by remember { mutableIntStateOf(0) }
+
+    var currentPositionMs by remember { mutableLongStateOf(0L) }
+    var durationMs by remember { mutableLongStateOf(0L) }
+    var isUserSeeking by remember { mutableStateOf(false) }
+    var seekSliderPosition by remember { mutableFloatStateOf(0f) }
+
+    // Progress update loop while playing
+    LaunchedEffect(isPlaying, isUserSeeking) {
+        while (isPlaying && !isUserSeeking) {
+            mediaPlayerRef.value?.let { mp ->
+                try {
+                    if (mp.isPlaying) {
+                        currentPositionMs = mp.currentPosition.toLong()
+                        val d = mp.duration.toLong()
+                        if (d > 0) durationMs = d
+                    }
+                } catch (_: Exception) {}
+            }
+            kotlinx.coroutines.delay(200L)
+        }
+    }
 
     DisposableEffect(uri) {
         val player = MediaPlayer()
@@ -338,11 +392,13 @@ fun BasicStatusVideoPlayer(
                     }
                 }
                 player.setOnPreparedListener { mp ->
-                    // Capture dimensions reported by the decoder
+                    isPrepared = true
                     if (mp.videoWidth > 0 && mp.videoHeight > 0) {
                         videoWidth = mp.videoWidth
                         videoHeight = mp.videoHeight
                     }
+                    val d = mp.duration.toLong()
+                    if (d > 0) durationMs = d
                     mp.start()
                     isPlaying = true
                 }
@@ -361,15 +417,15 @@ fun BasicStatusVideoPlayer(
             try {
                 player.stop()
                 player.release()
-            } catch (e: Exception) {
-                // Ignore
-            }
+            } catch (_: Exception) {}
             try {
                 pfdRef.value?.close()
-            } catch (e: Exception) {
-                // Ignore
-            }
+            } catch (_: Exception) {}
+            try {
+                surfaceRef.value?.release()
+            } catch (_: Exception) {}
             mediaPlayerRef.value = null
+            surfaceRef.value = null
         }
     }
 
@@ -393,9 +449,7 @@ fun BasicStatusVideoPlayer(
                     }
                     try {
                         context.startActivity(Intent.createChooser(intent, "Play Video"))
-                    } catch (e: Exception) {
-                        // Ignore
-                    }
+                    } catch (_: Exception) {}
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen)
             ) {
@@ -410,7 +464,7 @@ fun BasicStatusVideoPlayer(
                 .fillMaxSize()
                 .clickable {
                     val p = mediaPlayerRef.value
-                    if (p != null && !isError) {
+                    if (p != null && isPrepared && !isError) {
                         if (p.isPlaying) {
                             p.pause()
                             isPlaying = false
@@ -430,9 +484,11 @@ fun BasicStatusVideoPlayer(
                 Modifier.fillMaxSize()
             }
 
+            // CRITICAL FIX: Alpha depends ONLY on isPrepared, NEVER on isPlaying!
+            // When paused, alpha remains 1f so the paused frame stays visible without turning black!
             val videoAlpha by animateFloatAsState(
-                targetValue = if (isPlaying && videoWidth > 0 && videoHeight > 0) 1f else 0f,
-                animationSpec = tween(250),
+                targetValue = if (isPrepared && videoWidth > 0 && videoHeight > 0) 1f else 0f,
+                animationSpec = tween(200),
                 label = "statusVideoFadeIn"
             )
 
@@ -442,18 +498,19 @@ fun BasicStatusVideoPlayer(
                         surfaceTextureListener = object : TextureView.SurfaceTextureListener {
                             override fun onSurfaceTextureAvailable(st: SurfaceTexture, width: Int, height: Int) {
                                 val surface = Surface(st)
+                                surfaceRef.value = surface
                                 mediaPlayerRef.value?.setSurface(surface)
                                 try {
                                     mediaPlayerRef.value?.prepareAsync()
-                                } catch (e: Exception) {
-                                    // Already preparing or prepared
-                                }
+                                } catch (_: Exception) {}
                             }
 
                             override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, width: Int, height: Int) {}
 
                             override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
                                 mediaPlayerRef.value?.setSurface(null)
+                                surfaceRef.value?.release()
+                                surfaceRef.value = null
                                 return true
                             }
 
@@ -465,22 +522,88 @@ fun BasicStatusVideoPlayer(
             )
 
             // Play pause overlay indicator when paused
-            if (!isPlaying) {
+            if (!isPlaying && isPrepared) {
                 Surface(
                     shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.6f),
-                    modifier = Modifier.size(64.dp)
+                    color = Color.Black.copy(alpha = 0.65f),
+                    modifier = Modifier.size(68.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             Icons.Default.PlayArrow,
                             contentDescription = "Play",
                             tint = Color.White,
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(42.dp)
                         )
                     }
                 }
             }
+
+            // Loading spinner before video prepares
+            if (!isPrepared) {
+                CircularProgressIndicator(
+                    color = WhatsAppGreen,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+
+            // Bottom Video Progress Bar & Seek Scrubber (shown above bottom controls)
+            if (isPrepared && durationMs > 0) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 76.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = formatStatusDuration(if (isUserSeeking) (seekSliderPosition * durationMs).toLong() else currentPositionMs),
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = formatStatusDuration(durationMs),
+                            color = Color.White.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    Slider(
+                        value = if (isUserSeeking) seekSliderPosition else (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f),
+                        onValueChange = { newVal ->
+                            isUserSeeking = true
+                            seekSliderPosition = newVal
+                        },
+                        onValueChangeFinished = {
+                            val targetMs = (seekSliderPosition * durationMs).toInt()
+                            mediaPlayerRef.value?.seekTo(targetMs)
+                            currentPositionMs = targetMs.toLong()
+                            isUserSeeking = false
+                        },
+                        colors = SliderDefaults.colors(
+                            thumbColor = WhatsAppGreen,
+                            activeTrackColor = WhatsAppGreen,
+                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(28.dp)
+                    )
+                }
+            }
         }
     }
+}
+
+private fun formatStatusDuration(millis: Long): String {
+    val totalSecs = (millis / 1000).coerceAtLeast(0)
+    val mins = totalSecs / 60
+    val secs = totalSecs % 60
+    return "%02d:%02d".format(mins, secs)
 }
