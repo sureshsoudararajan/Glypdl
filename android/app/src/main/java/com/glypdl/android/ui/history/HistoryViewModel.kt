@@ -19,7 +19,9 @@ package com.glypdl.android.ui.history
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.glypdl.android.data.local.entity.HistoryEntity
+import com.glypdl.android.data.model.SubtitleFile
 import com.glypdl.android.data.repository.HistoryRepository
+import com.glypdl.android.data.repository.SubtitleRepository
 import com.glypdl.android.domain.usecase.GetDownloadHistoryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -44,7 +46,8 @@ data class HistoryUiState(
 @HiltViewModel
 class HistoryViewModel @Inject constructor(
     private val getHistoryUseCase: GetDownloadHistoryUseCase,
-    private val historyRepository: HistoryRepository
+    private val historyRepository: HistoryRepository,
+    private val subtitleRepository: SubtitleRepository? = null
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -89,5 +92,9 @@ class HistoryViewModel @Inject constructor(
         viewModelScope.launch {
             historyRepository.clearAll()
         }
+    }
+
+    suspend fun getSubtitlesForDownload(downloadId: String): List<SubtitleFile> {
+        return subtitleRepository?.getSubtitlesForDownloadSync(downloadId) ?: emptyList()
     }
 }

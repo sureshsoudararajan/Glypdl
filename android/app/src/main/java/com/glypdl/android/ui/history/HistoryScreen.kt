@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
@@ -51,7 +52,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.glypdl.android.data.local.entity.HistoryEntity
+import com.glypdl.android.data.model.SubtitleFile
 import com.glypdl.android.ui.components.ThumbnailImage
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -64,7 +67,11 @@ fun HistoryScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val historyItems by viewModel.historyItems.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
+    val coroutineScope = rememberCoroutineScope()
     var showClearDialog by remember { mutableStateOf(false) }
+
+    var selectedItemForDetails by remember { mutableStateOf<HistoryEntity?>(null) }
+    var itemSubtitles by remember { mutableStateOf<List<SubtitleFile>>(emptyList()) }
 
     Scaffold(
         topBar = {
@@ -160,6 +167,12 @@ fun HistoryScreen(
                         items(items, key = { it.id }) { item ->
                             HistoryItemRow(
                                 item = item,
+                                onClick = {
+                                    selectedItemForDetails = item
+                                    coroutineScope.launch {
+                                        itemSubtitles = viewModel.getSubtitlesForDownload(item.downloadId)
+                                    }
+                                },
                                 onRedownload = { onNavigateToAnalyze(item.url) },
                                 onDelete = { viewModel.deleteHistoryItem(item) }
                             )
@@ -192,125 +205,189 @@ fun HistoryScreen(
             }
         )
     }
+
+    if (selectedItemForDetails != null) {
+        HistoryDetailBottomSheet(
+            item = selectedItemForDetails!!,
+            subtitles = itemSubtitles,
+            onDismissRequest = { selectedItemForDetails = null },
+            onRedownload = {
+                val url = selectedItemForDetails!!.url
+                selectedItemForDetails = null
+                onNavigateToAnalyze(url)
+            },
+            onDelete = {
+                val item = selectedItemForDetails!!
+                selectedItemForDetails = null
+                viewModel.deleteHistoryItem(item)
+            }
+        )
+    }
 }
 
 @Composable
 private fun HistoryItemRow(
     item: HistoryEntity,
+    onClick: () -> Unit,
     onRedownload: () -> Unit,
     onDelete: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val platformMeta = remember(item.url) { detectPlatformMeta(item.url) }
     
-    val formattedSize = remember(item.fileSize) {
-        Formatter.formatShortFileSize(context, item.fileSize)
+    val targetUri = item.fileUri?.ifBlank { null } ?: item.filePath ?: ""
+    val effectiveSize = remember(item.fileSize, targetUri) {
+        if (item.fileSize > 0L) {
+            item.fileSize
+        } else {
+            com.glypdl.android.util.StorageHelper.getFileSizeFromUri(context, targetUri)
+        }
+    }
+    val formattedSize = remember(effectiveSize) {
+        Formatter.formatShortFileSize(context, effectiveSize)
     }
     
     val formattedDate = remember(item.completedAt) {
         SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()).format(Date(item.completedAt))
     }
 
-    Row(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        onClick = onClick
     ) {
-        ThumbnailImage(
-            url = item.thumbnailUrl,
+        Row(
             modifier = Modifier
-                .size(64.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
-            contentDescription = item.title
-        )
-        
-        Spacer(modifier = Modifier.width(16.dp))
-        
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(vertical = 2.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+            ThumbnailImage(
+                url = item.thumbnailUrl,
+                modifier = Modifier
+                    .size(68.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)),
+                contentDescription = item.title
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Surface(
-                shape = MaterialTheme.shapes.extraSmall,
-                color = MaterialTheme.colorScheme.secondaryContainer
+            
+            Spacer(modifier = Modifier.width(14.dp))
+            
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 2.dp)
             ) {
                 Text(
-                    text = item.format.uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
+                    text = item.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = platformMeta.containerColor
+                    ) {
+                        Text(
+                            text = platformMeta.name,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = platformMeta.brandColor,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer
+                    ) {
+                        Text(
+                            text = item.format.uppercase(),
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "$formattedDate • $formattedSize",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "$formattedDate • $formattedSize",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        
-        Box {
-            IconButton(onClick = { expanded = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "Options")
-            }
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                val isAudio = item.format.contains("audio", ignoreCase = true) ||
-                        item.format.contains("m4a", ignoreCase = true) ||
-                        item.format.contains("mp3", ignoreCase = true) ||
-                        item.format.contains("opus", ignoreCase = true)
-                val targetUri = if (!item.fileUri.isNullOrBlank()) item.fileUri else (item.filePath ?: "")
-
-                if (targetUri.isNotBlank()) {
+            
+            Box {
+                IconButton(onClick = { expanded = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Options")
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
                     DropdownMenuItem(
-                        text = { Text("Open") },
+                        text = { Text("View details") },
                         onClick = {
                             expanded = false
-                            com.glypdl.android.util.StorageHelper.openMedia(context, targetUri, isAudio)
+                            onClick()
                         },
-                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) }
+                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) }
+                    )
+
+                    val isAudio = item.format.contains("audio", ignoreCase = true) ||
+                            item.format.contains("m4a", ignoreCase = true) ||
+                            item.format.contains("mp3", ignoreCase = true) ||
+                            item.format.contains("opus", ignoreCase = true)
+
+                    if (targetUri.isNotBlank()) {
+                        DropdownMenuItem(
+                            text = { Text("Open") },
+                            onClick = {
+                                expanded = false
+                                com.glypdl.android.util.StorageHelper.openMedia(context, targetUri, isAudio)
+                            },
+                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Share") },
+                            onClick = {
+                                expanded = false
+                                com.glypdl.android.util.StorageHelper.shareMedia(context, targetUri, item.title, isAudio)
+                            },
+                            leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) }
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text("Redownload") },
+                        onClick = {
+                            expanded = false
+                            onRedownload()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
                     )
                     DropdownMenuItem(
-                        text = { Text("Share") },
+                        text = { Text("Delete from history") },
                         onClick = {
                             expanded = false
-                            com.glypdl.android.util.StorageHelper.shareMedia(context, targetUri, item.title, isAudio)
+                            onDelete()
                         },
-                        leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) }
+                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) }
                     )
                 }
-                DropdownMenuItem(
-                    text = { Text("Redownload") },
-                    onClick = {
-                        expanded = false
-                        onRedownload()
-                    },
-                    leadingIcon = { Icon(Icons.Default.Refresh, contentDescription = null) }
-                )
-                DropdownMenuItem(
-                    text = { Text("Delete from history") },
-                    onClick = {
-                        expanded = false
-                        onDelete()
-                    },
-                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) }
-                )
             }
         }
     }
