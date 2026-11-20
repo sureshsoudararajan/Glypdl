@@ -26,6 +26,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
@@ -432,6 +433,42 @@ object StorageHelper {
         } catch (e: Exception) {
             e.printStackTrace()
             false
+        }
+    }
+
+    /**
+     * Resolves the actual byte size of a file given a content:// or file:// URI string.
+     */
+    fun getFileSizeFromUri(context: Context, uriOrPath: String?): Long {
+        if (uriOrPath.isNullOrBlank()) return 0L
+        return try {
+            if (uriOrPath.startsWith("content://")) {
+                val uri = Uri.parse(uriOrPath)
+                context.contentResolver.query(
+                    uri,
+                    arrayOf(OpenableColumns.SIZE),
+                    null,
+                    null,
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                        if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
+                            val size = cursor.getLong(sizeIndex)
+                            if (size > 0L) return size
+                        }
+                    }
+                }
+                context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                    if (pfd.statSize > 0L) return pfd.statSize
+                }
+                0L
+            } else {
+                val file = File(uriOrPath)
+                if (file.exists()) file.length() else 0L
+            }
+        } catch (_: Exception) {
+            0L
         }
     }
 }

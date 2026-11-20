@@ -95,6 +95,12 @@ class SubtitleRepository @Inject constructor(
     fun getSubtitleCount(): Flow<Int> = subtitleDao.getSubtitleCount()
 
     private fun SubtitleFileEntity.toModel(): SubtitleFile {
+        val effectiveSize = if (sizeBytes > 0L) {
+            sizeBytes
+        } else {
+            val uri = fileUri.ifBlank { filePath ?: "" }
+            StorageHelper.getFileSizeFromUri(context, uri)
+        }
         return SubtitleFile(
             id = id,
             downloadId = downloadId,
@@ -107,7 +113,7 @@ class SubtitleRepository @Inject constructor(
             contentUri = fileUri,
             filePath = filePath,
             fileName = fileName,
-            fileSize = sizeBytes,
+            fileSize = effectiveSize,
             createdAt = createdAt,
             isEmbedded = isEmbedded
         )

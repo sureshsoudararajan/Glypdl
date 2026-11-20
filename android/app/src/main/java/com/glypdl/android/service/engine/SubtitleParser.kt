@@ -114,9 +114,16 @@ object SubtitleParser {
             }
 
             val languageName = resolveLanguageName(langCode, extractedName)
+            val isTranslated = type == SubtitleType.AUTOMATIC && (firstUrl?.contains("tlang=") == true || (!langCode.endsWith("-orig") && allKeys.contains("$langCode-orig")))
             val isOriginalTrack = when (type) {
                 SubtitleType.MANUAL -> true
-                SubtitleType.AUTOMATIC -> langCode.endsWith("-orig") || (firstUrl != null && !firstUrl.contains("tlang="))
+                SubtitleType.AUTOMATIC -> !isTranslated
+            }
+
+            // User requirement: Only show and allow selecting original subtitles.
+            // Exclude all machine-translated auto-caption tracks (which contain tlang= and are rate-limited/blocked).
+            if (type == SubtitleType.AUTOMATIC && !isOriginalTrack) {
+                continue
             }
 
             val existing = tracksMap[langCode]

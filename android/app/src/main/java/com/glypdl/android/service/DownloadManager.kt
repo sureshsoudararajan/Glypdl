@@ -222,6 +222,8 @@ class DownloadManager @Inject constructor(
                             val primaryFile = allSubFiles.firstOrNull() ?: file
                             val primaryExt = primaryFile.extension.ifBlank { actualExt }
                             val primaryMime = StorageHelper.getMimeType(primaryExt)
+                            val primarySize = primaryFile.length().takeIf { it > 0L } ?: fileLength
+
                             val primaryExport = StorageHelper.exportToPermanentStorage(
                                 context = context,
                                 stagingFile = primaryFile,
@@ -229,7 +231,7 @@ class DownloadManager @Inject constructor(
                                 mimeType = primaryMime,
                                 isAudio = false,
                                 customTreeUriString = customTreeUri,
-                                overrideCategory = StorageHelper.MediaCategory.VIDEOS
+                                overrideCategory = StorageHelper.MediaCategory.SUBTITLES
                             )
                             primaryExport.onSuccess { permanentUri ->
                                 val finalUriString = permanentUri.toString()
@@ -238,8 +240,8 @@ class DownloadManager @Inject constructor(
                                     entity.copy(
                                         status = DownloadStatus.COMPLETED,
                                         filePath = finalUriString,
-                                        downloadedBytes = fileLength,
-                                        totalBytes = fileLength,
+                                        downloadedBytes = primarySize,
+                                        totalBytes = primarySize,
                                         progress = 100f,
                                         ext = primaryExt,
                                         errorMessage = null,
@@ -255,7 +257,7 @@ class DownloadManager @Inject constructor(
                                     format = "Subtitle (${primaryExt.uppercase()})",
                                     filePath = finalUriString,
                                     fileUri = finalUriString,
-                                    fileSize = primaryFile.length(),
+                                    fileSize = primarySize,
                                     duration = 0L,
                                     completedAt = System.currentTimeMillis()
                                 )
@@ -275,7 +277,7 @@ class DownloadManager @Inject constructor(
                                         contentUri = finalUriString,
                                         filePath = null,
                                         fileName = primaryFile.name,
-                                        fileSize = primaryFile.length(),
+                                        fileSize = primarySize,
                                         createdAt = System.currentTimeMillis(),
                                         isEmbedded = false
                                     )
@@ -285,16 +287,19 @@ class DownloadManager @Inject constructor(
                                 for (extraSubFile in allSubFiles.drop(1)) {
                                     val extraExt = extraSubFile.extension.lowercase()
                                     val extraMime = StorageHelper.getMimeType(extraExt)
+                                    val extraSize = extraSubFile.length()
+                                    val extraFileName = extraSubFile.name
+                                    val extraLangCode = extraSubFile.nameWithoutExtension.substringAfterLast('.', "und")
+
                                     StorageHelper.exportToPermanentStorage(
                                         context = context,
                                         stagingFile = extraSubFile,
-                                        displayName = extraSubFile.name,
+                                        displayName = extraFileName,
                                         mimeType = extraMime,
                                         isAudio = false,
                                         customTreeUriString = customTreeUri,
-                                        overrideCategory = StorageHelper.MediaCategory.VIDEOS
+                                        overrideCategory = StorageHelper.MediaCategory.SUBTITLES
                                     ).onSuccess { extraUri ->
-                                        val extraLangCode = extraSubFile.nameWithoutExtension.substringAfterLast('.', "und")
                                         subtitleRepository.insertSubtitle(
                                             SubtitleFile(
                                                 id = 0,
@@ -304,11 +309,11 @@ class DownloadManager @Inject constructor(
                                                 languageCode = extraLangCode,
                                                 languageName = SubtitleParser.resolveLanguageName(extraLangCode),
                                                 format = extraExt,
-                                                isAutoGenerated = extraSubFile.name.contains(".auto.", ignoreCase = true),
+                                                isAutoGenerated = extraFileName.contains(".auto.", ignoreCase = true),
                                                 contentUri = extraUri.toString(),
                                                 filePath = null,
-                                                fileName = extraSubFile.name,
-                                                fileSize = extraSubFile.length(),
+                                                fileName = extraFileName,
+                                                fileSize = extraSize,
                                                 createdAt = System.currentTimeMillis(),
                                                 isEmbedded = false
                                             )

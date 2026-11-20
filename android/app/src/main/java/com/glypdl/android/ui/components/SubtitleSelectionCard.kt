@@ -279,10 +279,10 @@ fun SubtitleSelectionCard(
                             Spacer(modifier = Modifier.height(8.dp))
                         }
 
-                        // Automatic Captions Group
+                        // Automatic Captions Group (Spoken audio transcripts only)
                         if (includeAuto && automaticSubtitles.isNotEmpty()) {
                             Text(
-                                text = "Automatic Captions (${automaticSubtitles.size})",
+                                text = "Original Audio Captions (${automaticSubtitles.size})",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.tertiary,
@@ -295,39 +295,6 @@ fun SubtitleSelectionCard(
                                     isSelected = downloadAllLanguages || selectedLanguages.contains(track.languageCode),
                                     onToggle = { onToggleLanguage(track.languageCode) }
                                 )
-                            }
-
-                            val hasSelectedAutoTranslated = automaticSubtitles.any {
-                                (downloadAllLanguages || selectedLanguages.contains(it.languageCode)) &&
-                                !it.isOriginal && !it.languageCode.endsWith("-orig")
-                            }
-
-                            if (hasSelectedAutoTranslated) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 10.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(10.dp),
-                                        verticalAlignment = Alignment.Top,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Info,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Text(
-                                            text = "Note on Auto-Translated Captions: Translated tracks are generated live by YouTube and may be rate-limited or blocked by YouTube's servers. Spoken original transcripts and creator manual subtitles download reliably.",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
                             }
                         }
                     }

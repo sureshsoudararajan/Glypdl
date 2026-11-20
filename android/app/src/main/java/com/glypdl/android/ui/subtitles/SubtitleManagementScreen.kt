@@ -334,7 +334,14 @@ private fun SubtitleItemCard(
             Spacer(modifier = Modifier.height(6.dp))
 
             val context = LocalContext.current
-            val sizeFormatted = android.text.format.Formatter.formatShortFileSize(context, subtitle.fileSize)
+            val effectiveSize = remember(subtitle.id, subtitle.fileSize, subtitle.contentUri) {
+                if (subtitle.fileSize > 0L) {
+                    subtitle.fileSize
+                } else {
+                    StorageHelper.getFileSizeFromUri(context, subtitle.contentUri)
+                }
+            }
+            val sizeFormatted = android.text.format.Formatter.formatShortFileSize(context, effectiveSize)
             val dateFormatted = SimpleDateFormat("MMM d, yyyy • HH:mm", Locale.getDefault()).format(Date(subtitle.createdAt))
 
             Text(
