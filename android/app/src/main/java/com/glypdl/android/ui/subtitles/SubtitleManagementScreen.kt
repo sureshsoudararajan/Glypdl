@@ -304,6 +304,20 @@ private fun SubtitleItemCard(
                             )
                         }
                     }
+
+                    if (subtitle.isEmbedded) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Text(
+                                text = "EMBEDDED",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
                 }
 
                 Row {
@@ -334,14 +348,22 @@ private fun SubtitleItemCard(
             Spacer(modifier = Modifier.height(6.dp))
 
             val context = LocalContext.current
-            val effectiveSize = remember(subtitle.id, subtitle.fileSize, subtitle.contentUri) {
-                if (subtitle.fileSize > 0L) {
+            val effectiveSize = remember(subtitle.id, subtitle.fileSize, subtitle.contentUri, subtitle.isEmbedded) {
+                if (subtitle.isEmbedded) {
+                    0L
+                } else if (subtitle.fileSize > 0L) {
                     subtitle.fileSize
                 } else {
                     StorageHelper.getFileSizeFromUri(context, subtitle.contentUri)
                 }
             }
-            val sizeFormatted = android.text.format.Formatter.formatShortFileSize(context, effectiveSize)
+            val sizeFormatted = if (subtitle.isEmbedded) {
+                "Embedded track"
+            } else if (effectiveSize > 0L) {
+                android.text.format.Formatter.formatShortFileSize(context, effectiveSize)
+            } else {
+                "—"
+            }
             val dateFormatted = SimpleDateFormat("MMM d, yyyy • HH:mm", Locale.getDefault()).format(Date(subtitle.createdAt))
 
             Text(

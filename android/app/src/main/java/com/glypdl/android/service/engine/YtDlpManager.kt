@@ -853,7 +853,7 @@ class YtDlpManager @Inject constructor(
                 dlRequest.addOption("--merge-output-format", mergeFormat)
             }
 
-            if (subOpts.isEnabled) {
+            if (subOpts.isEnabled && (subOpts.selectedLanguages.isNotEmpty() || subOpts.downloadAllLanguages)) {
                 // Ensure individual subtitle download/rate-limiting errors (e.g. YouTube HTTP 429 on timedtext)
                 // do not abort the media download or subtitle download.
                 dlRequest.addOption("--ignore-errors")
@@ -867,39 +867,36 @@ class YtDlpManager @Inject constructor(
                 // Add delay between subtitle requests to avoid triggering YouTube's timedtext 429 rate limit
                 dlRequest.addOption("--sleep-subtitles", "2")
 
-                val langParam = if (subOpts.downloadAllLanguages) {
-                    "all"
-                } else if (subOpts.selectedLanguages.isNotEmpty()) {
-                    // Pass specific clean language codes requested by the user.
-                    // If an original ASR track is selected (e.g. "en-orig"), DO NOT also add "en",
-                    // because passing "en" instructs yt-dlp to request YouTube's auto-translation
-                    // endpoint (tlang=en), which triggers HTTP 429 rate limits!
-                    val origBases = subOpts.selectedLanguages
-                        .filter { it.endsWith("-orig") }
-                        .map { it.removeSuffix("-orig").removePrefix("a-") }
-                        .toSet()
+                val origBases = subOpts.selectedLanguages
+                    .filter { it.endsWith("-orig") }
+                    .map { it.removeSuffix("-orig").removePrefix("a-") }
+                    .toSet()
 
-                    val cleanedCodes = linkedSetOf<String>()
-                    subOpts.selectedLanguages.forEach { lang ->
-                        if (lang.endsWith("-orig")) {
-                            cleanedCodes.add(lang)
-                        } else {
-                            val base = lang.removePrefix("a-")
-                            // Only add if we don't already have the -orig version
-                            if (!origBases.contains(base)) {
-                                cleanedCodes.add(base)
-                            }
+                val cleanedCodes = linkedSetOf<String>()
+                subOpts.selectedLanguages.forEach { lang ->
+                    if (lang.endsWith("-orig")) {
+                        cleanedCodes.add(lang)
+                    } else {
+                        val base = lang.removePrefix("a-")
+                        // Only add if we don't already have the -orig version
+                        if (!origBases.contains(base)) {
+                            cleanedCodes.add(base)
                         }
                     }
-                    if (cleanedCodes.isEmpty()) {
-                        subOpts.selectedLanguages.joinToString(",")
-                    } else {
-                        cleanedCodes.joinToString(",")
-                    }
-                } else {
-                    "all"
                 }
-                dlRequest.addOption("--sub-langs", langParam)
+
+                val langParam = if (cleanedCodes.isNotEmpty()) {
+                    cleanedCodes.joinToString(",")
+                } else if (subOpts.selectedLanguages.isNotEmpty()) {
+                    subOpts.selectedLanguages.joinToString(",")
+                } else {
+                    ""
+                }
+
+                // Explicit clean language codes only: NEVER pass "all" to prevent looping 140+ languages!
+                if (langParam.isNotBlank()) {
+                    dlRequest.addOption("--sub-langs", langParam)
+                }
 
                 if (subOpts.preferredFormat != SubtitleFormatPreference.BEST) {
                     dlRequest.addOption("--convert-subs", subOpts.preferredFormat.format)

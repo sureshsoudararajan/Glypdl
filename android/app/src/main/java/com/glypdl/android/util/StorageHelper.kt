@@ -18,6 +18,7 @@
  */
 package com.glypdl.android.util
 
+import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -442,29 +443,56 @@ object StorageHelper {
     fun getFileSizeFromUri(context: Context, uriOrPath: String?): Long {
         if (uriOrPath.isNullOrBlank()) return 0L
         return try {
-            if (uriOrPath.startsWith("content://")) {
-                val uri = Uri.parse(uriOrPath)
-                context.contentResolver.query(
-                    uri,
-                    arrayOf(OpenableColumns.SIZE),
-                    null,
-                    null,
-                    null
-                )?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                        if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
-                            val size = cursor.getLong(sizeIndex)
-                            if (size > 0L) return size
+            val uri = Uri.parse(uriOrPath)
+            if (uri.scheme == ContentResolver.SCHEME_CONTENT || uriOrPath.startsWith("content://")) {
+                // 1. Try ContentResolver query with OpenableColumns.SIZE
+                try {
+                    context.contentResolver.query(
+                        uri,
+                        arrayOf(OpenableColumns.SIZE),
+                        null,
+                        null,
+                        null
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                            if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
+                                val size = cursor.getLong(sizeIndex)
+                                if (size > 0L) return size
+                            }
                         }
                     }
-                }
-                context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                    if (pfd.statSize > 0L) return pfd.statSize
-                }
+                } catch (_: Exception) {}
+
+                // 2. Try openFileDescriptor statSize and channel size
+                try {
+                    context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                        if (pfd.statSize > 0L) return pfd.statSize
+                        val channelSize = java.io.FileInputStream(pfd.fileDescriptor).channel.size()
+                        if (channelSize > 0L) return channelSize
+                    }
+                } catch (_: Exception) {}
+
+                // 3. Try openInputStream to determine size
+                try {
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        val available = stream.available().toLong()
+                        if (available > 0L) return available
+                        if (stream is java.io.FileInputStream) {
+                            val channelSize = stream.channel.size()
+                            if (channelSize > 0L) return channelSize
+                        }
+                    }
+                } catch (_: Exception) {}
+
                 0L
             } else {
-                val file = File(uriOrPath)
+                val cleanPath = if (uri.scheme == "file") {
+                    uri.path ?: uriOrPath.removePrefix("file://")
+                } else {
+                    uriOrPath
+                }
+                val file = File(cleanPath)
                 if (file.exists()) file.length() else 0L
             }
         } catch (_: Exception) {
