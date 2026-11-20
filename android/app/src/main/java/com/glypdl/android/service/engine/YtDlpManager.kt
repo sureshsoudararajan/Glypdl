@@ -855,12 +855,8 @@ class YtDlpManager @Inject constructor(
 
             if (subOpts.isEnabled) {
                 // Ensure individual subtitle download/rate-limiting errors (e.g. YouTube HTTP 429 on timedtext)
-                // do not abort the media download when downloading media + subtitles.
-                if (!subOpts.isSubtitlesOnly) {
-                    dlRequest.addOption("--ignore-errors")
-                } else {
-                    dlRequest.addOption("--no-abort-on-error")
-                }
+                // do not abort the media download or subtitle download.
+                dlRequest.addOption("--ignore-errors")
 
                 // Always enable both --write-subs and --write-auto-subs so yt-dlp retrieves all requested
                 // languages regardless of whether a track is an author-uploaded manual subtitle or
@@ -875,15 +871,31 @@ class YtDlpManager @Inject constructor(
                     "all"
                 } else if (subOpts.selectedLanguages.isNotEmpty()) {
                     // Pass specific clean language codes requested by the user.
-                    // DO NOT use regex wildcards (e.g. "en.*") because YouTube matches dozens
-                    // of translated variants, triggering HTTP 429 Too Many Requests rate limits.
+                    // If an original ASR track is selected (e.g. "en-orig"), DO NOT also add "en",
+                    // because passing "en" instructs yt-dlp to request YouTube's auto-translation
+                    // endpoint (tlang=en), which triggers HTTP 429 rate limits!
+                    val origBases = subOpts.selectedLanguages
+                        .filter { it.endsWith("-orig") }
+                        .map { it.removeSuffix("-orig").removePrefix("a-") }
+                        .toSet()
+
                     val cleanedCodes = linkedSetOf<String>()
                     subOpts.selectedLanguages.forEach { lang ->
-                        cleanedCodes.add(lang)
-                        val base = lang.removeSuffix("-orig").removePrefix("a-")
-                        if (base.isNotBlank()) cleanedCodes.add(base)
+                        if (lang.endsWith("-orig")) {
+                            cleanedCodes.add(lang)
+                        } else {
+                            val base = lang.removePrefix("a-")
+                            // Only add if we don't already have the -orig version
+                            if (!origBases.contains(base)) {
+                                cleanedCodes.add(base)
+                            }
+                        }
                     }
-                    cleanedCodes.joinToString(",")
+                    if (cleanedCodes.isEmpty()) {
+                        subOpts.selectedLanguages.joinToString(",")
+                    } else {
+                        cleanedCodes.joinToString(",")
+                    }
                 } else {
                     "all"
                 }
@@ -1017,6 +1029,34 @@ class YtDlpManager @Inject constructor(
                                 retryEx.printStackTrace()
                                 val parsedError = YtDlpErrorParser.parse(retryEx.message ?: e.message, installed)
                                 return@withContext Result.failure(GlypdlException(parsedError))
+                            }
+                        }
+                    }
+                }
+
+                // If this is SUBS_ONLY and an error (like HTTP 429 on an extra translation track) occurred,
+                // but one or more subtitle files were already successfully written to stagingDir,
+                // recover and treat the download as a success with the downloaded subtitle(s)!
+                if (!recovered && subOpts.isSubtitlesOnly) {
+                    val dir = File(downloadDir)
+                    if (dir.exists() && dir.isDirectory) {
+                        val downloadedSubs = dir.listFiles()?.filter { f ->
+                            f.isFile && f.length() > 0 &&
+                            !f.name.endsWith(".part") && !f.name.endsWith(".temp") && !f.name.endsWith(".ytdl") &&
+                            f.extension.lowercase() in SUBTITLE_EXTS &&
+                            (System.currentTimeMillis() - f.lastModified() < 600_000)
+                        } ?: emptyList()
+
+                        if (downloadedSubs.isNotEmpty()) {
+                            val candidate = downloadedSubs.maxByOrNull { it.lastModified() }
+                            if (candidate != null) {
+                                finalOutputFile = candidate.absolutePath
+                                recovered = true
+                                DiagnosticLogger.log(
+                                    "yt-dlp",
+                                    "Recovered from partial subtitle failure (e.g. HTTP 429 on extra track). Using ${downloadedSubs.size} downloaded subtitle(s): ${candidate.name}",
+                                    LogLevel.WARN
+                                )
                             }
                         }
                     }
