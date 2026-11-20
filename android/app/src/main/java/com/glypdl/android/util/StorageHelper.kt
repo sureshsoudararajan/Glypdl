@@ -275,8 +275,49 @@ object StorageHelper {
         }
     }
 
+    /**
+     * Checks if a media file or ContentResolver URI is currently accessible and exists on disk.
+     */
+    fun isFileAvailable(context: Context, uriOrPath: String?): Boolean {
+        if (uriOrPath.isNullOrBlank()) return false
+        return try {
+            if (uriOrPath.startsWith("content://")) {
+                val uri = Uri.parse(uriOrPath)
+                val pfd = try {
+                    context.contentResolver.openFileDescriptor(uri, "r")
+                } catch (_: Exception) {
+                    null
+                }
+                if (pfd != null) {
+                    pfd.close()
+                    return true
+                }
+                val stream = try {
+                    context.contentResolver.openInputStream(uri)
+                } catch (_: Exception) {
+                    null
+                }
+                if (stream != null) {
+                    stream.close()
+                    return true
+                }
+                false
+            } else {
+                val cleanPath = if (uriOrPath.startsWith("file://")) {
+                    Uri.parse(uriOrPath).path ?: uriOrPath.removePrefix("file://")
+                } else {
+                    uriOrPath
+                }
+                val file = File(cleanPath)
+                file.exists() && file.length() > 0
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun createOpenIntent(context: Context, uriOrPath: String, isAudio: Boolean): Intent? {
-        if (uriOrPath.isBlank()) return null
+        if (uriOrPath.isBlank() || !isFileAvailable(context, uriOrPath)) return null
         return try {
             val uri: Uri
             val mime: String
@@ -303,8 +344,12 @@ object StorageHelper {
     }
 
     fun openMedia(context: Context, uriOrPath: String, isAudio: Boolean): Boolean {
+        if (uriOrPath.isBlank() || !isFileAvailable(context, uriOrPath)) {
+            Toast.makeText(context, "Media file has been deleted or moved", Toast.LENGTH_SHORT).show()
+            return false
+        }
         val intent = createOpenIntent(context, uriOrPath, isAudio) ?: run {
-            Toast.makeText(context, "Media file could not be found", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Media file has been deleted or moved", Toast.LENGTH_SHORT).show()
             return false
         }
         return try {
@@ -317,7 +362,10 @@ object StorageHelper {
     }
 
     fun shareMedia(context: Context, uriOrPath: String, title: String, isAudio: Boolean): Boolean {
-        if (uriOrPath.isBlank()) return false
+        if (uriOrPath.isBlank() || !isFileAvailable(context, uriOrPath)) {
+            Toast.makeText(context, "Media file has been deleted or moved", Toast.LENGTH_SHORT).show()
+            return false
+        }
         return try {
             val uri: Uri
             val mime: String

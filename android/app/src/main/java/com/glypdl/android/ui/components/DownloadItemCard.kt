@@ -43,9 +43,11 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.glypdl.android.data.local.entity.DownloadEntity
@@ -65,6 +67,15 @@ fun DownloadItemCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val fileAvailable = remember(download.filePath, download.status) {
+        if (download.status == DownloadStatus.COMPLETED) {
+            com.glypdl.android.util.StorageHelper.isFileAvailable(context, download.filePath)
+        } else {
+            true
+        }
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -179,11 +190,20 @@ fun DownloadItemCard(
                         )
                     }
                     DownloadStatus.COMPLETED -> {
-                        Text(
-                            text = "✓ Completed",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        if (fileAvailable) {
+                            Text(
+                                text = "✓ Completed",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Text(
+                                text = "⚠️ File missing",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+                            )
+                        }
                     }
                     DownloadStatus.FAILED -> {
                         Text(
@@ -251,8 +271,15 @@ fun DownloadItemCard(
                     }
                 }
                 DownloadStatus.COMPLETED -> {
-                    IconButton(onClick = onOpen) {
-                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Open")
+                    IconButton(
+                        onClick = onOpen,
+                        enabled = fileAvailable
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = "Open",
+                            tint = if (fileAvailable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        )
                     }
                     IconButton(onClick = onDelete) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)

@@ -160,17 +160,7 @@ fun HistoryDetailBottomSheet(
     val durationText = remember(item.duration) { formatDurationSeconds(item.duration) }
 
     val fileAvailable = remember(targetUri) {
-        try {
-            if (targetUri.startsWith("content://")) {
-                context.contentResolver.openFileDescriptor(Uri.parse(targetUri), "r")?.use { true } ?: false
-            } else if (targetUri.isNotBlank()) {
-                File(targetUri).exists()
-            } else {
-                false
-            }
-        } catch (_: Exception) {
-            false
-        }
+        StorageHelper.isFileAvailable(context, targetUri)
     }
 
     ModalBottomSheet(
