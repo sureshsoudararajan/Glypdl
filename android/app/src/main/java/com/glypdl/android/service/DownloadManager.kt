@@ -189,6 +189,7 @@ class DownloadManager @Inject constructor(
                 }
 
                 result.onSuccess { path ->
+                    DiagnosticLogger.log("DownloadManager", "Media processing complete: $path", LogLevel.INFO)
                     val file = File(path)
                     if (!file.exists() || file.length() <= 0L) {
                         val errorMsg = "Download completed but output file was not created or is empty (0 B)."
@@ -232,6 +233,7 @@ class DownloadManager @Inject constructor(
                             )
                             primaryExport.onSuccess { permanentUri ->
                                 val finalUriString = permanentUri.toString()
+                                DiagnosticLogger.log("DownloadManager", "Subtitle exported to storage: ${primaryFile.name} ($finalUriString)", LogLevel.INFO)
                                 downloadRepository.updateDownload(
                                     entity.copy(
                                         status = DownloadStatus.COMPLETED,
@@ -342,6 +344,7 @@ class DownloadManager @Inject constructor(
 
                             exportResult.onSuccess { permanentUri ->
                                 val finalUriString = permanentUri.toString()
+                                DiagnosticLogger.log("DownloadManager", "Exported to storage: $displayName ($finalUriString)", LogLevel.INFO)
                                 downloadRepository.updateDownload(
                                     entity.copy(
                                         status = DownloadStatus.COMPLETED,
