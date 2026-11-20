@@ -837,7 +837,7 @@ class YtDlpManager @Inject constructor(
             val outputPath = File(downloadDir, filenameTemplate).absolutePath
             dlRequest.addOption("-o", outputPath)
 
-            if (!subOpts.isSubtitlesOnly && !request.isAudioOnly && (effectiveFormat.contains("+") || effectiveFormat.contains("bestvideo"))) {
+            if (!subOpts.isSubtitlesOnly && !request.isAudioOnly && (effectiveFormat.contains("+") || effectiveFormat.contains("bestvideo") || subOpts.shouldEmbed)) {
                 // If container is webm or mp4, provide mkv as automatic fallback container
                 // e.g. "webm/mkv" or "mp4/mkv". yt-dlp checks whether the downloaded audio and video
                 // codecs fit into the preferred container (e.g. WebM strictly forbids AAC audio;
@@ -845,6 +845,10 @@ class YtDlpManager @Inject constructor(
                 // to Matroska (mkv) without failing FFmpeg remuxing.
                 val preferredExt = request.ext.trim().lowercase().removePrefix(".")
                 val mergeFormat = when {
+                    // For embedded subtitles: WebM container cannot embed SRT subtitles and FFmpeg will drop them.
+                    // MKV natively containerizes all video/audio streams (VP9, AV1, Opus) AND all subtitle formats without loss!
+                    subOpts.shouldEmbed && (preferredExt == "webm" || preferredExt == "mkv") -> "mkv"
+                    subOpts.shouldEmbed && preferredExt == "mp4" -> "mp4/mkv"
                     preferredExt.isBlank() || preferredExt == "mp4" -> "mp4/mkv"
                     preferredExt == "webm" -> "webm/mkv"
                     preferredExt == "mkv" -> "mkv"
@@ -901,9 +905,12 @@ class YtDlpManager @Inject constructor(
                 if (subOpts.preferredFormat != SubtitleFormatPreference.BEST) {
                     dlRequest.addOption("--convert-subs", subOpts.preferredFormat.format)
                 } else if (subOpts.shouldEmbed) {
-                    // MP4 / MKV embedding requires SRT conversion so FFmpeg can embed
-                    // subtitles cleanly into the container without failing on WebVTT styling tags
-                    dlRequest.addOption("--convert-subs", "srt")
+                    val preferredExt = request.ext.trim().lowercase().removePrefix(".")
+                    // MP4 container uses mov_text which requires SRT input.
+                    // For MKV, do NOT force SRT conversion because MKV natively supports WebVTT, SRT, and ASS without conversion loss!
+                    if (preferredExt == "mp4") {
+                        dlRequest.addOption("--convert-subs", "srt")
+                    }
                 }
 
                 if (subOpts.shouldEmbed && !subOpts.isSubtitlesOnly && !request.isAudioOnly) {

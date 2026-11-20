@@ -379,28 +379,57 @@ fun DownloadDetailScreen(
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable {
-                                            com.glypdl.android.util.StorageHelper.openSubtitle(context, sub.contentUri)
+                                            if (sub.isEmbedded) {
+                                                com.glypdl.android.util.StorageHelper.openMedia(context, sub.contentUri, false)
+                                            } else {
+                                                com.glypdl.android.util.StorageHelper.openSubtitle(context, sub.contentUri)
+                                            }
                                         }
                                         .padding(vertical = 4.dp, horizontal = 2.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = "${sub.languageName} (${sub.languageCode.uppercase()})",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            if (sub.isEmbedded) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                                ) {
+                                                    Text(
+                                                        text = "EMBEDDED",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        val subInfoText = if (sub.isEmbedded) {
+                                            "Embedded track in video"
+                                        } else {
+                                            "${sub.format.uppercase()} • ${android.text.format.Formatter.formatShortFileSize(context, sub.fileSize)}"
+                                        }
                                         Text(
-                                            text = "${sub.languageName} (${sub.languageCode.uppercase()})",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                        Text(
-                                            text = "${sub.format.uppercase()} • ${android.text.format.Formatter.formatShortFileSize(context, sub.fileSize)}",
+                                            text = subInfoText,
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
-                                    IconButton(onClick = {
-                                        com.glypdl.android.util.StorageHelper.shareSubtitle(context, sub.contentUri, sub.mediaTitle)
-                                    }) {
-                                        Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(18.dp))
+                                    if (!sub.isEmbedded) {
+                                        IconButton(onClick = {
+                                            com.glypdl.android.util.StorageHelper.shareSubtitle(context, sub.contentUri, sub.mediaTitle)
+                                        }) {
+                                            Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(18.dp))
+                                        }
                                     }
                                 }
                             }
