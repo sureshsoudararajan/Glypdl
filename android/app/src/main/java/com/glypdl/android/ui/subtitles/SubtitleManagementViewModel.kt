@@ -141,6 +141,7 @@ class SubtitleManagementViewModel @Inject constructor(
                 }
 
                 if (tempFile.exists() && tempFile.length() > 0) {
+                    val tempSize = tempFile.length()
                     val customTree = settingsRepository.downloadDirUri.first()
                     val mime = StorageHelper.getMimeType(ext)
                     val exportRes = StorageHelper.exportToPermanentStorage(
@@ -166,7 +167,7 @@ class SubtitleManagementViewModel @Inject constructor(
                             contentUri = permUri.toString(),
                             filePath = null,
                             fileName = displayName,
-                            fileSize = tempFile.length().takeIf { it > 0 } ?: size,
+                            fileSize = if (tempSize > 0) tempSize else size,
                             createdAt = System.currentTimeMillis(),
                             isEmbedded = false
                         )

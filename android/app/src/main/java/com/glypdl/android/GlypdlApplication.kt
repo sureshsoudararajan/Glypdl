@@ -51,6 +51,7 @@ class GlypdlApplication : Application(), ImageLoaderFactory {
         super.onCreate()
         
         notificationHelper.createNotificationChannels()
+        com.glypdl.android.util.DiagnosticLogger.init(this)
         
         applicationScope.launch {
             try {

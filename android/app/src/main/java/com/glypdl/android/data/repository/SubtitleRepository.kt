@@ -73,7 +73,7 @@ class SubtitleRepository @Inject constructor(
     suspend fun deleteSubtitle(id: Long, deleteFileFromDisk: Boolean = true): Boolean {
         val entity = subtitleDao.getSubtitleById(id) ?: return false
         var diskDeleted = true
-        if (deleteFileFromDisk) {
+        if (deleteFileFromDisk && !entity.isEmbedded) {
             val uriOrPath = entity.fileUri.ifBlank { entity.filePath ?: "" }
             diskDeleted = StorageHelper.deleteFileFromStorage(context, uriOrPath)
         }
@@ -85,8 +85,10 @@ class SubtitleRepository @Inject constructor(
         val subtitles = subtitleDao.getSubtitlesForDownloadSync(downloadId)
         if (deleteFileFromDisk) {
             for (sub in subtitles) {
-                val uriOrPath = sub.fileUri.ifBlank { sub.filePath ?: "" }
-                StorageHelper.deleteFileFromStorage(context, uriOrPath)
+                if (!sub.isEmbedded) {
+                    val uriOrPath = sub.fileUri.ifBlank { sub.filePath ?: "" }
+                    StorageHelper.deleteFileFromStorage(context, uriOrPath)
+                }
             }
         }
         subtitleDao.deleteByDownloadId(downloadId)
@@ -95,6 +97,14 @@ class SubtitleRepository @Inject constructor(
     fun getSubtitleCount(): Flow<Int> = subtitleDao.getSubtitleCount()
 
     private fun SubtitleFileEntity.toModel(): SubtitleFile {
+        val effectiveSize = if (isEmbedded) {
+            0L
+        } else if (sizeBytes > 0L) {
+            sizeBytes
+        } else {
+            val uri = fileUri.ifBlank { filePath ?: "" }
+            StorageHelper.getFileSizeFromUri(context, uri)
+        }
         return SubtitleFile(
             id = id,
             downloadId = downloadId,
@@ -107,7 +117,7 @@ class SubtitleRepository @Inject constructor(
             contentUri = fileUri,
             filePath = filePath,
             fileName = fileName,
-            fileSize = sizeBytes,
+            fileSize = effectiveSize,
             createdAt = createdAt,
             isEmbedded = isEmbedded
         )

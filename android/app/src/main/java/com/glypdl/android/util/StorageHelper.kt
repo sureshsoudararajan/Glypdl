@@ -18,6 +18,7 @@
  */
 package com.glypdl.android.util
 
+import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -26,6 +27,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
@@ -37,7 +39,7 @@ object StorageHelper {
         VIDEOS("videos"),
         MUSIC("music"),
         IMAGES("images"),
-        SUBTITLES("subtitles"),
+        SUBTITLES("videos"),
         OTHERS("others");
     }
 
@@ -166,7 +168,8 @@ object StorageHelper {
         displayName: String,
         mimeType: String,
         isAudio: Boolean,
-        customTreeUriString: String?
+        customTreeUriString: String?,
+        overrideCategory: MediaCategory? = null
     ): Result<Uri> {
         // 0. Verify staging file exists and has content
         if (!stagingFile.exists() || stagingFile.length() <= 0L) {
@@ -174,7 +177,9 @@ object StorageHelper {
         }
 
         val ext = displayName.substringAfterLast('.', "")
-        val category = getMediaCategory(ext, mimeType, isAudio)
+        // overrideCategory allows callers (e.g. subtitle-alongside-video) to place files
+        // in a specific folder rather than the default category-derived folder.
+        val category = overrideCategory ?: getMediaCategory(ext, mimeType, isAudio)
 
         // 1. Try Custom SAF Tree if configured
         if (!customTreeUriString.isNullOrBlank()) {
@@ -270,8 +275,49 @@ object StorageHelper {
         }
     }
 
+    /**
+     * Checks if a media file or ContentResolver URI is currently accessible and exists on disk.
+     */
+    fun isFileAvailable(context: Context, uriOrPath: String?): Boolean {
+        if (uriOrPath.isNullOrBlank()) return false
+        return try {
+            if (uriOrPath.startsWith("content://")) {
+                val uri = Uri.parse(uriOrPath)
+                val pfd = try {
+                    context.contentResolver.openFileDescriptor(uri, "r")
+                } catch (_: Exception) {
+                    null
+                }
+                if (pfd != null) {
+                    pfd.close()
+                    return true
+                }
+                val stream = try {
+                    context.contentResolver.openInputStream(uri)
+                } catch (_: Exception) {
+                    null
+                }
+                if (stream != null) {
+                    stream.close()
+                    return true
+                }
+                false
+            } else {
+                val cleanPath = if (uriOrPath.startsWith("file://")) {
+                    Uri.parse(uriOrPath).path ?: uriOrPath.removePrefix("file://")
+                } else {
+                    uriOrPath
+                }
+                val file = File(cleanPath)
+                file.exists() && file.length() > 0
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     fun createOpenIntent(context: Context, uriOrPath: String, isAudio: Boolean): Intent? {
-        if (uriOrPath.isBlank()) return null
+        if (uriOrPath.isBlank() || !isFileAvailable(context, uriOrPath)) return null
         return try {
             val uri: Uri
             val mime: String
@@ -298,8 +344,12 @@ object StorageHelper {
     }
 
     fun openMedia(context: Context, uriOrPath: String, isAudio: Boolean): Boolean {
+        if (uriOrPath.isBlank() || !isFileAvailable(context, uriOrPath)) {
+            Toast.makeText(context, "Media file has been deleted or moved", Toast.LENGTH_SHORT).show()
+            return false
+        }
         val intent = createOpenIntent(context, uriOrPath, isAudio) ?: run {
-            Toast.makeText(context, "Media file could not be found", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Media file has been deleted or moved", Toast.LENGTH_SHORT).show()
             return false
         }
         return try {
@@ -312,7 +362,10 @@ object StorageHelper {
     }
 
     fun shareMedia(context: Context, uriOrPath: String, title: String, isAudio: Boolean): Boolean {
-        if (uriOrPath.isBlank()) return false
+        if (uriOrPath.isBlank() || !isFileAvailable(context, uriOrPath)) {
+            Toast.makeText(context, "Media file has been deleted or moved", Toast.LENGTH_SHORT).show()
+            return false
+        }
         return try {
             val uri: Uri
             val mime: String
@@ -429,6 +482,69 @@ object StorageHelper {
         } catch (e: Exception) {
             e.printStackTrace()
             false
+        }
+    }
+
+    /**
+     * Resolves the actual byte size of a file given a content:// or file:// URI string.
+     */
+    fun getFileSizeFromUri(context: Context, uriOrPath: String?): Long {
+        if (uriOrPath.isNullOrBlank()) return 0L
+        return try {
+            val uri = Uri.parse(uriOrPath)
+            if (uri.scheme == ContentResolver.SCHEME_CONTENT || uriOrPath.startsWith("content://")) {
+                // 1. Try ContentResolver query with OpenableColumns.SIZE
+                try {
+                    context.contentResolver.query(
+                        uri,
+                        arrayOf(OpenableColumns.SIZE),
+                        null,
+                        null,
+                        null
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                            if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
+                                val size = cursor.getLong(sizeIndex)
+                                if (size > 0L) return size
+                            }
+                        }
+                    }
+                } catch (_: Exception) {}
+
+                // 2. Try openFileDescriptor statSize and channel size
+                try {
+                    context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                        if (pfd.statSize > 0L) return pfd.statSize
+                        val channelSize = java.io.FileInputStream(pfd.fileDescriptor).channel.size()
+                        if (channelSize > 0L) return channelSize
+                    }
+                } catch (_: Exception) {}
+
+                // 3. Try openInputStream to determine size
+                try {
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        val available = stream.available().toLong()
+                        if (available > 0L) return available
+                        if (stream is java.io.FileInputStream) {
+                            val channelSize = stream.channel.size()
+                            if (channelSize > 0L) return channelSize
+                        }
+                    }
+                } catch (_: Exception) {}
+
+                0L
+            } else {
+                val cleanPath = if (uri.scheme == "file") {
+                    uri.path ?: uriOrPath.removePrefix("file://")
+                } else {
+                    uriOrPath
+                }
+                val file = File(cleanPath)
+                if (file.exists()) file.length() else 0L
+            }
+        } catch (_: Exception) {
+            0L
         }
     }
 }

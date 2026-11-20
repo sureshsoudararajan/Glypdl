@@ -105,9 +105,38 @@ class SubtitleParserTest {
 
         // ta-orig and en should be present; translated ta must be skipped to avoid 429 translation errors
         assertEquals(2, tracks.size)
-        assertTrue(tracks.any { it.languageCode == "ta-orig" })
+        val taOrig = tracks.find { it.languageCode == "ta-orig" }
+        assertNotNull(taOrig)
+        assertTrue(taOrig?.isOriginal == true)
         assertFalse(tracks.any { it.languageCode == "ta" })
         assertTrue(tracks.any { it.languageCode == "en" })
+    }
+
+    @Test
+    fun testMachineTranslatedTracksAreExcluded() {
+        val jsonStr = """
+            {
+                "automatic_captions": {
+                    "ta-orig": [
+                        {"ext": "vtt", "url": "https://example.com/ta-orig.vtt", "name": "Tamil (original)"}
+                    ],
+                    "th": [
+                        {"ext": "vtt", "url": "https://example.com/timedtext?v=123&tlang=th", "name": "Thai"}
+                    ],
+                    "fr": [
+                        {"ext": "vtt", "url": "https://example.com/timedtext?v=123&tlang=fr", "name": "French"}
+                    ]
+                }
+            }
+        """.trimIndent()
+
+        val json = JSONObject(jsonStr)
+        val tracks = SubtitleParser.parseAutomaticCaptions(json)
+
+        // Only original ta-orig must be kept; translated th and fr must be excluded
+        assertEquals(1, tracks.size)
+        assertEquals("ta-orig", tracks[0].languageCode)
+        assertTrue(tracks[0].isOriginal)
     }
 
     @Test

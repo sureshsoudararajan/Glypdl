@@ -54,13 +54,14 @@ fun StatusSavedGridItem(
     Card(
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        colors = CardDefaults.cardColors(containerColor = Color.Black),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(1f)
+            .aspectRatio(9f / 16f)
             .clickable(onClick = onOpenClick)
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(Uri.parse(item.savedUri))
@@ -72,7 +73,7 @@ fun StatusSavedGridItem(
                     .crossfade(true)
                     .build(),
                 contentDescription = item.displayName,
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
             )
 

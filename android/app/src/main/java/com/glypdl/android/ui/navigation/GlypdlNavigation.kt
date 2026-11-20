@@ -18,10 +18,15 @@
 package com.glypdl.android.ui.navigation
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
@@ -124,13 +129,19 @@ fun GlypdlRootApp(
         },
         modifier = modifier
     ) { innerPadding ->
+        val isFullscreenPreview = currentRoute == Screen.StatusPreview.route
+        val effectivePadding = if (isFullscreenPreview) {
+            PaddingValues(0.dp)
+        } else {
+            innerPadding
+        }
         GlypdlNavHost(
             navController = navController,
             startDestination = startDestination,
             settingsRepository = settingsRepository,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(effectivePadding)
         )
     }
 }
@@ -271,7 +282,13 @@ fun GlypdlNavHost(
             )
         }
 
-        composable(Screen.StatusPreview.route) {
+        composable(
+            route = Screen.StatusPreview.route,
+            enterTransition = { fadeIn(animationSpec = tween(250)) },
+            exitTransition = { fadeOut(animationSpec = tween(200)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(250)) },
+            popExitTransition = { fadeOut(animationSpec = tween(200)) }
+        ) {
             StatusPreviewScreen(
                 onNavigateBack = { navController.popBackStack() }
             )

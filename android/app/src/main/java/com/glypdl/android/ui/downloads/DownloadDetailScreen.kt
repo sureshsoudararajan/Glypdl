@@ -58,6 +58,7 @@ fun DownloadDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
     val download = uiState.download
     val progress = uiState.progress
+    val context = androidx.compose.ui.platform.LocalContext.current
     var showDeleteDialog by remember { mutableStateOf(false) }
     var deleteFileWithDownload by remember { mutableStateOf(true) }
 
@@ -116,11 +117,22 @@ fun DownloadDetailScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                val chipColor = when (download.status) {
-                    DownloadStatus.COMPLETED -> Color(0xFF4CAF50)
-                    DownloadStatus.DOWNLOADING -> Color(0xFF2196F3)
-                    DownloadStatus.FAILED -> Color(0xFFF44336)
+                val fileAvailable = remember(download.filePath) {
+                    com.glypdl.android.util.StorageHelper.isFileAvailable(context, download.filePath)
+                }
+                val isCompletedMissing = download.status == DownloadStatus.COMPLETED && !fileAvailable
+
+                val chipColor = when {
+                    isCompletedMissing -> Color(0xFFE53935)
+                    download.status == DownloadStatus.COMPLETED -> Color(0xFF4CAF50)
+                    download.status == DownloadStatus.DOWNLOADING -> Color(0xFF2196F3)
+                    download.status == DownloadStatus.FAILED -> Color(0xFFF44336)
                     else -> Color.Gray
+                }
+
+                val chipText = when {
+                    isCompletedMissing -> "FILE MISSING"
+                    else -> download.status.name
                 }
 
                 Surface(
@@ -128,11 +140,50 @@ fun DownloadDetailScreen(
                     shape = MaterialTheme.shapes.small
                 ) {
                     Text(
-                        text = download.status.name,
+                        text = chipText,
                         color = chipColor,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
                     )
+                }
+
+                if (isCompletedMissing) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.ErrorOutline,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "File Missing from Storage",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "This media file was deleted or moved from your gallery or file manager outside Glypdl.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -194,7 +245,11 @@ fun DownloadDetailScreen(
                 Text("Format: $formatDisplay", style = MaterialTheme.typography.bodyMedium)
                 Text("Quality: $qualityDisplay", style = MaterialTheme.typography.bodyMedium)
                 if (!download.filePath.isNullOrBlank()) {
-                    Text("File Path: ${download.filePath}", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = if (isCompletedMissing) "File Path: ${download.filePath} (Deleted from storage)" else "File Path: ${download.filePath}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isCompletedMissing) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                    )
                 }
 
                 if (download.status == DownloadStatus.FAILED) {
@@ -324,28 +379,57 @@ fun DownloadDetailScreen(
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable {
-                                            com.glypdl.android.util.StorageHelper.openSubtitle(context, sub.contentUri)
+                                            if (sub.isEmbedded) {
+                                                com.glypdl.android.util.StorageHelper.openMedia(context, sub.contentUri, false)
+                                            } else {
+                                                com.glypdl.android.util.StorageHelper.openSubtitle(context, sub.contentUri)
+                                            }
                                         }
                                         .padding(vertical = 4.dp, horizontal = 2.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = "${sub.languageName} (${sub.languageCode.uppercase()})",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            if (sub.isEmbedded) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                                ) {
+                                                    Text(
+                                                        text = "EMBEDDED",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        val subInfoText = if (sub.isEmbedded) {
+                                            "Embedded track in video"
+                                        } else {
+                                            "${sub.format.uppercase()} • ${android.text.format.Formatter.formatShortFileSize(context, sub.fileSize)}"
+                                        }
                                         Text(
-                                            text = "${sub.languageName} (${sub.languageCode.uppercase()})",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                        Text(
-                                            text = "${sub.format.uppercase()} • ${android.text.format.Formatter.formatShortFileSize(context, sub.fileSize)}",
+                                            text = subInfoText,
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
-                                    IconButton(onClick = {
-                                        com.glypdl.android.util.StorageHelper.shareSubtitle(context, sub.contentUri, sub.mediaTitle)
-                                    }) {
-                                        Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(18.dp))
+                                    if (!sub.isEmbedded) {
+                                        IconButton(onClick = {
+                                            com.glypdl.android.util.StorageHelper.shareSubtitle(context, sub.contentUri, sub.mediaTitle)
+                                        }) {
+                                            Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(18.dp))
+                                        }
                                     }
                                 }
                             }
@@ -355,7 +439,6 @@ fun DownloadDetailScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                val context = androidx.compose.ui.platform.LocalContext.current
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -428,21 +511,29 @@ fun DownloadDetailScreen(
                             Button(onClick = { showDeleteDialog = true }, modifier = Modifier.weight(1f)) { Text("Clear") }
                         }
                         DownloadStatus.COMPLETED -> {
-                            Button(onClick = {
-                                com.glypdl.android.util.StorageHelper.openMedia(
-                                    context,
-                                    download.filePath ?: "",
-                                    download.isAudioOnly
-                                )
-                            }, modifier = Modifier.weight(1f)) { Text("Open") }
-                            Button(onClick = {
-                                com.glypdl.android.util.StorageHelper.shareMedia(
-                                    context,
-                                    download.filePath ?: "",
-                                    download.title,
-                                    download.isAudioOnly
-                                )
-                            }, modifier = Modifier.weight(1f)) { Text("Share") }
+                            Button(
+                                onClick = {
+                                    com.glypdl.android.util.StorageHelper.openMedia(
+                                        context,
+                                        download.filePath ?: "",
+                                        download.isAudioOnly
+                                    )
+                                },
+                                enabled = fileAvailable,
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Open") }
+                            Button(
+                                onClick = {
+                                    com.glypdl.android.util.StorageHelper.shareMedia(
+                                        context,
+                                        download.filePath ?: "",
+                                        download.title,
+                                        download.isAudioOnly
+                                    )
+                                },
+                                enabled = fileAvailable,
+                                modifier = Modifier.weight(1f)
+                            ) { Text("Share") }
                         }
                         else -> {
                             Button(onClick = viewModel::cancelDownload, modifier = Modifier.weight(1f)) { Text("Cancel") }
@@ -472,7 +563,8 @@ fun DownloadDetailScreen(
             text = {
                 Column {
                     Text("Delete \"${download.title}\"?")
-                    if (!download.filePath.isNullOrBlank()) {
+                    val isFileOnDisk = com.glypdl.android.util.StorageHelper.isFileAvailable(context, download.filePath)
+                    if (!download.filePath.isNullOrBlank() && isFileOnDisk) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(

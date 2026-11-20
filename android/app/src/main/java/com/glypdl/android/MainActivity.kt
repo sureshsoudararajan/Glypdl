@@ -61,6 +61,8 @@ class MainActivity : ComponentActivity() {
 
     private val sharedUrlFlow = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
     private val navigateToDownloadIdFlow = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    private val navigateToRouteFlow = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    private var pendingAutoAnalyze = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -94,15 +96,33 @@ class MainActivity : ComponentActivity() {
         }
 
         val initialUrl = IntentHandler.extractUrlFromIntent(intent)
-        sharedUrlFlow.value = initialUrl
+        val isAutoAnalyze = intent.getBooleanExtra(com.glypdl.android.service.tile.ClipboardAnalyzeTileService.EXTRA_AUTO_ANALYZE, false)
+        if (initialUrl != null) {
+            sharedUrlFlow.value = initialUrl
+        } else if (isAutoAnalyze) {
+            if (hasWindowFocus()) {
+                val clipUrl = com.glypdl.android.util.ClipboardHelper.getUrlFromClipboard(this)
+                if (!clipUrl.isNullOrBlank()) {
+                    sharedUrlFlow.value = clipUrl
+                } else {
+                    android.widget.Toast.makeText(this, "No link found in clipboard. Copy a URL first.", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                pendingAutoAnalyze = true
+            }
+        }
         intent.getStringExtra(EXTRA_NAVIGATE_TO_DOWNLOAD_ID)?.let {
             navigateToDownloadIdFlow.value = it
+        }
+        intent.getStringExtra(EXTRA_NAVIGATE_TO_ROUTE)?.let {
+            navigateToRouteFlow.value = it
         }
 
         setContent {
             val themePreference by settingsRepository.theme.collectAsState(initial = initialTheme)
             val pendingUrl by sharedUrlFlow.collectAsState()
             val pendingDownloadId by navigateToDownloadIdFlow.collectAsState()
+            val pendingRoute by navigateToRouteFlow.collectAsState()
 
             GlypdlTheme(themeSetting = themePreference, dynamicColor = false) {
                 Surface(
@@ -135,6 +155,18 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    LaunchedEffect(pendingRoute, hasNavGraph) {
+                        if (hasNavGraph) {
+                            pendingRoute?.let { route ->
+                                val target = if (route == "status_saver") Screen.StatusSaver.route else route
+                                navController.navigate(target) {
+                                    launchSingleTop = true
+                                }
+                                navigateToRouteFlow.value = null
+                            }
+                        }
+                    }
+
                     GlypdlRootApp(
                         navController = navController,
                         startDestination = startDestination,
@@ -149,15 +181,47 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        IntentHandler.extractUrlFromIntent(intent)?.let { url ->
-            sharedUrlFlow.value = url
+        val extractedUrl = IntentHandler.extractUrlFromIntent(intent)
+        val isAutoAnalyze = intent.getBooleanExtra(com.glypdl.android.service.tile.ClipboardAnalyzeTileService.EXTRA_AUTO_ANALYZE, false)
+        if (extractedUrl != null) {
+            sharedUrlFlow.value = extractedUrl
+        } else if (isAutoAnalyze) {
+            if (hasWindowFocus()) {
+                val clipUrl = com.glypdl.android.util.ClipboardHelper.getUrlFromClipboard(this)
+                if (!clipUrl.isNullOrBlank()) {
+                    sharedUrlFlow.value = clipUrl
+                } else {
+                    android.widget.Toast.makeText(this, "No link found in clipboard. Copy a URL first.", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                pendingAutoAnalyze = true
+            }
         }
         intent.getStringExtra(EXTRA_NAVIGATE_TO_DOWNLOAD_ID)?.let { downloadId ->
             navigateToDownloadIdFlow.value = downloadId
+        }
+        intent.getStringExtra(EXTRA_NAVIGATE_TO_ROUTE)?.let { route ->
+            navigateToRouteFlow.value = route
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && pendingAutoAnalyze) {
+            pendingAutoAnalyze = false
+            window.decorView.post {
+                val clipUrl = com.glypdl.android.util.ClipboardHelper.getUrlFromClipboard(this)
+                if (!clipUrl.isNullOrBlank()) {
+                    sharedUrlFlow.value = clipUrl
+                } else {
+                    android.widget.Toast.makeText(this, "No link found in clipboard. Copy a URL first.", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
     companion object {
         const val EXTRA_NAVIGATE_TO_DOWNLOAD_ID = "com.glypdl.android.extra.NAVIGATE_TO_DOWNLOAD_ID"
+        const val EXTRA_NAVIGATE_TO_ROUTE = "com.glypdl.android.extra.NAVIGATE_TO_ROUTE"
     }
 }

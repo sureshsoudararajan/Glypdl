@@ -182,7 +182,8 @@ fun HomeScreen(
             text = {
                 Column {
                     Text("Are you sure you want to delete \"${download.title}\"?")
-                    if (!download.filePath.isNullOrBlank()) {
+                    val isFileOnDisk = com.glypdl.android.util.StorageHelper.isFileAvailable(context, download.filePath)
+                    if (!download.filePath.isNullOrBlank() && isFileOnDisk) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(

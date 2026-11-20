@@ -84,10 +84,10 @@ sealed interface AnalyzeUiState {
         val isFacebook: Boolean = false,
         val instagramChoice: SimplifiedMediaChoice = SimplifiedMediaChoice.VIDEO_AND_AUDIO,
         val selectedSubtitleLanguages: Set<String> = emptySet(),
-        val subtitleDownloadMode: SubtitleDownloadMode = SubtitleDownloadMode.MEDIA_ONLY,
+        val subtitleDownloadMode: SubtitleDownloadMode = SubtitleDownloadMode.EMBED_SUBS,
         val downloadAllSubtitles: Boolean = false,
         val includeManualSubtitles: Boolean = true,
-        val includeAutoSubtitles: Boolean = false,
+        val includeAutoSubtitles: Boolean = true,
         val preferredSubtitleFormat: SubtitleFormatPreference = SubtitleFormatPreference.BEST,
         val subtitleSectionExpanded: Boolean = false,
         val selectedYouTubeAudioLanguage: YouTubeAudioLanguage? = null,
@@ -99,12 +99,7 @@ sealed interface AnalyzeUiState {
         val totalSubtitleCount: Int get() = mediaInfo.totalSubtitleCount
         val hasMultipleAudioLanguages: Boolean get() = mediaInfo.hasMultipleAudioLanguages
         val youtubeAudioLanguages: List<YouTubeAudioLanguage> get() = mediaInfo.youtubeAudioLanguages
-        val availableSubtitleTracks: List<SubtitleTrack> get() {
-            val list = mutableListOf<SubtitleTrack>()
-            if (includeManualSubtitles) list.addAll(mediaInfo.manualSubtitles)
-            if (includeAutoSubtitles) list.addAll(mediaInfo.automaticSubtitles)
-            return list
-        }
+        val availableSubtitleTracks: List<SubtitleTrack> get() = mediaInfo.manualSubtitles + mediaInfo.automaticSubtitles
         val isSubtitlesOnly: Boolean get() = subtitleDownloadMode == SubtitleDownloadMode.SUBS_ONLY
 
         val estimatedTotalBytes: Long?
@@ -488,26 +483,52 @@ class AnalyzeViewModel @Inject constructor(
                     "m4a"
                 }
 
+                // Read quality / format preferences so playlist downloads respect Settings,
+                // exactly the same as individual video downloads do.
+                val prefQuality = try { settingsRepository.defaultQuality.first() } catch (e: Exception) { "best" }
+                val prefFormat  = try { settingsRepository.defaultFormat.first() }  catch (e: Exception) { "mp4" }
+                val prefCodec   = try { settingsRepository.preferredVideoCodec.first() } catch (e: Exception) { "any" }
+
                 val ext = if (isAudio) {
                     preferredAudio.ifBlank { "m4a" }
                 } else {
-                    "mp4"
+                    prefFormat.ifBlank { "mp4" }
                 }
 
                 val formatId = if (isAudio) {
                     when (ext) {
-                        "m4a" -> "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio/best"
+                        "m4a"  -> "bestaudio[ext=m4a]/bestaudio[ext=aac]/bestaudio/best"
                         "opus" -> "bestaudio[ext=opus]/bestaudio[ext=webm]/bestaudio/best"
-                        "mp3" -> "bestaudio[ext=mp3]/bestaudio/best"
+                        "mp3"  -> "bestaudio[ext=mp3]/bestaudio/best"
                         "flac" -> "bestaudio[ext=flac]/bestaudio/best"
-                        "ogg" -> "bestaudio[ext=ogg]/bestaudio/best"
-                        else -> "bestaudio[ext=$ext]/bestaudio/best"
+                        "ogg"  -> "bestaudio[ext=ogg]/bestaudio/best"
+                        else   -> "bestaudio[ext=$ext]/bestaudio/best"
                     }
                 } else {
-                    "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best"
+                    // Build video format selector from user preferences, mirroring what
+                    // individual-video downloads do in createDownloadRequest().
+                    val videoExt = ext.lowercase()
+                    val codecFilter = if (!prefCodec.equals("any", ignoreCase = true)) "[$prefCodec]" else ""
+                    val heightFilter = when {
+                        prefQuality.equals("best", ignoreCase = true) -> ""
+                        prefQuality.contains("p", ignoreCase = true)  ->
+                            "[height<=${prefQuality.replace("p", "", ignoreCase = true).trim()}]"
+                        else -> ""
+                    }
+                    if (prefQuality.equals("best", ignoreCase = true)) {
+                        "bestvideo[ext=$videoExt]$codecFilter+bestaudio[ext=$preferredAudio]" +
+                        "/bestvideo[ext=$videoExt]+bestaudio" +
+                        "/bestvideo+bestaudio/best"
+                    } else {
+                        "bestvideo[ext=$videoExt]$heightFilter$codecFilter+bestaudio[ext=$preferredAudio]" +
+                        "/bestvideo$heightFilter$codecFilter+bestaudio" +
+                        "/bestvideo[ext=$videoExt]+bestaudio" +
+                        "/bestvideo+bestaudio/best"
+                    }
                 }
 
-                val resLabel = if (isAudio) "Audio (${ext.uppercase()})" else "Video (Best)"
+                val resLabel = if (isAudio) "Audio (${ext.uppercase()})" else
+                    if (prefQuality.equals("best", ignoreCase = true)) "Video (Best)" else "Video ($prefQuality)"
 
                 selectedItems.forEach { item ->
                     val request = DownloadRequest(
@@ -544,8 +565,11 @@ class AnalyzeViewModel @Inject constructor(
                 } else {
                     current.add(languageCode)
                 }
+                // Auto-activate EMBED_SUBS when the user picks a language and no explicit mode
+                // is set yet. EMBED_SUBS is the preferred default: subtitle tracks are baked into
+                // the video container so there is no need to handle separate .srt files.
                 val newMode = if (current.isNotEmpty() && state.subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY) {
-                    SubtitleDownloadMode.MEDIA_WITH_SUBS
+                    SubtitleDownloadMode.EMBED_SUBS
                 } else if (current.isEmpty() && !state.downloadAllSubtitles && state.subtitleDownloadMode != SubtitleDownloadMode.MEDIA_ONLY) {
                     SubtitleDownloadMode.MEDIA_ONLY
                 } else {
@@ -563,11 +587,11 @@ class AnalyzeViewModel @Inject constructor(
     fun selectAllSubtitles() {
         _uiState.update { state ->
             if (state is AnalyzeUiState.Success) {
-                val allLangs = state.availableSubtitleTracks.map { it.languageCode }.toSet()
+                val allLangs = (state.mediaInfo.manualSubtitles + state.mediaInfo.automaticSubtitles).map { it.languageCode }.toSet()
                 state.copy(
                     selectedSubtitleLanguages = allLangs,
-                    downloadAllSubtitles = true,
-                    subtitleDownloadMode = if (state.subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY) SubtitleDownloadMode.MEDIA_WITH_SUBS else state.subtitleDownloadMode
+                    downloadAllSubtitles = false,
+                    subtitleDownloadMode = if (state.subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY) SubtitleDownloadMode.EMBED_SUBS else state.subtitleDownloadMode
                 )
             } else state
         }
@@ -591,7 +615,7 @@ class AnalyzeViewModel @Inject constructor(
                 state.copy(
                     downloadAllSubtitles = downloadAll,
                     selectedSubtitleLanguages = if (downloadAll) state.availableSubtitleTracks.map { it.languageCode }.toSet() else emptySet(),
-                    subtitleDownloadMode = if (downloadAll && state.subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY) SubtitleDownloadMode.MEDIA_WITH_SUBS else state.subtitleDownloadMode
+                    subtitleDownloadMode = if (downloadAll && state.subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY) SubtitleDownloadMode.EMBED_SUBS else state.subtitleDownloadMode
                 )
             } else state
         }
@@ -689,7 +713,7 @@ class AnalyzeViewModel @Inject constructor(
         selectedAudioQuality: AudioQuality?,
         selectedVideoQuality: VideoQuality?,
         selectedFormat: MediaFormat?,
-        subtitleDownloadMode: SubtitleDownloadMode = SubtitleDownloadMode.MEDIA_ONLY,
+        subtitleDownloadMode: SubtitleDownloadMode = SubtitleDownloadMode.EMBED_SUBS,
         selectedSubtitleLanguages: Set<String> = emptySet(),
         downloadAllSubtitles: Boolean = false,
         includeManualSubtitles: Boolean = true,
@@ -698,9 +722,9 @@ class AnalyzeViewModel @Inject constructor(
         selectedYouTubeAudioLanguage: YouTubeAudioLanguage? = null,
         selectedYouTubeAudioTrack: YouTubeAudioTrack? = null
     ): DownloadRequest {
-        val hasSubSelections = selectedSubtitleLanguages.isNotEmpty() || downloadAllSubtitles
+        val hasSubSelections = selectedSubtitleLanguages.isNotEmpty()
         val effectiveSubMode = if (subtitleDownloadMode == SubtitleDownloadMode.MEDIA_ONLY && hasSubSelections) {
-            SubtitleDownloadMode.MEDIA_WITH_SUBS
+            SubtitleDownloadMode.EMBED_SUBS
         } else {
             subtitleDownloadMode
         }
@@ -708,21 +732,22 @@ class AnalyzeViewModel @Inject constructor(
         val subOptions = SubtitleDownloadOptions(
             mode = effectiveSubMode,
             selectedLanguages = selectedSubtitleLanguages,
-            downloadAllLanguages = downloadAllSubtitles,
-            includeManual = includeManualSubtitles,
-            includeAutoGenerated = includeAutoSubtitles,
+            downloadAllLanguages = false,
+            includeManual = true,
+            includeAutoGenerated = true,
             preferredFormat = preferredSubtitleFormat,
             embedInVideo = effectiveSubMode == SubtitleDownloadMode.EMBED_SUBS
         )
 
         if (effectiveSubMode == SubtitleDownloadMode.SUBS_ONLY) {
+            val subExt = if (preferredSubtitleFormat == SubtitleFormatPreference.BEST) "srt" else preferredSubtitleFormat.format
             return DownloadRequest(
                 id = UUID.randomUUID().toString(),
                 url = mediaInfo.url,
                 title = mediaInfo.title,
                 thumbnailUrl = mediaInfo.thumbnail,
-                formatId = "subtitles",
-                ext = preferredSubtitleFormat.format.ifBlank { "srt" },
+                formatId = "",
+                ext = subExt,
                 resolution = "Subtitles (${preferredSubtitleFormat.displayName})",
                 isAudioOnly = false,
                 destinationUri = null,

@@ -68,17 +68,18 @@ fun StatusGridItem(
         } else {
             BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
         },
+        colors = CardDefaults.cardColors(containerColor = Color.Black),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(1f)
+            .aspectRatio(9f / 16f)
             .combinedClickable(
                 onClick = onItemClick,
                 onLongClick = onItemLongClick
             )
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            // Thumbnail
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            // Thumbnail — ContentScale.Fit preserves original aspect ratio without zooming
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(status.uri)
@@ -90,7 +91,7 @@ fun StatusGridItem(
                     .crossfade(true)
                     .build(),
                 contentDescription = status.displayName,
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
             )
 

@@ -25,8 +25,12 @@ import com.glypdl.android.data.repository.SettingsRepository
 import com.glypdl.android.data.repository.SubtitleRepository
 import com.glypdl.android.service.engine.SubtitleParser
 import com.glypdl.android.util.StorageHelper
+import com.glypdl.android.util.DiagnosticLogger
+import com.glypdl.android.util.LogLevel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -56,9 +60,11 @@ class DownloadManager @Inject constructor(
 
     private val activeJobs = ConcurrentHashMap<String, Job>()
     private val requestMap = ConcurrentHashMap<String, DownloadRequest>()
+    private val queueMutex = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     suspend fun enqueueDownload(request: DownloadRequest) {
+        DiagnosticLogger.log("DownloadManager", "Enqueued task: ${request.title} (ID: ${request.id}, mode: ${request.subtitleOptions.mode})", LogLevel.INFO)
         requestMap[request.id] = request
         val subtitleJson = serializeSubtitleOptions(request.subtitleOptions)
         val entity = DownloadEntity(
@@ -88,316 +94,460 @@ class DownloadManager @Inject constructor(
     }
 
     suspend fun processQueue() {
-        val isWifiOnly = settingsRepository.wifiOnly.first()
-        if (isWifiOnly && !networkMonitor.isWifi.value) {
-            // User requested downloads to proceed strictly over unmetered Wi-Fi
-            return
-        }
+        queueMutex.withLock {
+            val isWifiOnly = settingsRepository.wifiOnly.first()
+            if (isWifiOnly && !networkMonitor.isWifi.value) {
+                // User requested downloads to proceed strictly over unmetered Wi-Fi
+                return
+            }
 
-        val concurrentLimit = settingsRepository.concurrentDownloads.first().coerceIn(1, 10)
-        val inFlightCount = activeJobs.size
-        
-        if (inFlightCount < concurrentLimit) {
-            val queuedDownloads = downloadRepository.getDownloadsByStatus(DownloadStatus.QUEUED).first()
-            val slotsAvailable = (concurrentLimit - inFlightCount).coerceAtLeast(0)
-            
-            queuedDownloads.take(slotsAvailable).forEach { entity ->
-                startDownload(entity)
+            val concurrentLimit = settingsRepository.concurrentDownloads.first().coerceIn(1, 10)
+            val inFlightCount = activeJobs.size
+
+            if (inFlightCount < concurrentLimit) {
+                val queuedDownloads = try {
+                    downloadRepository.getQueuedDownloadsFifo().first()
+                } catch (_: Exception) {
+                    try {
+                        downloadRepository.getDownloadsByStatus(DownloadStatus.QUEUED).first()
+                    } catch (_: Exception) {
+                        emptyList()
+                    }
+                }
+                val slotsAvailable = (concurrentLimit - inFlightCount).coerceAtLeast(0)
+
+                // IMPORTANT: Filter out items that are already active in activeJobs before taking slotsAvailable.
+                // This prevents active tasks from starving queued tasks of slots.
+                val eligible = queuedDownloads.filter { !activeJobs.containsKey(it.id) }
+                eligible.take(slotsAvailable).forEach { entity ->
+                    startDownload(entity)
+                }
             }
         }
     }
 
     private fun startDownload(entity: DownloadEntity) {
         if (activeJobs.containsKey(entity.id)) return
-        
+        DiagnosticLogger.log("DownloadManager", "Starting download: ${entity.title} (${entity.id})", LogLevel.INFO)
+
         val job = scope.launch {
-            downloadRepository.updateStatus(entity.id, DownloadStatus.PREPARING)
-            downloadRepository.updateStatus(entity.id, DownloadStatus.DOWNLOADING)
-            downloadNotificationManager.onDownloadStarted(entity.id, entity.title)
-            
-            val inMemoryRequest = requestMap[entity.id]
-            val subOptions = inMemoryRequest?.subtitleOptions ?: deserializeSubtitleOptions(entity.subtitleOptionsJson)
-            val request = inMemoryRequest ?: DownloadRequest(
-                id = entity.id,
-                url = entity.url,
-                title = entity.title,
-                thumbnailUrl = entity.thumbnailUrl,
-                formatId = entity.formatId,
-                ext = entity.ext,
-                resolution = entity.resolution,
-                isAudioOnly = entity.isAudioOnly,
-                destinationUri = entity.filePath,
-                subtitleOptions = subOptions
-            )
-            
-            val stagingDir = com.glypdl.android.util.StorageHelper.getDefaultStagingDir(context)
-            var lastDbUpdateTime = 0L
+            try {
+                downloadRepository.updateStatus(entity.id, DownloadStatus.PREPARING)
+                downloadRepository.updateStatus(entity.id, DownloadStatus.DOWNLOADING)
+                downloadNotificationManager.onDownloadStarted(entity.id, entity.title)
 
-            var statusSetToProcessing = false
-            val result = ytDlpService.download(request, stagingDir.absolutePath) { progress, downloaded, total, speed, eta ->
-                val isMerging = speed.contains("Merging", ignoreCase = true)
-                if (isMerging && !statusSetToProcessing) {
-                    statusSetToProcessing = true
-                    launch {
-                        downloadRepository.updateStatus(entity.id, DownloadStatus.PROCESSING)
-                    }
-                }
-
-                val currentProgress = DownloadProgress(
-                    downloadId = entity.id,
-                    percent = progress,
-                    downloadedBytes = downloaded,
-                    totalBytes = total,
-                    speed = speed,
-                    eta = eta,
-                    title = entity.title
+                val inMemoryRequest = requestMap[entity.id]
+                val subOptions = inMemoryRequest?.subtitleOptions ?: deserializeSubtitleOptions(entity.subtitleOptionsJson)
+                val request = inMemoryRequest ?: DownloadRequest(
+                    id = entity.id,
+                    url = entity.url,
+                    title = entity.title,
+                    thumbnailUrl = entity.thumbnailUrl,
+                    formatId = entity.formatId,
+                    ext = entity.ext,
+                    resolution = entity.resolution,
+                    isAudioOnly = entity.isAudioOnly,
+                    destinationUri = entity.filePath,
+                    subtitleOptions = subOptions
                 )
-                _downloadProgress.value = _downloadProgress.value.toMutableMap().apply {
-                    put(entity.id, currentProgress)
-                }
-                downloadNotificationManager.onDownloadProgress(entity.id, entity.title, progress, speed, eta)
-                
-                // Throttle Room DB updates to at most once every 1.5 seconds
-                val now = System.currentTimeMillis()
-                if (now - lastDbUpdateTime > 1500L) {
-                    lastDbUpdateTime = now
-                    launch {
-                        downloadRepository.updateProgress(entity.id, progress, downloaded, total, speed)
+
+                val stagingDir = com.glypdl.android.util.StorageHelper.getDefaultStagingDir(context)
+                var lastDbUpdateTime = 0L
+
+                var statusSetToProcessing = false
+                val result = ytDlpService.download(request, stagingDir.absolutePath) { progress, downloaded, total, speed, eta ->
+                    val isMerging = speed.contains("Merging", ignoreCase = true)
+                    if (isMerging && !statusSetToProcessing) {
+                        statusSetToProcessing = true
+                        launch {
+                            downloadRepository.updateStatus(entity.id, DownloadStatus.PROCESSING)
+                        }
+                    }
+
+                    val currentProgress = DownloadProgress(
+                        downloadId = entity.id,
+                        percent = progress,
+                        downloadedBytes = downloaded,
+                        totalBytes = total,
+                        speed = speed,
+                        eta = eta,
+                        title = entity.title
+                    )
+                    _downloadProgress.value = _downloadProgress.value.toMutableMap().apply {
+                        put(entity.id, currentProgress)
+                    }
+                    downloadNotificationManager.onDownloadProgress(entity.id, entity.title, progress, speed, eta)
+
+                    // Throttle Room DB updates to at most once every 1.5 seconds
+                    val now = System.currentTimeMillis()
+                    if (now - lastDbUpdateTime > 1500L) {
+                        lastDbUpdateTime = now
+                        launch {
+                            downloadRepository.updateProgress(entity.id, progress, downloaded, total, speed)
+                        }
                     }
                 }
-            }
 
-            result.onSuccess { path ->
-                val file = File(path)
-                if (!file.exists() || file.length() <= 0L) {
-                    val errorMsg = "Download completed but output file was not created or is empty (0 B)."
-                    downloadRepository.updateDownload(
-                        entity.copy(
-                            status = DownloadStatus.FAILED,
-                            errorMessage = errorMsg,
-                            technicalLog = "Output file: $path does not exist or has 0 bytes.",
-                            updatedAt = System.currentTimeMillis()
+                result.onSuccess { path ->
+                    DiagnosticLogger.log("DownloadManager", "Media processing complete: $path", LogLevel.INFO)
+                    val file = File(path)
+                    if (!file.exists() || file.length() <= 0L) {
+                        val errorMsg = "Download completed but output file was not created or is empty (0 B)."
+                        downloadRepository.updateDownload(
+                            entity.copy(
+                                status = DownloadStatus.FAILED,
+                                errorMessage = errorMsg,
+                                technicalLog = "Output file: $path does not exist or has 0 bytes.",
+                                updatedAt = System.currentTimeMillis()
+                            )
                         )
-                    )
-                    downloadNotificationManager.onDownloadFailed(entity.id, entity.title, errorMsg)
-                } else {
-                    val fileLength = file.length()
-                    val actualExt = file.extension.ifBlank { entity.ext }
-                    val customTreeUri = settingsRepository.downloadDirUri.first()
-                    val subtitleExtensions = setOf("srt", "vtt", "ass", "ssa", "lrc", "ttml", "sbv", "sub")
-
-                    if (request.subtitleOptions.isSubtitlesOnly) {
-                        val displayName = file.name
-                        val mimeType = StorageHelper.getMimeType(actualExt)
-                        val exportResult = StorageHelper.exportToPermanentStorage(
-                            context = context,
-                            stagingFile = file,
-                            displayName = displayName,
-                            mimeType = mimeType,
-                            isAudio = false,
-                            customTreeUriString = customTreeUri
-                        )
-                        exportResult.onSuccess { permanentUri ->
-                            val finalUriString = permanentUri.toString()
-                            downloadRepository.updateDownload(
-                                entity.copy(
-                                    status = DownloadStatus.COMPLETED,
-                                    filePath = finalUriString,
-                                    downloadedBytes = fileLength,
-                                    totalBytes = fileLength,
-                                    progress = 100f,
-                                    ext = actualExt,
-                                    errorMessage = null,
-                                    updatedAt = System.currentTimeMillis()
-                                )
-                            )
-                            val history = HistoryEntity(
-                                id = 0,
-                                downloadId = entity.id,
-                                url = entity.url,
-                                title = entity.title,
-                                thumbnailUrl = entity.thumbnailUrl,
-                                format = "Subtitle (${actualExt.uppercase()})",
-                                filePath = finalUriString,
-                                fileUri = finalUriString,
-                                fileSize = fileLength,
-                                duration = 0L,
-                                completedAt = System.currentTimeMillis()
-                            )
-                            historyRepository.insertHistory(history)
-
-                            val nameWithoutExt = file.nameWithoutExtension
-                            val langCode = nameWithoutExt.substringAfterLast('.', "und")
-                            val subModel = SubtitleFile(
-                                id = 0,
-                                downloadId = entity.id,
-                                mediaTitle = entity.title,
-                                mediaUrl = entity.url,
-                                languageCode = langCode,
-                                languageName = SubtitleParser.resolveLanguageName(langCode),
-                                format = actualExt,
-                                isAutoGenerated = request.subtitleOptions.includeAutoGenerated && !request.subtitleOptions.includeManual,
-                                contentUri = finalUriString,
-                                filePath = null,
-                                fileName = displayName,
-                                fileSize = fileLength,
-                                createdAt = System.currentTimeMillis(),
-                                isEmbedded = false
-                            )
-                            subtitleRepository.insertSubtitle(subModel)
-                            downloadNotificationManager.onDownloadCompleted(entity.id, entity.title, finalUriString)
-                        }.onFailure { exportError ->
-                            val errorMsg = "Unable to save subtitle to device storage: ${exportError.message ?: "Unknown storage error"}"
-                            downloadRepository.updateDownload(
-                                entity.copy(
-                                    status = DownloadStatus.FAILED,
-                                    errorMessage = errorMsg,
-                                    technicalLog = exportError.stackTraceToString(),
-                                    updatedAt = System.currentTimeMillis()
-                                )
-                            )
-                            downloadNotificationManager.onDownloadFailed(entity.id, entity.title, errorMsg)
-                        }
+                        downloadNotificationManager.onDownloadFailed(entity.id, entity.title, errorMsg)
                     } else {
-                        val mimeType = StorageHelper.getMimeType(actualExt, entity.isAudioOnly)
-                        val displayName = file.name
+                        val fileLength = file.length()
+                        val actualExt = file.extension.ifBlank { entity.ext }
+                        val customTreeUri = settingsRepository.downloadDirUri.first()
+                        val subtitleExtensions = setOf("srt", "vtt", "ass", "ssa", "lrc", "ttml", "sbv", "sub")
 
-                        val exportResult = StorageHelper.exportToPermanentStorage(
-                            context = context,
-                            stagingFile = file,
-                            displayName = displayName,
-                            mimeType = mimeType,
-                            isAudio = entity.isAudioOnly,
-                            customTreeUriString = customTreeUri
-                        )
+                        if (request.subtitleOptions.isSubtitlesOnly) {
+                            // Collect ALL subtitle files from the staging directory (not just the one
+                            // returned by yt-dlp as the "primary" output). yt-dlp writes one file per
+                            // language, e.g. title_id.en.srt, title_id.es.srt, title_id.ta.srt.
+                            val allSubFiles = stagingDir.listFiles()?.filter { f ->
+                                f.isFile && f.length() > 0 &&
+                                f.extension.lowercase() in subtitleExtensions &&
+                                (f.lastModified() == 0L || (System.currentTimeMillis() - f.lastModified() < 1_800_000L))
+                            }?.sortedByDescending { it.lastModified() } ?: listOf(file)
 
-                        exportResult.onSuccess { permanentUri ->
-                            val finalUriString = permanentUri.toString()
-                            downloadRepository.updateDownload(
-                                entity.copy(
-                                    status = DownloadStatus.COMPLETED,
+                            // The primary file (returned by yt-dlp) is used for the download record
+                            val primaryFile = allSubFiles.firstOrNull() ?: file
+                            val primaryExt = primaryFile.extension.ifBlank { actualExt }
+                            val primaryMime = StorageHelper.getMimeType(primaryExt)
+                            val primarySize = primaryFile.length().takeIf { it > 0L } ?: fileLength
+
+                            val primaryExport = StorageHelper.exportToPermanentStorage(
+                                context = context,
+                                stagingFile = primaryFile,
+                                displayName = primaryFile.name,
+                                mimeType = primaryMime,
+                                isAudio = false,
+                                customTreeUriString = customTreeUri,
+                                overrideCategory = StorageHelper.MediaCategory.SUBTITLES
+                            )
+                            primaryExport.onSuccess { permanentUri ->
+                                val finalUriString = permanentUri.toString()
+                                DiagnosticLogger.log("DownloadManager", "Subtitle exported to storage: ${primaryFile.name} ($finalUriString)", LogLevel.INFO)
+                                downloadRepository.updateDownload(
+                                    entity.copy(
+                                        status = DownloadStatus.COMPLETED,
+                                        filePath = finalUriString,
+                                        downloadedBytes = primarySize,
+                                        totalBytes = primarySize,
+                                        progress = 100f,
+                                        ext = primaryExt,
+                                        errorMessage = null,
+                                        updatedAt = System.currentTimeMillis()
+                                    )
+                                )
+                                val history = HistoryEntity(
+                                    id = 0,
+                                    downloadId = entity.id,
+                                    url = entity.url,
+                                    title = entity.title,
+                                    thumbnailUrl = entity.thumbnailUrl,
+                                    format = "Subtitle (${primaryExt.uppercase()})",
                                     filePath = finalUriString,
-                                    downloadedBytes = fileLength,
-                                    totalBytes = fileLength,
-                                    progress = 100f,
-                                    ext = actualExt,
-                                    errorMessage = null,
-                                    updatedAt = System.currentTimeMillis()
+                                    fileUri = finalUriString,
+                                    fileSize = primarySize,
+                                    duration = 0L,
+                                    completedAt = System.currentTimeMillis()
                                 )
-                            )
-                            val history = HistoryEntity(
-                                id = 0,
-                                downloadId = entity.id,
-                                url = entity.url,
-                                title = entity.title,
-                                thumbnailUrl = entity.thumbnailUrl,
-                                format = request.resolution ?: request.ext,
-                                filePath = finalUriString,
-                                fileUri = finalUriString,
-                                fileSize = fileLength,
-                                duration = 0L,
-                                completedAt = System.currentTimeMillis()
-                            )
-                            historyRepository.insertHistory(history)
+                                historyRepository.insertHistory(history)
 
-                            // Check and export any downloaded subtitle files in staging directory
-                            val downloadedSubs = stagingDir.listFiles()?.filter { f ->
-                                f.isFile && f.length() > 0 && f.extension.lowercase() in subtitleExtensions &&
-                                (System.currentTimeMillis() - f.lastModified() < 600_000)
-                            } ?: emptyList()
-
-                            for (subFile in downloadedSubs) {
-                                val subDisplayName = subFile.name
-                                val subExt = subFile.extension.lowercase()
-                                val subLength = subFile.length()
-                                val subMime = StorageHelper.getMimeType(subExt)
-                                val subExport = StorageHelper.exportToPermanentStorage(
-                                    context = context,
-                                    stagingFile = subFile,
-                                    displayName = subDisplayName,
-                                    mimeType = subMime,
-                                    isAudio = false,
-                                    customTreeUriString = customTreeUri
-                                )
-                                subExport.onSuccess { subUri ->
-                                    val subNameWithoutExt = subFile.nameWithoutExtension
-                                    val subLangCode = subNameWithoutExt.substringAfterLast('.', "und")
-                                    val subModel = SubtitleFile(
+                                val primaryLangCode = primaryFile.nameWithoutExtension.substringAfterLast('.', "und")
+                                subtitleRepository.insertSubtitle(
+                                    SubtitleFile(
                                         id = 0,
                                         downloadId = entity.id,
                                         mediaTitle = entity.title,
                                         mediaUrl = entity.url,
-                                        languageCode = subLangCode,
-                                        languageName = SubtitleParser.resolveLanguageName(subLangCode),
-                                        format = subExt,
-                                        isAutoGenerated = subDisplayName.contains(".auto.", ignoreCase = true),
-                                        contentUri = subUri.toString(),
+                                        languageCode = primaryLangCode,
+                                        languageName = SubtitleParser.resolveLanguageName(primaryLangCode),
+                                        format = primaryExt,
+                                        isAutoGenerated = request.subtitleOptions.includeAutoGenerated && !request.subtitleOptions.includeManual,
+                                        contentUri = finalUriString,
                                         filePath = null,
-                                        fileName = subDisplayName,
-                                        fileSize = subLength,
+                                        fileName = primaryFile.name,
+                                        fileSize = primarySize,
                                         createdAt = System.currentTimeMillis(),
-                                        isEmbedded = request.subtitleOptions.shouldEmbed
+                                        isEmbedded = false
                                     )
-                                    subtitleRepository.insertSubtitle(subModel)
-                                }
-                            }
-
-                            downloadNotificationManager.onDownloadCompleted(entity.id, entity.title, finalUriString)
-                        }.onFailure { exportError ->
-                            val mediaLabel = if (entity.isAudioOnly) "audio" else "video"
-                            val errorMsg = "Unable to save $mediaLabel to device storage: ${exportError.message ?: "Unknown storage error"}"
-                            val technicalDetails = buildString {
-                                appendLine("Storage Export Failure:")
-                                appendLine("Display Name: $displayName")
-                                appendLine("Actual Extension: $actualExt")
-                                appendLine("MIME Type: $mimeType")
-                                appendLine("Is Audio: ${entity.isAudioOnly}")
-                                appendLine("Staging File: ${file.absolutePath} (${file.length()} bytes)")
-                                appendLine("Target Storage: ${customTreeUri ?: "Default Public MediaStore"}")
-                                appendLine("Error: ${exportError.message}")
-                                appendLine(exportError.stackTraceToString())
-                            }
-                            val redactedLog = com.glypdl.android.service.engine.LogRedactor.redact(technicalDetails)
-                            downloadRepository.updateDownload(
-                                entity.copy(
-                                    status = DownloadStatus.FAILED,
-                                    errorMessage = errorMsg,
-                                    technicalLog = redactedLog,
-                                    updatedAt = System.currentTimeMillis()
                                 )
+
+                                // Export every remaining subtitle file (additional languages)
+                                for (extraSubFile in allSubFiles.drop(1)) {
+                                    val extraExt = extraSubFile.extension.lowercase()
+                                    val extraMime = StorageHelper.getMimeType(extraExt)
+                                    val extraSize = extraSubFile.length()
+                                    val extraFileName = extraSubFile.name
+                                    val extraLangCode = extraSubFile.nameWithoutExtension.substringAfterLast('.', "und")
+
+                                    StorageHelper.exportToPermanentStorage(
+                                        context = context,
+                                        stagingFile = extraSubFile,
+                                        displayName = extraFileName,
+                                        mimeType = extraMime,
+                                        isAudio = false,
+                                        customTreeUriString = customTreeUri,
+                                        overrideCategory = StorageHelper.MediaCategory.SUBTITLES
+                                    ).onSuccess { extraUri ->
+                                        subtitleRepository.insertSubtitle(
+                                            SubtitleFile(
+                                                id = 0,
+                                                downloadId = entity.id,
+                                                mediaTitle = entity.title,
+                                                mediaUrl = entity.url,
+                                                languageCode = extraLangCode,
+                                                languageName = SubtitleParser.resolveLanguageName(extraLangCode),
+                                                format = extraExt,
+                                                isAutoGenerated = extraFileName.contains(".auto.", ignoreCase = true),
+                                                contentUri = extraUri.toString(),
+                                                filePath = null,
+                                                fileName = extraFileName,
+                                                fileSize = extraSize,
+                                                createdAt = System.currentTimeMillis(),
+                                                isEmbedded = false
+                                            )
+                                        )
+                                    }
+                                }
+
+                                downloadNotificationManager.onDownloadCompleted(entity.id, entity.title, finalUriString)
+                            }.onFailure { exportError ->
+                                val errorMsg = "Unable to save subtitle to device storage: ${exportError.message ?: "Unknown storage error"}"
+                                downloadRepository.updateDownload(
+                                    entity.copy(
+                                        status = DownloadStatus.FAILED,
+                                        errorMessage = errorMsg,
+                                        technicalLog = exportError.stackTraceToString(),
+                                        updatedAt = System.currentTimeMillis()
+                                    )
+                                )
+                                downloadNotificationManager.onDownloadFailed(entity.id, entity.title, errorMsg)
+                            }
+                        } else {
+                            val mimeType = StorageHelper.getMimeType(actualExt, entity.isAudioOnly)
+                            val displayName = file.name
+
+                            val exportResult = StorageHelper.exportToPermanentStorage(
+                                context = context,
+                                stagingFile = file,
+                                displayName = displayName,
+                                mimeType = mimeType,
+                                isAudio = entity.isAudioOnly,
+                                customTreeUriString = customTreeUri
                             )
-                            downloadNotificationManager.onDownloadFailed(entity.id, entity.title, errorMsg)
+
+                            exportResult.onSuccess { permanentUri ->
+                                val finalUriString = permanentUri.toString()
+                                DiagnosticLogger.log("DownloadManager", "Exported to storage: $displayName ($finalUriString)", LogLevel.INFO)
+                                downloadRepository.updateDownload(
+                                    entity.copy(
+                                        status = DownloadStatus.COMPLETED,
+                                        filePath = finalUriString,
+                                        downloadedBytes = fileLength,
+                                        totalBytes = fileLength,
+                                        progress = 100f,
+                                        ext = actualExt,
+                                        errorMessage = null,
+                                        updatedAt = System.currentTimeMillis()
+                                    )
+                                )
+                                val history = HistoryEntity(
+                                    id = 0,
+                                    downloadId = entity.id,
+                                    url = entity.url,
+                                    title = entity.title,
+                                    thumbnailUrl = entity.thumbnailUrl,
+                                    format = request.resolution ?: request.ext,
+                                    filePath = finalUriString,
+                                    fileUri = finalUriString,
+                                    fileSize = fileLength,
+                                    duration = 0L,
+                                    completedAt = System.currentTimeMillis()
+                                )
+                                historyRepository.insertHistory(history)
+
+                                // Handle downloaded subtitle files in staging directory.
+                                val downloadedSubs = stagingDir.listFiles()?.filter { f ->
+                                    f.isFile && f.length() > 0 && f.extension.lowercase() in subtitleExtensions &&
+                                    (f.lastModified() == 0L || (System.currentTimeMillis() - f.lastModified() < 1_800_000L))
+                                } ?: emptyList()
+
+                                if (request.subtitleOptions.shouldEmbed) {
+                                    // When subtitles are embedded in the video container, do NOT export
+                                    // separate subtitle files to public storage (the user expects a single
+                                    // combined video file, not separate video + subtitle files).
+                                    // We register each embedded track in Room DB referencing the video's URI.
+                                    if (downloadedSubs.isNotEmpty()) {
+                                        for (subFile in downloadedSubs) {
+                                            val subDisplayName = subFile.name
+                                            val subExt = subFile.extension.lowercase()
+                                            val subNameWithoutExt = subFile.nameWithoutExtension
+                                            val subLangCode = subNameWithoutExt.substringAfterLast('.', "und")
+                                            val subModel = SubtitleFile(
+                                                id = 0,
+                                                downloadId = entity.id,
+                                                mediaTitle = entity.title,
+                                                mediaUrl = entity.url,
+                                                languageCode = subLangCode,
+                                                languageName = SubtitleParser.resolveLanguageName(subLangCode),
+                                                format = subExt,
+                                                isAutoGenerated = subDisplayName.contains(".auto.", ignoreCase = true) || subLangCode.endsWith("-orig"),
+                                                contentUri = finalUriString,
+                                                filePath = null,
+                                                fileName = subDisplayName,
+                                                fileSize = 0L,
+                                                createdAt = System.currentTimeMillis(),
+                                                isEmbedded = true
+                                            )
+                                            subtitleRepository.insertSubtitle(subModel)
+                                            try { subFile.delete() } catch (_: Exception) {}
+                                        }
+                                    } else {
+                                        // yt-dlp embedded the subtitles into the video container and deleted staging files.
+                                        // Register each selected track as an embedded subtitle record in Room DB.
+                                        for (lang in request.subtitleOptions.selectedLanguages) {
+                                            val cleanCode = lang.removePrefix("a-")
+                                            val subModel = SubtitleFile(
+                                                id = 0,
+                                                downloadId = entity.id,
+                                                mediaTitle = entity.title,
+                                                mediaUrl = entity.url,
+                                                languageCode = cleanCode,
+                                                languageName = SubtitleParser.resolveLanguageName(cleanCode),
+                                                format = "embedded",
+                                                isAutoGenerated = cleanCode.endsWith("-orig"),
+                                                contentUri = finalUriString,
+                                                filePath = null,
+                                                fileName = "${entity.title}.$cleanCode",
+                                                fileSize = 0L,
+                                                createdAt = System.currentTimeMillis(),
+                                                isEmbedded = true
+                                            )
+                                            subtitleRepository.insertSubtitle(subModel)
+                                        }
+                                    }
+                                } else {
+                                    // Subtitle mode is MEDIA_WITH_SUBS: export subtitles as separate files alongside the video
+                                    for (subFile in downloadedSubs) {
+                                        val subDisplayName = subFile.name
+                                        val subExt = subFile.extension.lowercase()
+                                        val subLength = subFile.length()
+                                        val subMime = StorageHelper.getMimeType(subExt)
+                                        val subExport = StorageHelper.exportToPermanentStorage(
+                                            context = context,
+                                            stagingFile = subFile,
+                                            displayName = subDisplayName,
+                                            mimeType = subMime,
+                                            isAudio = false,
+                                            customTreeUriString = customTreeUri,
+                                            overrideCategory = StorageHelper.MediaCategory.VIDEOS
+                                        )
+                                        subExport.onSuccess { subUri ->
+                                            val subNameWithoutExt = subFile.nameWithoutExtension
+                                            val subLangCode = subNameWithoutExt.substringAfterLast('.', "und")
+                                            val subModel = SubtitleFile(
+                                                id = 0,
+                                                downloadId = entity.id,
+                                                mediaTitle = entity.title,
+                                                mediaUrl = entity.url,
+                                                languageCode = subLangCode,
+                                                languageName = SubtitleParser.resolveLanguageName(subLangCode),
+                                                format = subExt,
+                                                isAutoGenerated = subDisplayName.contains(".auto.", ignoreCase = true),
+                                                contentUri = subUri.toString(),
+                                                filePath = null,
+                                                fileName = subDisplayName,
+                                                fileSize = subLength,
+                                                createdAt = System.currentTimeMillis(),
+                                                isEmbedded = false
+                                            )
+                                            subtitleRepository.insertSubtitle(subModel)
+                                        }
+                                    }
+                                }
+
+                                downloadNotificationManager.onDownloadCompleted(entity.id, entity.title, finalUriString)
+                            }.onFailure { exportError ->
+                                val mediaLabel = if (entity.isAudioOnly) "audio" else "video"
+                                val errorMsg = "Unable to save $mediaLabel to device storage: ${exportError.message ?: "Unknown storage error"}"
+                                val technicalDetails = buildString {
+                                    appendLine("Storage Export Failure:")
+                                    appendLine("Display Name: $displayName")
+                                    appendLine("Actual Extension: $actualExt")
+                                    appendLine("MIME Type: $mimeType")
+                                    appendLine("Is Audio: ${entity.isAudioOnly}")
+                                    appendLine("Staging File: ${file.absolutePath} (${file.length()} bytes)")
+                                    appendLine("Target Storage: ${customTreeUri ?: "Default Public MediaStore"}")
+                                    appendLine("Error: ${exportError.message}")
+                                    appendLine(exportError.stackTraceToString())
+                                }
+                                val redactedLog = com.glypdl.android.service.engine.LogRedactor.redact(technicalDetails)
+                                downloadRepository.updateDownload(
+                                    entity.copy(
+                                        status = DownloadStatus.FAILED,
+                                        errorMessage = errorMsg,
+                                        technicalLog = redactedLog,
+                                        updatedAt = System.currentTimeMillis()
+                                    )
+                                )
+                                downloadNotificationManager.onDownloadFailed(entity.id, entity.title, errorMsg)
+                            }
                         }
                     }
+                }.onFailure { error ->
+                    DiagnosticLogger.logError("DownloadManager", "Task failed: ${entity.title} - ${error.message}", error)
+                    if (error !is CancellationException) {
+                        val userFriendlyMessage = when (error) {
+                            is com.glypdl.android.data.model.GlypdlException -> error.error.userMessage
+                            else -> com.glypdl.android.service.engine.YtDlpErrorParser.parse(error.message).userMessage
+                        }
+                        val technicalLog = when (error) {
+                            is com.glypdl.android.data.model.GlypdlException ->
+                                error.error.technicalDetails ?: com.glypdl.android.service.engine.LogRedactor.redact(error.stackTraceToString())
+                            else -> com.glypdl.android.service.engine.LogRedactor.redact(error.stackTraceToString())
+                        }
+                        downloadRepository.updateDownload(
+                            entity.copy(
+                                status = DownloadStatus.FAILED,
+                                errorMessage = userFriendlyMessage,
+                                technicalLog = technicalLog,
+                                updatedAt = System.currentTimeMillis()
+                            )
+                        )
+                        downloadNotificationManager.onDownloadFailed(entity.id, entity.title, userFriendlyMessage)
+                    }
                 }
-            }.onFailure { error ->
-                if (error !is CancellationException) {
-                    val userFriendlyMessage = when (error) {
-                        is com.glypdl.android.data.model.GlypdlException -> error.error.userMessage
-                        else -> com.glypdl.android.service.engine.YtDlpErrorParser.parse(error.message).userMessage
-                    }
-                    val technicalLog = when (error) {
-                        is com.glypdl.android.data.model.GlypdlException ->
-                            error.error.technicalDetails ?: com.glypdl.android.service.engine.LogRedactor.redact(error.stackTraceToString())
-                        else -> com.glypdl.android.service.engine.LogRedactor.redact(error.stackTraceToString())
-                    }
+            } catch (t: Throwable) {
+                if (t !is CancellationException) {
+                    val userFriendly = com.glypdl.android.service.engine.YtDlpErrorParser.parse(t.message).userMessage
                     downloadRepository.updateDownload(
                         entity.copy(
                             status = DownloadStatus.FAILED,
-                            errorMessage = userFriendlyMessage,
-                            technicalLog = technicalLog,
+                            errorMessage = userFriendly,
+                            technicalLog = t.stackTraceToString(),
                             updatedAt = System.currentTimeMillis()
                         )
                     )
-                    downloadNotificationManager.onDownloadFailed(entity.id, entity.title, userFriendlyMessage)
+                    downloadNotificationManager.onDownloadFailed(entity.id, entity.title, userFriendly)
                 }
+            } finally {
+                _downloadProgress.value = _downloadProgress.value.toMutableMap().apply { remove(entity.id) }
+                activeJobs.remove(entity.id)
+                processQueue()
             }
-            
-            _downloadProgress.value = _downloadProgress.value.toMutableMap().apply { remove(entity.id) }
-            activeJobs.remove(entity.id)
-            processQueue()
         }
-        
+
         activeJobs[entity.id] = job
     }
 

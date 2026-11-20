@@ -252,4 +252,20 @@ class SettingsViewModel @Inject constructor(
     fun setEmbedSubtitlesDefault(embed: Boolean) {
         viewModelScope.launch { settingsRepository.setEmbedSubtitlesDefault(embed) }
     }
+
+    val diagnosticLogs: StateFlow<List<com.glypdl.android.util.LogEntry>> = com.glypdl.android.util.DiagnosticLogger.logs
+
+    fun getFormattedLogs(): String = com.glypdl.android.util.DiagnosticLogger.getFormattedLogs()
+
+    fun clearDiagnosticLogs() {
+        com.glypdl.android.util.DiagnosticLogger.clear()
+    }
+
+    fun exportDiagnosticLogs(context: android.content.Context): java.io.File {
+        return com.glypdl.android.util.DiagnosticLogger.exportLogsToFile(context)
+    }
+
+    fun createShareLogsIntent(context: android.content.Context): android.content.Intent? {
+        return com.glypdl.android.util.DiagnosticLogger.createShareIntent(context)
+    }
 }

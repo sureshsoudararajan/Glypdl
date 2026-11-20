@@ -220,31 +220,18 @@ fun SubtitleSelectionCard(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Toggles: Include manual, include auto, download all
+                        // 3. Subtitles Header with All and None buttons
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                if (manualSubtitles.isNotEmpty()) {
-                                    FilterChip(
-                                        selected = includeManual,
-                                        onClick = { onIncludeManualChanged(!includeManual) },
-                                        label = { Text("Manual (${manualSubtitles.size})") }
-                                    )
-                                }
-                                if (automaticSubtitles.isNotEmpty()) {
-                                    FilterChip(
-                                        selected = includeAuto,
-                                        onClick = { onIncludeAutoChanged(!includeAuto) },
-                                        label = { Text("Auto (${automaticSubtitles.size})") }
-                                    )
-                                }
-                            }
+                            Text(
+                                text = "Available Subtitles ($totalSubs)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
 
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 TextButton(onClick = onSelectAll) {
@@ -256,43 +243,41 @@ fun SubtitleSelectionCard(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                        // 3. Track List
-                        // Manual Subtitles Group
-                        if (includeManual && manualSubtitles.isNotEmpty()) {
+                        // 4. Track List - Always shown by default! No hidden place!
+                        if (manualSubtitles.isNotEmpty()) {
                             Text(
                                 text = "Manual Subtitles (${manualSubtitles.size})",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.padding(vertical = 6.dp)
+                                modifier = Modifier.padding(vertical = 4.dp)
                             )
 
                             manualSubtitles.forEach { track ->
                                 SubtitleTrackRow(
                                     track = track,
-                                    isSelected = downloadAllLanguages || selectedLanguages.contains(track.languageCode),
+                                    isSelected = selectedLanguages.contains(track.languageCode),
                                     onToggle = { onToggleLanguage(track.languageCode) }
                                 )
                             }
                             Spacer(modifier = Modifier.height(8.dp))
                         }
 
-                        // Automatic Captions Group
-                        if (includeAuto && automaticSubtitles.isNotEmpty()) {
+                        if (automaticSubtitles.isNotEmpty()) {
                             Text(
-                                text = "Automatic Captions (${automaticSubtitles.size})",
+                                text = "Original Audio Captions (${automaticSubtitles.size})",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.padding(vertical = 6.dp)
+                                modifier = Modifier.padding(vertical = 4.dp)
                             )
 
                             automaticSubtitles.forEach { track ->
                                 SubtitleTrackRow(
                                     track = track,
-                                    isSelected = downloadAllLanguages || selectedLanguages.contains(track.languageCode),
+                                    isSelected = selectedLanguages.contains(track.languageCode),
                                     onToggle = { onToggleLanguage(track.languageCode) }
                                 )
                             }
@@ -350,15 +335,16 @@ private fun SubtitleTrackRow(
                     )
                 }
                 if (track.type == SubtitleType.AUTOMATIC) {
+                    val isOrig = track.isOriginal || track.languageCode.endsWith("-orig")
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        color = if (isOrig) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.padding(horizontal = 2.dp)
                     ) {
                         Text(
-                            text = "AUTO",
+                            text = if (isOrig) "ORIGINAL ASR" else "TRANSLATED",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            color = if (isOrig) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }

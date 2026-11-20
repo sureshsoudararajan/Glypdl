@@ -20,6 +20,8 @@ import com.glypdl.android.data.model.PlaylistItem
 import com.glypdl.android.data.model.SubtitleFormatPreference
 import com.glypdl.android.data.repository.SettingsRepository
 import com.glypdl.android.util.UrlValidator
+import com.glypdl.android.util.DiagnosticLogger
+import com.glypdl.android.util.LogLevel
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -536,6 +538,7 @@ class YtDlpManager @Inject constructor(
         installed: String?
     ): Result<MediaInfo> {
         try {
+            DiagnosticLogger.log("yt-dlp", "Analyzing URL: $targetUrl", LogLevel.INFO)
             val request = YoutubeDLRequest(targetUrl)
             request.addOption("-J")
             request.addOption("--no-playlist")
@@ -810,13 +813,18 @@ class YtDlpManager @Inject constructor(
             } else {
                 "bestvideo+bestaudio/best"
             }
-            dlRequest.addOption("-f", effectiveFormat)
+            val subOpts = request.subtitleOptions
+            if (!subOpts.isSubtitlesOnly) {
+                dlRequest.addOption("-f", effectiveFormat)
+            }
 
             // Preserve non-ASCII / Unicode titles (Tamil, Hindi, Japanese, emoji)
             dlRequest.addOption("--no-restrict-filenames")
 
             // Mobile-optimized post-processor args (limit thread contention during remux)
-            dlRequest.addOption("--postprocessor-args", "Merger:-threads 4")
+            if (!subOpts.isSubtitlesOnly) {
+                dlRequest.addOption("--postprocessor-args", "Merger:-threads 4")
+            }
 
             // Safe Unicode truncation to <= 80 bytes in UTF-8 to prevent [Errno 36] File name too long
             val safeTitle = com.glypdl.android.util.FileNameSanitizer.safeFsTitle(request.title, 80)
@@ -829,7 +837,7 @@ class YtDlpManager @Inject constructor(
             val outputPath = File(downloadDir, filenameTemplate).absolutePath
             dlRequest.addOption("-o", outputPath)
 
-            if (!request.isAudioOnly && (effectiveFormat.contains("+") || effectiveFormat.contains("bestvideo"))) {
+            if (!subOpts.isSubtitlesOnly && !request.isAudioOnly && (effectiveFormat.contains("+") || effectiveFormat.contains("bestvideo") || subOpts.shouldEmbed)) {
                 // If container is webm or mp4, provide mkv as automatic fallback container
                 // e.g. "webm/mkv" or "mp4/mkv". yt-dlp checks whether the downloaded audio and video
                 // codecs fit into the preferred container (e.g. WebM strictly forbids AAC audio;
@@ -837,6 +845,10 @@ class YtDlpManager @Inject constructor(
                 // to Matroska (mkv) without failing FFmpeg remuxing.
                 val preferredExt = request.ext.trim().lowercase().removePrefix(".")
                 val mergeFormat = when {
+                    // For embedded subtitles: WebM container cannot embed SRT subtitles and FFmpeg will drop them.
+                    // MKV natively containerizes all video/audio streams (VP9, AV1, Opus) AND all subtitle formats without loss!
+                    subOpts.shouldEmbed && (preferredExt == "webm" || preferredExt == "mkv") -> "mkv"
+                    subOpts.shouldEmbed && preferredExt == "mp4" -> "mp4/mkv"
                     preferredExt.isBlank() || preferredExt == "mp4" -> "mp4/mkv"
                     preferredExt == "webm" -> "webm/mkv"
                     preferredExt == "mkv" -> "mkv"
@@ -845,33 +857,60 @@ class YtDlpManager @Inject constructor(
                 dlRequest.addOption("--merge-output-format", mergeFormat)
             }
 
-            val subOpts = request.subtitleOptions
-            if (subOpts.isEnabled) {
+            if (subOpts.isEnabled && (subOpts.selectedLanguages.isNotEmpty() || subOpts.downloadAllLanguages)) {
                 // Ensure individual subtitle download/rate-limiting errors (e.g. YouTube HTTP 429 on timedtext)
-                // do not abort the media download when downloading media + subtitles.
-                if (!subOpts.isSubtitlesOnly) {
-                    dlRequest.addOption("--ignore-errors")
-                } else {
-                    dlRequest.addOption("--no-abort-on-error")
+                // do not abort the media download or subtitle download.
+                dlRequest.addOption("--ignore-errors")
+
+                // Always enable both --write-subs and --write-auto-subs so yt-dlp retrieves all requested
+                // languages regardless of whether a track is an author-uploaded manual subtitle or
+                // an auto-generated / translated ASR caption (e.g. Tamil ta-orig or English en).
+                dlRequest.addOption("--write-subs")
+                dlRequest.addOption("--write-auto-subs")
+
+                // Add delay between subtitle requests to avoid triggering YouTube's timedtext 429 rate limit
+                dlRequest.addOption("--sleep-subtitles", "2")
+
+                val origBases = subOpts.selectedLanguages
+                    .filter { it.endsWith("-orig") }
+                    .map { it.removeSuffix("-orig").removePrefix("a-") }
+                    .toSet()
+
+                val cleanedCodes = linkedSetOf<String>()
+                subOpts.selectedLanguages.forEach { lang ->
+                    if (lang.endsWith("-orig")) {
+                        cleanedCodes.add(lang)
+                    } else {
+                        val base = lang.removePrefix("a-")
+                        // Only add if we don't already have the -orig version
+                        if (!origBases.contains(base)) {
+                            cleanedCodes.add(base)
+                        }
+                    }
                 }
 
-                if (subOpts.includeManual) {
-                    dlRequest.addOption("--write-subs")
-                }
-                if (subOpts.includeAutoGenerated) {
-                    dlRequest.addOption("--write-auto-subs")
-                }
-                val langParam = if (subOpts.downloadAllLanguages) {
-                    "all"
+                val langParam = if (cleanedCodes.isNotEmpty()) {
+                    cleanedCodes.joinToString(",")
                 } else if (subOpts.selectedLanguages.isNotEmpty()) {
                     subOpts.selectedLanguages.joinToString(",")
                 } else {
-                    "all"
+                    ""
                 }
-                dlRequest.addOption("--sub-langs", langParam)
+
+                // Explicit clean language codes only: NEVER pass "all" to prevent looping 140+ languages!
+                if (langParam.isNotBlank()) {
+                    dlRequest.addOption("--sub-langs", langParam)
+                }
 
                 if (subOpts.preferredFormat != SubtitleFormatPreference.BEST) {
                     dlRequest.addOption("--convert-subs", subOpts.preferredFormat.format)
+                } else if (subOpts.shouldEmbed) {
+                    val preferredExt = request.ext.trim().lowercase().removePrefix(".")
+                    // MP4 container uses mov_text which requires SRT input.
+                    // For MKV, do NOT force SRT conversion because MKV natively supports WebVTT, SRT, and ASS without conversion loss!
+                    if (preferredExt == "mp4") {
+                        dlRequest.addOption("--convert-subs", "srt")
+                    }
                 }
 
                 if (subOpts.shouldEmbed && !subOpts.isSubtitlesOnly && !request.isAudioOnly) {
@@ -886,8 +925,10 @@ class YtDlpManager @Inject constructor(
             val SUBTITLE_EXTS = setOf("srt", "vtt", "ass", "ssa", "lrc", "ttml", "sbv", "sub", "smi", "dfxp")
             var finalOutputFile = ""
             var detectedMediaId: String? = null
+            val recordedSubFiles = mutableListOf<String>()
 
             val lineProcessor: (Float, Long, String) -> Unit = { progress, etaInSeconds, line ->
+                DiagnosticLogger.logStdout("yt-dlp", line)
                 val parsed = parseProgressLine(line, progress, etaInSeconds)
                 val isMerging = line.contains("[Merger]") || parsed.speed.contains("Merging", ignoreCase = true)
                 val effectiveSpeed = if (isMerging) "Merging media..." else parsed.speed
@@ -911,10 +952,25 @@ class YtDlpManager @Inject constructor(
                     if (dest.isNotBlank()) {
                         finalOutputFile = dest
                     }
+                } else if (trimmed.contains("[SubtitlesConvertor] Destination:")) {
+                    val dest = trimmed.substringAfter("[SubtitlesConvertor] Destination:").trim().trim('"', '\'')
+                    if (dest.isNotBlank()) {
+                        recordedSubFiles.add(dest)
+                        finalOutputFile = dest
+                    }
+                } else if (trimmed.contains("Writing video subtitles to:")) {
+                    val dest = trimmed.substringAfter("Writing video subtitles to:").trim().trim('"', '\'')
+                    if (dest.isNotBlank()) {
+                        recordedSubFiles.add(dest)
+                        finalOutputFile = dest
+                    }
                 } else if (trimmed.contains("Destination:")) {
                     val dest = trimmed.substringAfter("Destination:").trim().trim('"', '\'')
                     if (dest.isNotBlank()) {
                         val ext = dest.substringAfterLast('.', "").lowercase()
+                        if (ext in SUBTITLE_EXTS) {
+                            recordedSubFiles.add(dest)
+                        }
                         if (subOpts.isSubtitlesOnly || ext !in SUBTITLE_EXTS) {
                             finalOutputFile = dest
                         }
@@ -923,6 +979,9 @@ class YtDlpManager @Inject constructor(
                     val dest = trimmed.substringBefore("has already been").removePrefix("[download]").trim().trim('"', '\'')
                     if (dest.isNotBlank()) {
                         val ext = dest.substringAfterLast('.', "").lowercase()
+                        if (ext in SUBTITLE_EXTS) {
+                            recordedSubFiles.add(dest)
+                        }
                         if (subOpts.isSubtitlesOnly || ext !in SUBTITLE_EXTS) {
                             finalOutputFile = dest
                         }
@@ -931,10 +990,13 @@ class YtDlpManager @Inject constructor(
             }
 
             try {
+                val cmdLine = try { dlRequest.buildCommand().joinToString(" ") } catch (_: Exception) { targetUrl }
+                DiagnosticLogger.logCmd("yt-dlp $cmdLine")
                 YoutubeDL.getInstance().execute(dlRequest, request.id) { progress, etaInSeconds, line ->
                     lineProcessor(progress, etaInSeconds, line)
                 }
             } catch (e: Exception) {
+                DiagnosticLogger.logError("yt-dlp", "Execution failed: ${e.message}", e)
                 val errorMsg = e.message ?: ""
                 val isPostProcessingFailure = errorMsg.contains("Conversion failed", ignoreCase = true) ||
                         errorMsg.contains("postprocessing", ignoreCase = true) ||
@@ -968,6 +1030,9 @@ class YtDlpManager @Inject constructor(
                                     addOption("-o", outputPath)
                                     // Matroska (.mkv) can containerize any codec combination (e.g. VP9 + AAC)
                                     addOption("--merge-output-format", "mkv")
+                                    if (subOpts.shouldEmbed && !subOpts.isSubtitlesOnly && !request.isAudioOnly) {
+                                        addOption("--embed-subs")
+                                    }
                                 }
                                 YoutubeDL.getInstance().execute(retryRequest, request.id) { progress, etaInSeconds, line ->
                                     lineProcessor(progress, etaInSeconds, line)
@@ -982,6 +1047,45 @@ class YtDlpManager @Inject constructor(
                     }
                 }
 
+                // If this is SUBS_ONLY and an error (like HTTP 429 on an extra translation track) occurred,
+                // but one or more subtitle files were already successfully written to stagingDir,
+                // recover and treat the download as a success with the downloaded subtitle(s)!
+                if (!recovered && subOpts.isSubtitlesOnly) {
+                    val dir = File(downloadDir)
+                    if (dir.exists() && dir.isDirectory) {
+                        val existingRecordedSub = recordedSubFiles.reversed().firstOrNull { File(it).exists() && File(it).length() > 0 }
+                        if (existingRecordedSub != null) {
+                            finalOutputFile = existingRecordedSub
+                            recovered = true
+                            DiagnosticLogger.log(
+                                "yt-dlp",
+                                "Recovered from partial subtitle failure using recorded subtitle: ${File(existingRecordedSub).name}",
+                                LogLevel.WARN
+                            )
+                        } else {
+                            val downloadedSubs = dir.listFiles()?.filter { f ->
+                                f.isFile && f.length() > 0 &&
+                                !f.name.endsWith(".part") && !f.name.endsWith(".temp") && !f.name.endsWith(".ytdl") &&
+                                f.extension.lowercase() in SUBTITLE_EXTS &&
+                                (f.lastModified() == 0L || (System.currentTimeMillis() - f.lastModified() < 1_800_000L))
+                            } ?: emptyList()
+
+                            if (downloadedSubs.isNotEmpty()) {
+                                val candidate = downloadedSubs.maxByOrNull { it.lastModified() }
+                                if (candidate != null) {
+                                    finalOutputFile = candidate.absolutePath
+                                    recovered = true
+                                    DiagnosticLogger.log(
+                                        "yt-dlp",
+                                        "Recovered from partial subtitle failure (e.g. HTTP 429 on extra track). Using ${downloadedSubs.size} downloaded subtitle(s): ${candidate.name}",
+                                        LogLevel.WARN
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (!recovered) {
                     e.printStackTrace()
                     val parsedError = YtDlpErrorParser.parse(e.message, installed)
@@ -991,17 +1095,25 @@ class YtDlpManager @Inject constructor(
 
             finalOutputFile = finalOutputFile.trim('"', '\'')
 
+            // Prefer any successfully recorded subtitle file if finalOutputFile does not exist
+            if (subOpts.isSubtitlesOnly && (!File(finalOutputFile).exists() || File(finalOutputFile).length() <= 0)) {
+                val existingRecorded = recordedSubFiles.reversed().firstOrNull { File(it).exists() && File(it).length() > 0 }
+                if (existingRecorded != null) {
+                    finalOutputFile = existingRecorded
+                }
+            }
+
             // If path is missing, unexpanded template, or non-existent, find the output file in downloadDir
             if (finalOutputFile.isBlank() || finalOutputFile.contains("%(") || !File(finalOutputFile).exists() || (!subOpts.isSubtitlesOnly && File(finalOutputFile).extension.lowercase() in SUBTITLE_EXTS)) {
                 val dir = File(downloadDir)
                 if (dir.exists() && dir.isDirectory) {
                     val candidate = if (subOpts.isSubtitlesOnly) {
                         dir.listFiles()
-                            ?.filter { it.isFile && it.length() > 0 && !it.name.endsWith(".part") && !it.name.endsWith(".temp") && !it.name.endsWith(".ytdl") && it.extension.lowercase() in SUBTITLE_EXTS && (System.currentTimeMillis() - it.lastModified() < 600_000) }
+                            ?.filter { it.isFile && it.length() > 0 && !it.name.endsWith(".part") && !it.name.endsWith(".temp") && !it.name.endsWith(".ytdl") && it.extension.lowercase() in SUBTITLE_EXTS && (it.lastModified() == 0L || (System.currentTimeMillis() - it.lastModified() < 1_800_000L)) }
                             ?.maxByOrNull { it.lastModified() }
                     } else {
                         dir.listFiles()
-                            ?.filter { it.isFile && it.length() > 0 && !it.name.endsWith(".part") && !it.name.endsWith(".temp") && !it.name.endsWith(".ytdl") && !Regex("""\.f\w+\.[a-zA-Z0-9]+$""").containsMatchIn(it.name) && it.extension.lowercase() !in SUBTITLE_EXTS && (System.currentTimeMillis() - it.lastModified() < 600_000) }
+                            ?.filter { it.isFile && it.length() > 0 && !it.name.endsWith(".part") && !it.name.endsWith(".temp") && !it.name.endsWith(".ytdl") && !Regex("""\.f\w+\.[a-zA-Z0-9]+$""").containsMatchIn(it.name) && it.extension.lowercase() !in SUBTITLE_EXTS && (it.lastModified() == 0L || (System.currentTimeMillis() - it.lastModified() < 1_800_000L)) }
                             ?.maxByOrNull { it.lastModified() }
                     }
                     if (candidate != null) {
@@ -1010,8 +1122,22 @@ class YtDlpManager @Inject constructor(
                 }
             }
 
-            if (finalOutputFile.isBlank()) {
-                finalOutputFile = outputPath
+            if (finalOutputFile.isBlank() || (subOpts.isSubtitlesOnly && (finalOutputFile.contains("%(") || !File(finalOutputFile).exists()))) {
+                if (subOpts.isSubtitlesOnly) {
+                    val dir = File(downloadDir)
+                    val anySub = dir.listFiles()?.firstOrNull { it.isFile && it.length() > 0 && it.extension.lowercase() in SUBTITLE_EXTS && (it.lastModified() == 0L || (System.currentTimeMillis() - it.lastModified() < 1_800_000L)) }
+                    if (anySub != null) {
+                        finalOutputFile = anySub.absolutePath
+                    } else {
+                        val errMsg = "No subtitle files were created. YouTube's auto-translation server often blocks or rate-limits requests for machine-translated captions. Please select the video's original spoken transcript (ASR) or creator manual subtitles."
+                        DiagnosticLogger.logError("yt-dlp", errMsg)
+                        return@withContext Result.failure(
+                            GlypdlException(GlypdlError.UnknownError(userMessage = errMsg))
+                        )
+                    }
+                } else {
+                    finalOutputFile = outputPath
+                }
             }
 
             // CRITICAL VALIDATION: For Instagram Story, verify downloaded story ID matches requested story ID

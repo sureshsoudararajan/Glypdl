@@ -47,6 +47,7 @@ class DownloadManagerTest {
         every { settingsRepository.downloadDirUri } returns flowOf(null)
         every { downloadRepository.getActiveDownloads() } returns flowOf(emptyList())
         every { downloadRepository.getDownloadsByStatus(any()) } returns flowOf(emptyList())
+        every { downloadRepository.getQueuedDownloadsFifo() } returns flowOf(emptyList())
 
         val downloadNotificationManager: DownloadNotificationManager = mockk(relaxed = true)
         val networkMonitor: com.glypdl.android.util.NetworkMonitor = mockk(relaxed = true)
