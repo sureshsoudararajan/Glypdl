@@ -296,6 +296,39 @@ fun SubtitleSelectionCard(
                                     onToggle = { onToggleLanguage(track.languageCode) }
                                 )
                             }
+
+                            val hasSelectedAutoTranslated = automaticSubtitles.any {
+                                (downloadAllLanguages || selectedLanguages.contains(it.languageCode)) &&
+                                !it.isOriginal && !it.languageCode.endsWith("-orig")
+                            }
+
+                            if (hasSelectedAutoTranslated) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 10.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.Top,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = "Note on Auto-Translated Captions: Translated tracks are generated live by YouTube and may be rate-limited or blocked by YouTube's servers. Spoken original transcripts and creator manual subtitles download reliably.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -350,15 +383,16 @@ private fun SubtitleTrackRow(
                     )
                 }
                 if (track.type == SubtitleType.AUTOMATIC) {
+                    val isOrig = track.isOriginal || track.languageCode.endsWith("-orig")
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        color = if (isOrig) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.padding(horizontal = 2.dp)
                     ) {
                         Text(
-                            text = "AUTO",
+                            text = if (isOrig) "ORIGINAL ASR" else "TRANSLATED",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            color = if (isOrig) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }

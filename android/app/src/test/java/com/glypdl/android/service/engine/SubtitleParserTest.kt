@@ -105,7 +105,9 @@ class SubtitleParserTest {
 
         // ta-orig and en should be present; translated ta must be skipped to avoid 429 translation errors
         assertEquals(2, tracks.size)
-        assertTrue(tracks.any { it.languageCode == "ta-orig" })
+        val taOrig = tracks.find { it.languageCode == "ta-orig" }
+        assertNotNull(taOrig)
+        assertTrue(taOrig?.isOriginal == true)
         assertFalse(tracks.any { it.languageCode == "ta" })
         assertTrue(tracks.any { it.languageCode == "en" })
     }

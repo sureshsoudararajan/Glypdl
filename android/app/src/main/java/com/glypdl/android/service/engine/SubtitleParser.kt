@@ -114,6 +114,10 @@ object SubtitleParser {
             }
 
             val languageName = resolveLanguageName(langCode, extractedName)
+            val isOriginalTrack = when (type) {
+                SubtitleType.MANUAL -> true
+                SubtitleType.AUTOMATIC -> langCode.endsWith("-orig") || (firstUrl != null && !firstUrl.contains("tlang="))
+            }
 
             val existing = tracksMap[langCode]
             if (existing != null) {
@@ -122,7 +126,8 @@ object SubtitleParser {
                 tracksMap[langCode] = existing.copy(
                     formats = mergedFormats,
                     isDefault = existing.isDefault || isDefault,
-                    url = existing.url ?: firstUrl
+                    url = existing.url ?: firstUrl,
+                    isOriginal = existing.isOriginal || isOriginalTrack
                 )
             } else {
                 tracksMap[langCode] = SubtitleTrack(
@@ -131,7 +136,8 @@ object SubtitleParser {
                     type = type,
                     formats = formatList,
                     url = firstUrl,
-                    isDefault = isDefault
+                    isDefault = isDefault,
+                    isOriginal = isOriginalTrack
                 )
             }
         }
@@ -156,26 +162,30 @@ object SubtitleParser {
             return metadataName
         }
 
+        val isOrig = langCode.endsWith("-orig")
+        val cleanCode = langCode.removeSuffix("-orig")
+
         return try {
-            val locale = Locale.forLanguageTag(langCode)
+            val locale = Locale.forLanguageTag(cleanCode)
             val displayName = locale.getDisplayName(Locale.getDefault())
-            if (displayName.isNotBlank() && !displayName.equals(langCode, ignoreCase = true)) {
+            val baseName = if (displayName.isNotBlank() && !displayName.equals(cleanCode, ignoreCase = true)) {
                 displayName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
             } else {
                 // Fallback: test primary language tag before subtag (e.g. "en" from "en-US")
-                val baseTag = langCode.substringBefore('-').substringBefore('_')
+                val baseTag = cleanCode.substringBefore('-').substringBefore('_')
                 val baseLocale = Locale(baseTag)
-                val baseName = baseLocale.getDisplayLanguage(Locale.getDefault())
-                if (baseName.isNotBlank() && !baseName.equals(baseTag, ignoreCase = true)) {
+                val directName = baseLocale.getDisplayLanguage(Locale.getDefault())
+                if (directName.isNotBlank() && !directName.equals(baseTag, ignoreCase = true)) {
                     val region = locale.displayCountry.takeIf { it.isNotBlank() }
-                    val label = if (region != null) "$baseName ($region)" else baseName
+                    val label = if (region != null) "$directName ($region)" else directName
                     label.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
                 } else {
-                    langCode.uppercase(Locale.ROOT)
+                    cleanCode.uppercase(Locale.ROOT)
                 }
             }
+            if (isOrig) "$baseName (Original)" else baseName
         } catch (e: Exception) {
-            langCode.uppercase(Locale.ROOT)
+            if (isOrig) "${cleanCode.uppercase(Locale.ROOT)} (Original)" else cleanCode.uppercase(Locale.ROOT)
         }
     }
 

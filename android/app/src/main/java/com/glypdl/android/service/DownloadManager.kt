@@ -215,7 +215,7 @@ class DownloadManager @Inject constructor(
                             val allSubFiles = stagingDir.listFiles()?.filter { f ->
                                 f.isFile && f.length() > 0 &&
                                 f.extension.lowercase() in subtitleExtensions &&
-                                (System.currentTimeMillis() - f.lastModified() < 600_000)
+                                (f.lastModified() == 0L || (System.currentTimeMillis() - f.lastModified() < 1_800_000L))
                             }?.sortedByDescending { it.lastModified() } ?: listOf(file)
 
                             // The primary file (returned by yt-dlp) is used for the download record
@@ -375,7 +375,7 @@ class DownloadManager @Inject constructor(
                                 // Handle downloaded subtitle files in staging directory.
                                 val downloadedSubs = stagingDir.listFiles()?.filter { f ->
                                     f.isFile && f.length() > 0 && f.extension.lowercase() in subtitleExtensions &&
-                                    (System.currentTimeMillis() - f.lastModified() < 600_000)
+                                    (f.lastModified() == 0L || (System.currentTimeMillis() - f.lastModified() < 1_800_000L))
                                 } ?: emptyList()
 
                                 if (request.subtitleOptions.shouldEmbed) {
