@@ -159,6 +159,10 @@ fun GlypdlNavHost(
     NavHost(
         navController = navController,
         startDestination = startDestination,
+        enterTransition = { fadeIn(animationSpec = tween(280)) },
+        exitTransition = { fadeOut(animationSpec = tween(220)) },
+        popEnterTransition = { fadeIn(animationSpec = tween(280)) },
+        popExitTransition = { fadeOut(animationSpec = tween(220)) },
         modifier = modifier
     ) {
         composable(Screen.Welcome.route) {
@@ -230,7 +234,13 @@ fun GlypdlNavHost(
             )
         }
 
-        composable(Screen.Downloads.route) {
+        composable(
+            route = Screen.Downloads.route,
+            enterTransition = { fadeIn(animationSpec = tween(280)) },
+            exitTransition = { fadeOut(animationSpec = tween(220)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(280)) },
+            popExitTransition = { fadeOut(animationSpec = tween(220)) }
+        ) {
             DownloadsScreen(
                 onNavigateToDownloadDetail = { downloadId ->
                     navController.navigate(Screen.DownloadDetail.createRoute(downloadId))
@@ -302,6 +312,10 @@ fun GlypdlNavHost(
 
         composable(
             route = Screen.Browser.route,
+            enterTransition = { fadeIn(animationSpec = tween(280)) },
+            exitTransition = { fadeOut(animationSpec = tween(220)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(280)) },
+            popExitTransition = { fadeOut(animationSpec = tween(220)) },
             arguments = listOf(
                 navArgument("url") {
                     type = NavType.StringType

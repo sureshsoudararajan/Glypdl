@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -65,6 +66,7 @@ fun AddressBar(
     onShare: () -> Unit,
     onOpenExternal: () -> Unit,
     onCopyUrl: () -> Unit,
+    onExitBrowser: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -314,6 +316,17 @@ fun AddressBar(
                         },
                         leadingIcon = {
                             Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        }
+                    )
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Exit browser") },
+                        onClick = {
+                            menuExpanded = false
+                            onExitBrowser()
+                        },
+                        leadingIcon = {
+                            Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
                         }
                     )
                 }

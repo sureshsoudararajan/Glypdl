@@ -66,6 +66,7 @@ data class BrowserUiState(
     val isMediaSheetVisible: Boolean = false,
     val isTabSwitcherVisible: Boolean = false,
     val isBookmarksHistoryVisible: Boolean = false,
+    val bookmarksHistoryInitialTab: Int = 0,
     val isBookmarked: Boolean = false,
     val isFindInPageVisible: Boolean = false,
     val findQuery: String = "",
@@ -466,8 +467,8 @@ class BrowserViewModel @Inject constructor(
     }
 
     // Bookmarks and History
-    fun showBookmarksHistory() {
-        _uiState.update { it.copy(isBookmarksHistoryVisible = true) }
+    fun showBookmarksHistory(initialTab: Int = 0) {
+        _uiState.update { it.copy(isBookmarksHistoryVisible = true, bookmarksHistoryInitialTab = initialTab) }
     }
 
     fun hideBookmarksHistory() {

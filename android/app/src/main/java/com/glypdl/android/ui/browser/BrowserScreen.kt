@@ -32,7 +32,9 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -43,8 +45,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.webkit.WebViewCompat
@@ -206,7 +210,8 @@ fun BrowserScreen(
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             clipboard.setPrimaryClip(ClipData.newPlainText("URL", uiState.currentUrl))
                             Toast.makeText(context, "Link copied to clipboard", Toast.LENGTH_SHORT).show()
-                        }
+                        },
+                        onExitBrowser = onNavigateBack
                     )
                 }
 
@@ -261,14 +266,24 @@ fun BrowserScreen(
 
                     // Tabs Count Button
                     IconButton(onClick = { viewModel.showTabSwitcher() }) {
-                        BadgedBox(
-                            badge = {
-                                Badge {
-                                    Text("${uiState.tabs.size}")
-                                }
-                            }
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .border(
+                                    width = 2.dp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    shape = RoundedCornerShape(7.dp)
+                                ),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.FilterNone, contentDescription = "Tabs")
+                            Text(
+                                text = if (uiState.tabs.size > 99) "99+" else "${uiState.tabs.size}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = if (uiState.tabs.size >= 10) 10.sp else 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
 
@@ -500,8 +515,8 @@ fun BrowserScreen(
                             webViewRef?.loadUrl(resolved)
                         }
                     },
-                    onOpenBookmarks = { viewModel.showBookmarksHistory() },
-                    onOpenHistory = { viewModel.showBookmarksHistory() },
+                    onOpenBookmarks = { viewModel.showBookmarksHistory(initialTab = 0) },
+                    onOpenHistory = { viewModel.showBookmarksHistory(initialTab = 1) },
                     onOpenDownloads = onNavigateToDownloads,
                     modifier = Modifier.fillMaxSize()
                 )
@@ -613,6 +628,7 @@ fun BrowserScreen(
     // Bookmarks and History BottomSheet
     if (uiState.isBookmarksHistoryVisible) {
         BookmarksHistorySheet(
+            initialTab = uiState.bookmarksHistoryInitialTab,
             bookmarks = bookmarks,
             history = history,
             onSelectUrl = { targetUrl ->

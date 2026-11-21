@@ -39,6 +39,7 @@ import com.glypdl.android.data.local.entity.BrowserHistoryEntity
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookmarksHistorySheet(
+    initialTab: Int = 0,
     bookmarks: List<BookmarkEntity>,
     history: List<BrowserHistoryEntity>,
     onSelectUrl: (String) -> Unit,
@@ -48,7 +49,7 @@ fun BookmarksHistorySheet(
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    var selectedTabIndex by remember { mutableIntStateOf(initialTab) }
     var searchQuery by remember { mutableStateOf("") }
 
     ModalBottomSheet(
