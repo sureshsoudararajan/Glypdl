@@ -89,12 +89,13 @@ class BrowserViewModelTest {
     }
 
     @Test
-    fun defaultInitialState_loadsDuckDuckGo() {
+    fun defaultInitialState_loadsStartPage() {
         val viewModel = createViewModel()
         val state = viewModel.uiState.value
 
-        assertEquals("https://duckduckgo.com", state.currentUrl)
-        assertEquals("https://duckduckgo.com", state.inputUrl)
+        assertEquals(START_PAGE_URL, state.currentUrl)
+        assertEquals("", state.inputUrl)
+        assertTrue(state.isStartPage)
         assertTrue(state.isSecure)
         assertFalse(state.isLoading)
         assertNull(state.errorMessage)
@@ -134,6 +135,18 @@ class BrowserViewModelTest {
         val resolved = viewModel.resolveUrlOrSearch("open source android downloader")
         assertTrue(resolved.startsWith("https://duckduckgo.com/?q="))
         assertTrue(resolved.contains("open+source+android+downloader"))
+
+        val googleSearch = viewModel.resolveUrlOrSearch("hello world", com.glypdl.android.data.model.SearchEngine.GOOGLE)
+        assertEquals("https://www.google.com/search?q=hello+world", googleSearch)
+    }
+
+    @Test
+    fun setSearchEngine_updatesActiveEngine() {
+        val viewModel = createViewModel()
+        viewModel.setSearchEngine(com.glypdl.android.data.model.SearchEngine.GOOGLE)
+        assertEquals(com.glypdl.android.data.model.SearchEngine.GOOGLE, viewModel.uiState.value.currentSearchEngine)
+        val search = viewModel.resolveUrlOrSearch("test query")
+        assertEquals("https://www.google.com/search?q=test+query", search)
     }
 
     @Test
@@ -153,7 +166,7 @@ class BrowserViewModelTest {
         // Switch back to tab 1
         viewModel.switchTab(tab1Id)
         assertEquals(tab1Id, viewModel.uiState.value.activeTabId)
-        assertEquals("https://duckduckgo.com", viewModel.uiState.value.currentUrl)
+        assertEquals(START_PAGE_URL, viewModel.uiState.value.currentUrl)
 
         // Close tab 2
         viewModel.closeTab(tab2Id)

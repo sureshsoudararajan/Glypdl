@@ -109,7 +109,9 @@ fun BrowserScreen(
     // Handle active tab changes
     LaunchedEffect(uiState.activeTabId) {
         webViewRef?.let { wv ->
-            if (wv.url != uiState.currentUrl) {
+            if (uiState.isStartPage) {
+                wv.loadUrl("about:blank")
+            } else if (wv.url != uiState.currentUrl) {
                 wv.loadUrl(uiState.currentUrl)
             }
         }
@@ -159,11 +161,15 @@ fun BrowserScreen(
                         isBookmarked = uiState.isBookmarked,
                         isIncognito = uiState.isIncognito,
                         isAdBlockEnabled = uiState.isAdBlockEnabled,
+                        currentSearchEngine = uiState.currentSearchEngine,
+                        onSearchEngineChange = { viewModel.setSearchEngine(it) },
                         onUrlChange = { viewModel.onInputUrlChange(it) },
                         onSubmitUrl = { target ->
                             viewModel.onSubmitInput(target)
                             val resolved = viewModel.resolveUrlOrSearch(target)
-                            webViewRef?.loadUrl(resolved)
+                            if (resolved != START_PAGE_URL) {
+                                webViewRef?.loadUrl(resolved)
+                            }
                         },
                         onReload = {
                             viewModel.clearError()
@@ -246,8 +252,8 @@ fun BrowserScreen(
 
                     IconButton(
                         onClick = {
-                            viewModel.onSubmitInput("https://duckduckgo.com")
-                            webViewRef?.loadUrl("https://duckduckgo.com")
+                            viewModel.navigateToStartPage()
+                            webViewRef?.loadUrl("about:blank")
                         }
                     ) {
                         Icon(Icons.Default.Home, contentDescription = "Home")
@@ -269,10 +275,12 @@ fun BrowserScreen(
                     // Layer C: Download this page with yt-dlp
                     FilledTonalButton(
                         onClick = {
-                            val activeUrl = webViewRef?.url?.takeIf { it.isNotBlank() && !it.startsWith("about:") }
-                                ?: uiState.currentUrl
+                            val activeUrl = webViewRef?.url?.takeIf {
+                                it.isNotBlank() && !it.startsWith("about:") && !it.startsWith("glypdl:")
+                            } ?: uiState.currentUrl
                             onNavigateToAnalyze(activeUrl)
                         },
+                        enabled = !uiState.isStartPage && (webViewRef?.url?.startsWith("http") == true || uiState.currentUrl.startsWith("http")),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Icon(
@@ -393,10 +401,16 @@ fun BrowserScreen(
                                 view: WebView?,
                                 request: WebResourceRequest?
                             ): WebResourceResponse? {
-                                val uri = request?.url ?: return null
+                                if (request == null) return null
+                                // CRITICAL: Never block or intercept main frame navigation (prevents blank white screen)
+                                if (request.isForMainFrame) {
+                                    return null
+                                }
+
+                                val uri = request.url ?: return null
                                 val urlStr = uri.toString()
 
-                                // Block ads and intrusive tracking
+                                // Block ads and intrusive tracking for subresources
                                 if (uiState.isAdBlockEnabled && AdBlocker.isAd(urlStr)) {
                                     return WebResourceResponse(
                                         "text/plain",
@@ -467,10 +481,31 @@ fun BrowserScreen(
                             }
                         }
 
-                        loadUrl(uiState.currentUrl)
+                        if (!uiState.isStartPage) {
+                            loadUrl(uiState.currentUrl)
+                        }
                     }
                 }
             )
+
+            // Custom Glypdl Start Page (Opera-style Home)
+            if (uiState.isStartPage) {
+                GlypdlStartPage(
+                    currentSearchEngine = uiState.currentSearchEngine,
+                    onSearchEngineChange = { viewModel.setSearchEngine(it) },
+                    onSubmitQuery = { query ->
+                        val resolved = viewModel.resolveUrlOrSearch(query)
+                        viewModel.onSubmitInput(query)
+                        if (resolved != START_PAGE_URL) {
+                            webViewRef?.loadUrl(resolved)
+                        }
+                    },
+                    onOpenBookmarks = { viewModel.showBookmarksHistory() },
+                    onOpenHistory = { viewModel.showBookmarksHistory() },
+                    onOpenDownloads = onNavigateToDownloads,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
             // Error display overlay
             AnimatedVisibility(

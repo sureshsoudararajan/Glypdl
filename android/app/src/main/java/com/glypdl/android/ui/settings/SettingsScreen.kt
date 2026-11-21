@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.glypdl.android.data.model.SearchEngine
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.glypdl.android.ui.auth.AuthBrowserActivity
 import com.glypdl.android.util.StorageHelper
@@ -1232,7 +1233,7 @@ fun SettingsScreen(
                         icon = Icons.Default.Language,
                         title = "Search engine",
                         subtitle = "Default search engine used in address bar",
-                        currentValue = browserSearchEngine.replaceFirstChar { it.uppercase() },
+                        currentValue = SearchEngine.fromId(browserSearchEngine).name,
                         onClick = { searchEngineDialogVisible = true }
                     )
 
@@ -1775,12 +1776,9 @@ fun SettingsScreen(
 
     // Search Engine Selection Dialog
     if (searchEngineDialogVisible) {
-        val searchEngineOptions = listOf(
-            "duckduckgo" to "DuckDuckGo (Privacy focused)",
-            "google" to "Google",
-            "bing" to "Bing",
-            "startpage" to "StartPage (Private Google search)"
-        )
+        val searchEngineOptions = SearchEngine.ALL.map {
+            it.id to it.name
+        }
         SettingsSelectionDialog(
             title = "Default Search Engine",
             options = searchEngineOptions,

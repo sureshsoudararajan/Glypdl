@@ -1663,7 +1663,6 @@
 ||amazing.mirage-road.com^
 ||amazingcounters.com^
 ||amazon.^
-||amazon.com^
 ||amazon8898.com^
 ||amazonaws.com^
 ||amb-whatsapp.com^
@@ -2190,7 +2189,6 @@
 ||bilet.com^
 ||billboard.cz^
 ||billtable.com^
-||bing.com^
 ||binhchoncuocthivetranhsinhvien2024.weebly.com^
 ||bio.site^
 ||biqle.ru^
@@ -3391,7 +3389,6 @@
 ||du0.jp^
 ||dubiousserene.com^
 ||duckdns.org^
-||duckduckgo.com^
 ||dump.xxx^
 ||dunabear.com^
 ||duplichecker.com^
@@ -3677,7 +3674,6 @@
 ||fabric.io^
 ||faceb00k.com.vn^
 ||facebooc.jp^
-||facebook.com^
 ||facevideosc.com^
 ||fadedsnow.com^
 ||faecbook.vn^
@@ -4055,7 +4051,6 @@
 ||git44share.quest^
 ||gitcompiler.com^
 ||gitconnect-online.web.app^
-||github.com^
 ||github.io^
 ||gitnode-whatsapp.com^
 ||gjtech.net^
@@ -4142,7 +4137,6 @@
 ||google-google-chrome-google-com.hl.cn^
 ||google-zhcn-chrome.com.cn^
 ||google.^
-||google.com^
 ||googlea.eu.cc^
 ||googleadservices.com^
 ||googleanalytics.com^
@@ -4581,7 +4575,6 @@
 ||inspirationhistorical.com^
 ||inspirationwillingviagiant.com^
 ||instagram-nextjs-three.vercel.app^
-||instagram.com^
 ||instagram.irancell-10g-free.rf.gd^
 ||instagram0639.blogspot.^
 ||install.365-stream.com^
@@ -6623,7 +6616,6 @@
 ||record.mrwin.com^
 ||recruit-gold.com^
 ||redcdn.pl^
-||reddit.com^
 ||redir.me^
 ||redirect.viglink.com^
 ||redirectingat.com^
@@ -7228,7 +7220,6 @@
 ||sorteiosbrasil.netlify.app^
 ||sotemnovinhas.com^
 ||sougoupy.com.cn^
-||soundcloud.com^
 ||soundcloudapp.com^
 ||soundcore.com^
 ||sourceforge.net^
@@ -7334,7 +7325,6 @@
 ||starrynets.com^
 ||starsmarter.com^
 ||startapp.com^
-||startpage.com^
 ||stat-track.com^
 ||stat.cliche.se^
 ||stat.dyna.ultraweb.hu^
@@ -8054,7 +8044,6 @@
 ||tweitter.com^
 ||twelvedawn.com^
 ||twisty.net^
-||twitch.tv^
 ||twitob.com^
 ||twittad.com^
 ||twitter-circle.com^
@@ -8574,7 +8563,6 @@
 ||www8.glam.com^
 ||wwwpromoter.com^
 ||x.chip.de^
-||x.com^
 ||x.shopsavvy.com^
 ||x6.yakiuchi.com^
 ||xad.com^
@@ -8679,7 +8667,6 @@
 ||yourube.com^
 ||youtu.be^
 ||youtuba.com^
-||youtube.com^
 ||youtuberevanced.^
 ||youtubevanced.^
 ||youtunbe.com^

@@ -18,6 +18,7 @@
 
 package com.glypdl.android.ui.browser.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -37,6 +38,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
+import androidx.compose.ui.draw.clip
+import com.glypdl.android.data.model.SearchEngine
+
 @Composable
 fun AddressBar(
     url: String,
@@ -46,6 +50,8 @@ fun AddressBar(
     isBookmarked: Boolean = false,
     isIncognito: Boolean = false,
     isAdBlockEnabled: Boolean = true,
+    currentSearchEngine: SearchEngine = SearchEngine.DUCKDUCKGO,
+    onSearchEngineChange: (SearchEngine) -> Unit = {},
     onUrlChange: (String) -> Unit,
     onSubmitUrl: (String) -> Unit,
     onReload: () -> Unit,
@@ -91,27 +97,49 @@ fun AddressBar(
                     )
                 },
                 leadingIcon = {
-                    if (isIncognito) {
-                        Icon(
-                            Icons.Default.VisibilityOff,
-                            contentDescription = "Incognito Mode",
-                            tint = MaterialTheme.colorScheme.tertiary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    } else if (isSecure) {
-                        Icon(
-                            Icons.Default.Lock,
-                            contentDescription = "Secure Connection",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    } else {
-                        Icon(
-                            Icons.Default.Warning,
-                            contentDescription = "Insecure Connection",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(18.dp)
-                        )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(start = 4.dp)
+                    ) {
+                        if (isIncognito) {
+                            Icon(
+                                Icons.Default.VisibilityOff,
+                                contentDescription = "Incognito Mode",
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier
+                                    .padding(end = 4.dp)
+                                    .size(16.dp)
+                            )
+                        }
+
+                        var engineMenuExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { engineMenuExpanded = true }
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                            ) {
+                                SearchEngineBadge(engine = currentSearchEngine, size = 20.dp)
+                                Icon(
+                                    Icons.Default.ArrowDropDown,
+                                    contentDescription = "Search Engine Selector",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+
+                            SearchEngineDropdownMenu(
+                                expanded = engineMenuExpanded,
+                                selectedEngine = currentSearchEngine,
+                                onSelectEngine = {
+                                    onSearchEngineChange(it)
+                                    engineMenuExpanded = false
+                                },
+                                onDismissRequest = { engineMenuExpanded = false }
+                            )
+                        }
                     }
                 },
                 trailingIcon = {

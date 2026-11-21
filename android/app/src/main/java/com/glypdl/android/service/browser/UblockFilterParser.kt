@@ -34,6 +34,13 @@ data class UblockFilterRules(
  */
 object UblockFilterParser {
 
+    private val NEVER_BLOCK_DOMAINS = setOf(
+        "google.com", "bing.com", "duckduckgo.com", "youtube.com", "amazon.com",
+        "facebook.com", "github.com", "instagram.com", "reddit.com", "startpage.com",
+        "ecosia.org", "qwant.com", "wikipedia.org", "yahoo.com", "twitter.com",
+        "x.com", "tiktok.com", "twitch.tv", "vimeo.com", "soundcloud.com", "dailymotion.com"
+    )
+
     fun parse(inputStream: InputStream): UblockFilterRules {
         val blocked = hashSetOf<String>()
         val whitelisted = hashSetOf<String>()
@@ -61,7 +68,11 @@ object UblockFilterParser {
                 if (trimmed.startsWith("||")) {
                     val raw = trimmed.removePrefix("||")
                     val domain = raw.substringBefore('^').substringBefore('$').substringBefore('/').trim().lowercase()
-                    if (domain.isNotEmpty()) {
+                    if (domain.isNotEmpty() &&
+                        !NEVER_BLOCK_DOMAINS.contains(domain) &&
+                        !NEVER_BLOCK_DOMAINS.contains(domain.removePrefix("www.")) &&
+                        !NEVER_BLOCK_DOMAINS.contains(domain.removePrefix("m."))
+                    ) {
                         blocked.add(domain)
                     }
                     continue

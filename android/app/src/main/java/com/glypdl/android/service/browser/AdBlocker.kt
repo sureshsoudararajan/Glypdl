@@ -45,6 +45,16 @@ object AdBlocker {
         "/ads/", "/adserver/", "/ad_stream/", "/pagead/", "/advert/", "/ads.js", "/prebid"
     )
 
+    val CORE_SAFE_DOMAINS = setOf(
+        "google.com", "google.co.in", "google.co.uk", "google.ca", "google.de", "google.fr", "google.co.jp",
+        "duckduckgo.com", "bing.com", "yahoo.com", "search.yahoo.com",
+        "startpage.com", "ecosia.org", "qwant.com", "wikipedia.org", "wikimedia.org",
+        "youtube.com", "m.youtube.com", "youtu.be",
+        "reddit.com", "instagram.com", "twitter.com", "x.com",
+        "facebook.com", "tiktok.com", "twitch.tv", "github.com",
+        "amazon.com", "ebay.com", "vimeo.com", "soundcloud.com", "dailymotion.com"
+    )
+
     // Fallback domains if asset loading is unavailable
     private val FALLBACK_DOMAINS = setOf(
         "doubleclick.net", "googlesyndication.com", "googleadservices.com",
@@ -131,13 +141,20 @@ object AdBlocker {
         val uri = try { URI(url) } catch (_: Exception) { return false }
         val host = uri.host?.lowercase() ?: return false
 
-        // 1. Check whitelist / exception rules first
+        // 1. Core safe domains should never be blocked unless explicit ad subdomain
+        if (isSafeDomain(host)) {
+            if (!isExplicitAdSubdomain(host)) {
+                return false
+            }
+        }
+
+        // 2. Check whitelist / exception rules first
         if (isHostWhitelisted(host)) return false
 
-        // 2. Check domain / subdomain blocklist
+        // 3. Check domain / subdomain blocklist
         if (isHostBlocked(host)) return true
 
-        // 3. Check path keyword rules
+        // 4. Check path keyword rules
         val path = uri.path?.lowercase() ?: ""
         if (path.isNotEmpty()) {
             for (kw in pathKeywords) {
@@ -146,6 +163,22 @@ object AdBlocker {
         }
 
         return false
+    }
+
+    private fun isSafeDomain(host: String): Boolean {
+        val clean = host.removePrefix("www.").removePrefix("m.")
+        return CORE_SAFE_DOMAINS.contains(clean) || CORE_SAFE_DOMAINS.contains(host)
+    }
+
+    private fun isExplicitAdSubdomain(host: String): Boolean {
+        val lower = host.lowercase()
+        return lower.startsWith("adservice.") ||
+                lower.startsWith("pagead") ||
+                lower.startsWith("googleadservices") ||
+                lower.startsWith("ads.") ||
+                lower.startsWith("ad.") ||
+                lower.startsWith("analytics.") ||
+                lower.contains("doubleclick")
     }
 
     private fun isHostWhitelisted(host: String): Boolean {

@@ -46,6 +46,10 @@ class AdBlockerTest {
     @Test
     fun `isAd returns false for normal content URLs`() {
         assertFalse(AdBlocker.isAd("https://duckduckgo.com"))
+        assertFalse(AdBlocker.isAd("https://google.com"))
+        assertFalse(AdBlocker.isAd("https://www.google.com/search?q=test"))
+        assertFalse(AdBlocker.isAd("https://bing.com"))
+        assertFalse(AdBlocker.isAd("https://m.youtube.com/watch?v=123"))
         assertFalse(AdBlocker.isAd("https://en.wikipedia.org/wiki/Main_Page"))
         assertFalse(AdBlocker.isAd("https://github.com/sureshsoudararajan/Glypdl"))
         assertFalse(AdBlocker.isAd("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"))

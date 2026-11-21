@@ -44,12 +44,14 @@ import java.nio.charset.StandardCharsets
 import java.util.UUID
 import javax.inject.Inject
 
+const val START_PAGE_URL = "glypdl://start"
+
 data class BrowserUiState(
-    val tabs: List<BrowserTab> = listOf(BrowserTab(id = "default_tab")),
+    val tabs: List<BrowserTab> = listOf(BrowserTab(id = "default_tab", url = START_PAGE_URL, title = "New Tab")),
     val activeTabId: String = "default_tab",
-    val currentUrl: String = "https://duckduckgo.com",
-    val inputUrl: String = "https://duckduckgo.com",
-    val title: String = "Browser",
+    val currentUrl: String = START_PAGE_URL,
+    val inputUrl: String = "",
+    val title: String = "New Tab",
     val progress: Int = 0,
     val isLoading: Boolean = false,
     val canGoBack: Boolean = false,
@@ -58,6 +60,7 @@ data class BrowserUiState(
     val isIncognito: Boolean = false,
     val isAdBlockEnabled: Boolean = true,
     val isSecure: Boolean = true,
+    val currentSearchEngine: SearchEngine = SearchEngine.DUCKDUCKGO,
     val errorMessage: String? = null,
     val sslErrorDialogUrl: String? = null,
     val isMediaSheetVisible: Boolean = false,
@@ -70,7 +73,10 @@ data class BrowserUiState(
     val findTotalMatches: Int = 0,
     val selectedQualityMedia: DetectedMedia? = null,
     val snackbarMessage: String? = null
-)
+) {
+    val isStartPage: Boolean
+        get() = currentUrl == START_PAGE_URL || currentUrl.isBlank() || currentUrl == "about:blank"
+}
 
 @HiltViewModel
 class BrowserViewModel @Inject constructor(
@@ -83,12 +89,12 @@ class BrowserViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val initialUrl: String = savedStateHandle.get<String>("url")
-        ?.takeIf { it.isNotBlank() } ?: "https://duckduckgo.com"
+        ?.takeIf { it.isNotBlank() && it != "https://duckduckgo.com" } ?: START_PAGE_URL
 
     private val initialTab = BrowserTab(
         id = UUID.randomUUID().toString(),
         url = initialUrl,
-        title = "New Tab"
+        title = if (initialUrl == START_PAGE_URL) "New Tab" else "Browser"
     )
 
     private val _uiState = MutableStateFlow(
@@ -96,7 +102,7 @@ class BrowserViewModel @Inject constructor(
             tabs = listOf(initialTab),
             activeTabId = initialTab.id,
             currentUrl = initialUrl,
-            inputUrl = initialUrl
+            inputUrl = if (initialUrl == START_PAGE_URL) "" else initialUrl
         )
     )
     val uiState: StateFlow<BrowserUiState> = _uiState.asStateFlow()
@@ -112,7 +118,11 @@ class BrowserViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            settingsRepository.browserSearchEngine.collect { defaultSearchEngine = it }
+            settingsRepository.browserSearchEngine.collect { engineId ->
+                val engine = SearchEngine.fromId(engineId)
+                defaultSearchEngine = engine.id
+                _uiState.update { it.copy(currentSearchEngine = engine) }
+            }
         }
         viewModelScope.launch {
             settingsRepository.browserAutoDetect.collect { isAutoDetectEnabled = it }
@@ -131,6 +141,14 @@ class BrowserViewModel @Inject constructor(
         }
     }
 
+    fun setSearchEngine(engine: SearchEngine) {
+        defaultSearchEngine = engine.id
+        _uiState.update { it.copy(currentSearchEngine = engine) }
+        viewModelScope.launch {
+            settingsRepository.setBrowserSearchEngine(engine.id)
+        }
+    }
+
     fun onInputUrlChange(newInput: String) {
         _uiState.update { it.copy(inputUrl = newInput) }
     }
@@ -139,18 +157,22 @@ class BrowserViewModel @Inject constructor(
         val resolvedUrl = resolveUrlOrSearch(input.trim())
         _uiState.update { state ->
             val updatedTabs = state.tabs.map { tab ->
-                if (tab.id == state.activeTabId) tab.copy(url = resolvedUrl) else tab
+                if (tab.id == state.activeTabId) tab.copy(
+                    url = resolvedUrl,
+                    title = if (resolvedUrl == START_PAGE_URL) "New Tab" else tab.title
+                ) else tab
             }
             state.copy(
                 tabs = updatedTabs,
                 currentUrl = resolvedUrl,
-                inputUrl = resolvedUrl,
+                inputUrl = if (resolvedUrl == START_PAGE_URL) "" else resolvedUrl,
                 errorMessage = null
             )
         }
     }
 
     fun onPageStarted(url: String) {
+        if (url == START_PAGE_URL || url == "about:blank") return
         if (isAutoDetectEnabled) {
             mediaSniffer.resetForPage(url)
         }
@@ -171,6 +193,10 @@ class BrowserViewModel @Inject constructor(
     }
 
     fun onPageFinished(url: String, canBack: Boolean, canForward: Boolean) {
+        if (url == START_PAGE_URL || url == "about:blank") {
+            _uiState.update { it.copy(isLoading = false) }
+            return
+        }
         _uiState.update { state ->
             val updatedTabs = state.tabs.map { tab ->
                 if (tab.id == state.activeTabId) tab.copy(
@@ -193,7 +219,7 @@ class BrowserViewModel @Inject constructor(
         // Record in browsing history if not incognito
         val currentTab = _uiState.value.tabs.find { it.id == _uiState.value.activeTabId }
         val isIncognito = currentTab?.isIncognito ?: _uiState.value.isIncognito
-        if (!isIncognito && url.isNotBlank() && !url.startsWith("about:") && !url.startsWith("data:")) {
+        if (!isIncognito && url.isNotBlank() && !url.startsWith("about:") && !url.startsWith("data:") && !url.startsWith("glypdl:")) {
             viewModelScope.launch {
                 browserRepository.recordVisit(url, _uiState.value.title)
             }
@@ -321,7 +347,7 @@ class BrowserViewModel @Inject constructor(
         }
     }
 
-    fun openNewTab(url: String = "https://duckduckgo.com", isIncognito: Boolean = false) {
+    fun openNewTab(url: String = START_PAGE_URL, isIncognito: Boolean = false) {
         val newTab = BrowserTab(
             id = UUID.randomUUID().toString(),
             url = url,
@@ -334,7 +360,7 @@ class BrowserViewModel @Inject constructor(
                 tabs = state.tabs + newTab,
                 activeTabId = newTab.id,
                 currentUrl = newTab.url,
-                inputUrl = newTab.url,
+                inputUrl = if (newTab.url == START_PAGE_URL) "" else newTab.url,
                 title = newTab.title,
                 isIncognito = isIncognito,
                 isDesktopMode = newTab.isDesktopMode,
@@ -343,7 +369,25 @@ class BrowserViewModel @Inject constructor(
                 isTabSwitcherVisible = false
             )
         }
-        mediaSniffer.resetForPage(url)
+        if (url != START_PAGE_URL) {
+            mediaSniffer.resetForPage(url)
+        }
+    }
+
+    fun navigateToStartPage() {
+        _uiState.update { state ->
+            val updatedTabs = state.tabs.map { tab ->
+                if (tab.id == state.activeTabId) tab.copy(url = START_PAGE_URL, title = "New Tab") else tab
+            }
+            state.copy(
+                tabs = updatedTabs,
+                currentUrl = START_PAGE_URL,
+                inputUrl = "",
+                title = "New Tab",
+                isLoading = false,
+                errorMessage = null
+            )
+        }
     }
 
     fun switchTab(tabId: String) {
@@ -352,7 +396,7 @@ class BrowserViewModel @Inject constructor(
             it.copy(
                 activeTabId = tabId,
                 currentUrl = targetTab.url,
-                inputUrl = targetTab.url,
+                inputUrl = if (targetTab.url == START_PAGE_URL) "" else targetTab.url,
                 title = targetTab.title,
                 isDesktopMode = targetTab.isDesktopMode,
                 isIncognito = targetTab.isIncognito,
@@ -361,20 +405,22 @@ class BrowserViewModel @Inject constructor(
                 isTabSwitcherVisible = false
             )
         }
-        mediaSniffer.resetForPage(targetTab.url)
+        if (targetTab.url != START_PAGE_URL) {
+            mediaSniffer.resetForPage(targetTab.url)
+        }
     }
 
     fun closeTab(tabId: String) {
         val currentTabs = _uiState.value.tabs
         if (currentTabs.size <= 1) {
-            // If last tab is closed, reset to home tab
-            val freshTab = BrowserTab(url = "https://duckduckgo.com", title = "New Tab")
+            // If last tab is closed, reset to start page tab
+            val freshTab = BrowserTab(url = START_PAGE_URL, title = "New Tab")
             _uiState.update {
                 it.copy(
                     tabs = listOf(freshTab),
                     activeTabId = freshTab.id,
                     currentUrl = freshTab.url,
-                    inputUrl = freshTab.url,
+                    inputUrl = "",
                     title = freshTab.title,
                     isIncognito = false,
                     isTabSwitcherVisible = false
@@ -396,7 +442,7 @@ class BrowserViewModel @Inject constructor(
                 tabs = remaining,
                 activeTabId = nextActiveId,
                 currentUrl = nextActiveTab.url,
-                inputUrl = nextActiveTab.url,
+                inputUrl = if (nextActiveTab.url == START_PAGE_URL) "" else nextActiveTab.url,
                 title = nextActiveTab.title,
                 isDesktopMode = nextActiveTab.isDesktopMode,
                 isIncognito = nextActiveTab.isIncognito
@@ -405,19 +451,18 @@ class BrowserViewModel @Inject constructor(
     }
 
     fun closeAllTabs() {
-        val freshTab = BrowserTab(url = "https://duckduckgo.com", title = "New Tab")
+        val freshTab = BrowserTab(url = START_PAGE_URL, title = "New Tab")
         _uiState.update {
             it.copy(
                 tabs = listOf(freshTab),
                 activeTabId = freshTab.id,
                 currentUrl = freshTab.url,
-                inputUrl = freshTab.url,
+                inputUrl = "",
                 title = freshTab.title,
                 isIncognito = false,
                 isTabSwitcherVisible = false
             )
         }
-        mediaSniffer.resetForPage(freshTab.url)
     }
 
     // Bookmarks and History
@@ -688,24 +733,29 @@ class BrowserViewModel @Inject constructor(
         }
     }
 
-    fun resolveUrlOrSearch(input: String): String {
-        if (input.isBlank()) return "https://duckduckgo.com"
+    fun resolveUrlOrSearch(
+        input: String,
+        engine: SearchEngine = _uiState.value.currentSearchEngine
+    ): String {
+        val trimmed = input.trim()
+        if (trimmed.isBlank() ||
+            trimmed == START_PAGE_URL ||
+            trimmed.equals("about:home", ignoreCase = true) ||
+            trimmed.equals("about:blank", ignoreCase = true) ||
+            trimmed.equals("glypdl://start", ignoreCase = true)
+        ) {
+            return START_PAGE_URL
+        }
 
-        if (input.startsWith("https://", ignoreCase = true) || input.startsWith("http://", ignoreCase = true)) {
-            return input
+        if (trimmed.startsWith("https://", ignoreCase = true) || trimmed.startsWith("http://", ignoreCase = true)) {
+            return trimmed
         }
 
         val domainPattern = Regex("^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(/.*)?$")
-        if (domainPattern.matches(input) && !input.contains(" ")) {
-            return "https://$input"
+        if (domainPattern.matches(trimmed) && !trimmed.contains(" ")) {
+            return "https://$trimmed"
         }
 
-        val encoded = URLEncoder.encode(input, StandardCharsets.UTF_8.toString())
-        return when (defaultSearchEngine.lowercase()) {
-            "google" -> "https://www.google.com/search?q=$encoded"
-            "bing" -> "https://www.bing.com/search?q=$encoded"
-            "startpage" -> "https://www.startpage.com/sp/search?query=$encoded"
-            else -> "https://duckduckgo.com/?q=$encoded"
-        }
+        return engine.buildSearchUrl(trimmed)
     }
 }
