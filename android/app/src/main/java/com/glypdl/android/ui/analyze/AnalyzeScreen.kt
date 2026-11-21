@@ -29,6 +29,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -60,6 +61,7 @@ fun AnalyzeScreen(
     onNavigateToDownloads: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val scope = rememberCoroutineScope()
 
     // Automatically navigate to downloads screen when auto-download is triggered (Ask Before Download is off)
     LaunchedEffect(Unit) {
@@ -168,8 +170,12 @@ fun AnalyzeScreen(
                         onDeselectAll = viewModel::deselectAllPlaylistItems,
                         onAudioOnlyChanged = viewModel::setPlaylistAudioOnly,
                         onDownload = {
-                            viewModel.downloadSelectedPlaylist()
-                            onNavigateToDownloads()
+                            // Wait for the (fast) request-building job before leaving this screen.
+                            val buildJob = viewModel.downloadSelectedPlaylist()
+                            scope.launch {
+                                buildJob?.join()
+                                onNavigateToDownloads()
+                            }
                         }
                     )
                 }

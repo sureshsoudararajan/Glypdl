@@ -470,13 +470,21 @@ class AnalyzeViewModel @Inject constructor(
         }
     }
 
-    fun downloadSelectedPlaylist() {
+    /**
+     * Builds one [DownloadRequest] per selected playlist item and hands the whole batch to
+     * [DownloadMediaUseCase.enqueueAll], which enqueues on the app-scoped DownloadManager.
+     *
+     * Returns the short-lived Job that builds the requests (settings reads only) so the caller can
+     * `join()` it before navigating away. The actual enqueueing no longer depends on this
+     * ViewModel's lifetime, so popping the Analyze screen cannot cancel it part-way.
+     */
+    fun downloadSelectedPlaylist(): Job? {
         val currentState = _uiState.value
         if (currentState is AnalyzeUiState.PlaylistSuccess) {
             val selectedItems = currentState.playlistInfo.entries.filter { it.id in currentState.selectedItemIds }
             val isAudio = currentState.isAudioOnly
 
-            viewModelScope.launch {
+            return viewModelScope.launch {
                 val preferredAudio = try {
                     settingsRepository.preferredAudioFormat.first().lowercase().trim()
                 } catch (e: Exception) {
@@ -530,8 +538,8 @@ class AnalyzeViewModel @Inject constructor(
                 val resLabel = if (isAudio) "Audio (${ext.uppercase()})" else
                     if (prefQuality.equals("best", ignoreCase = true)) "Video (Best)" else "Video ($prefQuality)"
 
-                selectedItems.forEach { item ->
-                    val request = DownloadRequest(
+                val requests = selectedItems.map { item ->
+                    DownloadRequest(
                         id = UUID.randomUUID().toString(),
                         url = item.url,
                         title = item.title,
@@ -542,10 +550,11 @@ class AnalyzeViewModel @Inject constructor(
                         isAudioOnly = isAudio,
                         destinationUri = null
                     )
-                    downloadMediaUseCase(request)
                 }
+                downloadMediaUseCase.enqueueAll(requests)
             }
         }
+        return null
     }
 
     fun setSubtitleDownloadMode(mode: SubtitleDownloadMode) {
@@ -910,9 +919,9 @@ class AnalyzeViewModel @Inject constructor(
                 selectedYouTubeAudioLanguage = currentState.selectedYouTubeAudioLanguage,
                 selectedYouTubeAudioTrack = currentState.selectedYouTubeAudioTrack
             )
-            viewModelScope.launch {
-                downloadMediaUseCase(request)
-            }
+            // App-scoped hand-off: the screen navigates to Downloads right after this call, which
+            // clears this ViewModel and would cancel a viewModelScope.launch before it finishes.
+            downloadMediaUseCase.enqueueAll(listOf(request))
         }
     }
 }
