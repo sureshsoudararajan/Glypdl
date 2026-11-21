@@ -97,6 +97,35 @@ class DownloadManager @Inject constructor(
         processQueue()
     }
 
+    /**
+     * Enqueues a whole batch (for example a playlist selection) on this singleton's own
+     * application-lifetime [scope] and returns immediately.
+     *
+     * Enqueuing from a ViewModel scope is unsafe for batches: the UI navigates away right after the
+     * click, the ViewModel is cleared, `viewModelScope` is cancelled, and the loop stops part-way
+     * (only the first few items ever reach the database). Running it here means leaving the screen
+     * can no longer cancel it.
+     */
+    fun enqueueDownloads(requests: List<DownloadRequest>) {
+        if (requests.isEmpty()) return
+        scope.launch {
+            requests.forEach { request ->
+                try {
+                    enqueueDownload(request)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // One bad item must not drop the rest of the batch.
+                    DiagnosticLogger.log(
+                        "DownloadManager",
+                        "Failed to enqueue '${request.title}': ${e.message}",
+                        LogLevel.ERROR
+                    )
+                }
+            }
+        }
+    }
+
     suspend fun processQueue() {
         queueMutex.withLock {
             val isWifiOnly = settingsRepository.wifiOnly.first()

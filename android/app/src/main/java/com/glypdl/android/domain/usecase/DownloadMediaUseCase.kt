@@ -19,4 +19,12 @@ class DownloadMediaUseCase @Inject constructor(
     suspend operator fun invoke(request: DownloadRequest) {
         downloadManager.enqueueDownload(request)
     }
+
+    /**
+     * Hands a batch (e.g. playlist selection) to [DownloadManager], which enqueues it on its own
+     * app-lifetime scope. Non-suspending: safe to call right before navigating away.
+     */
+    fun enqueueAll(requests: List<DownloadRequest>) {
+        downloadManager.enqueueDownloads(requests)
+    }
 }
