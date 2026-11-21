@@ -200,6 +200,41 @@ class BrowserViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Handles single-page application (SPA) dynamic client-side URL changes
+     * (e.g. YouTube Shorts, Instagram Reels, Twitter) reported via JavaScript history interception.
+     */
+    fun onUrlChangedViaJs(newUrl: String, title: String?) {
+        if (newUrl.isBlank() || newUrl.startsWith("about:") || newUrl.startsWith("data:")) return
+        if (newUrl == _uiState.value.currentUrl) return
+
+        _uiState.update { state ->
+            val updatedTabs = state.tabs.map { tab ->
+                if (tab.id == state.activeTabId) tab.copy(
+                    url = newUrl,
+                    title = title?.takeIf { it.isNotBlank() } ?: tab.title
+                ) else tab
+            }
+            state.copy(
+                currentUrl = newUrl,
+                inputUrl = newUrl,
+                title = title?.takeIf { it.isNotBlank() } ?: state.title,
+                tabs = updatedTabs,
+                isSecure = newUrl.startsWith("https://", ignoreCase = true)
+            )
+        }
+        checkBookmarkStatus(newUrl)
+        mediaSniffer.resetForPage(newUrl)
+
+        val currentTab = _uiState.value.tabs.find { it.id == _uiState.value.activeTabId }
+        val isIncognito = currentTab?.isIncognito ?: _uiState.value.isIncognito
+        if (!isIncognito) {
+            viewModelScope.launch {
+                browserRepository.recordVisit(newUrl, title ?: _uiState.value.title)
+            }
+        }
+    }
+
     fun onProgressChanged(progress: Int) {
         _uiState.update {
             it.copy(

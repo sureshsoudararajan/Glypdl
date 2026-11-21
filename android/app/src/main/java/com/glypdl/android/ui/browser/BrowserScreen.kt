@@ -74,6 +74,10 @@ fun BrowserScreen(
     var customView by remember { mutableStateOf<View?>(null) }
     var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
 
+    LaunchedEffect(Unit) {
+        AdBlocker.init(context)
+    }
+
     BackHandler(enabled = true) {
         if (customView != null) {
             customViewCallback?.onCustomViewHidden()
@@ -264,7 +268,11 @@ fun BrowserScreen(
 
                     // Layer C: Download this page with yt-dlp
                     FilledTonalButton(
-                        onClick = { onNavigateToAnalyze(uiState.currentUrl) },
+                        onClick = {
+                            val activeUrl = webViewRef?.url?.takeIf { it.isNotBlank() && !it.startsWith("about:") }
+                                ?: uiState.currentUrl
+                            onNavigateToAnalyze(activeUrl)
+                        },
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Icon(
@@ -328,13 +336,20 @@ fun BrowserScreen(
                             false
                         }
 
-                        // Layer B: Add Javascript Interface for DOM reported media
+                        // Layer B: Add Javascript Interface for DOM reported media and SPA URL changes
                         addJavascriptInterface(
                             object {
                                 @JavascriptInterface
                                 fun reportMedia(jsonPayload: String) {
                                     post {
                                         viewModel.onDomMediaReported(jsonPayload)
+                                    }
+                                }
+
+                                @JavascriptInterface
+                                fun reportUrlChange(newUrl: String, title: String?) {
+                                    post {
+                                        viewModel.onUrlChangedViaJs(newUrl, title)
                                     }
                                 }
                             },

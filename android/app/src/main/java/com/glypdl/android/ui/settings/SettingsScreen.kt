@@ -82,6 +82,15 @@ fun SettingsScreen(
     val browserAutoDetect by viewModel.browserAutoDetect.collectAsState()
     val browserDesktopModeDefault by viewModel.browserDesktopModeDefault.collectAsState()
     val browserAdBlockEnabled by viewModel.browserAdBlockEnabled.collectAsState()
+    val isUpdatingAdBlock by viewModel.isUpdatingAdBlock.collectAsState()
+    val adBlockUpdateResult by viewModel.adBlockUpdateResult.collectAsState()
+
+    LaunchedEffect(adBlockUpdateResult) {
+        adBlockUpdateResult?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            viewModel.clearAdBlockUpdateResult()
+        }
+    }
     val engineStatus by viewModel.engineStatus.collectAsState()
     val isEngineBusy by viewModel.isEngineBusy.collectAsState()
     val engineActionMessage by viewModel.engineActionMessage.collectAsState()
@@ -1251,11 +1260,22 @@ fun SettingsScreen(
 
                     SettingsSwitchRow(
                         icon = Icons.Default.Shield,
-                        title = "Block ads & trackers",
-                        subtitle = "Block intrusive ads, banners, and telemetry trackers",
+                        title = "Block ads & trackers (uBlock Origin)",
+                        subtitle = "Community rules maintained by uBlock Origin & uAssets",
                         checked = browserAdBlockEnabled,
                         onCheckedChange = { viewModel.setBrowserAdBlockEnabled(it) }
                     )
+
+                    if (browserAdBlockEnabled) {
+                        SettingsItemDivider()
+
+                        SettingsLinkRow(
+                            icon = Icons.Default.CloudSync,
+                            title = "Update uBlock filters",
+                            subtitle = if (isUpdatingAdBlock) "Updating filters from uBlock Origin..." else "Sync latest community filter rules from GitHub",
+                            onClick = { viewModel.updateUblockFilters(context) }
+                        )
+                    }
 
                     SettingsItemDivider()
 

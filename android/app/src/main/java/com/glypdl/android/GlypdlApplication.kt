@@ -52,6 +52,7 @@ class GlypdlApplication : Application(), ImageLoaderFactory {
         
         notificationHelper.createNotificationChannels()
         com.glypdl.android.util.DiagnosticLogger.init(this)
+        com.glypdl.android.service.browser.AdBlocker.init(this)
         
         applicationScope.launch {
             try {

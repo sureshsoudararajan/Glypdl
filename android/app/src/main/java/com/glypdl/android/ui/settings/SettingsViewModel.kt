@@ -116,6 +116,29 @@ class SettingsViewModel @Inject constructor(
     val browserAdBlockEnabled: StateFlow<Boolean> = settingsRepository.browserAdBlockEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    private val _isUpdatingAdBlock = MutableStateFlow(false)
+    val isUpdatingAdBlock: StateFlow<Boolean> = _isUpdatingAdBlock.asStateFlow()
+
+    private val _adBlockUpdateResult = MutableStateFlow<String?>(null)
+    val adBlockUpdateResult: StateFlow<String?> = _adBlockUpdateResult.asStateFlow()
+
+    fun updateUblockFilters(context: android.content.Context) {
+        viewModelScope.launch {
+            _isUpdatingAdBlock.value = true
+            val result = com.glypdl.android.service.browser.UblockListUpdater.update(context)
+            _isUpdatingAdBlock.value = false
+            result.onSuccess { count ->
+                _adBlockUpdateResult.value = "Updated: $count uBlock rules active"
+            }.onFailure { ex ->
+                _adBlockUpdateResult.value = "Failed to update: ${ex.message}"
+            }
+        }
+    }
+
+    fun clearAdBlockUpdateResult() {
+        _adBlockUpdateResult.value = null
+    }
+
     private val _engineStatus = MutableStateFlow<EngineStatus?>(null)
     val engineStatus: StateFlow<EngineStatus?> = _engineStatus.asStateFlow()
 

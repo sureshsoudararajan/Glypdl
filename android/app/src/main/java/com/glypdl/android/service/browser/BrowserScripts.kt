@@ -27,6 +27,48 @@ object BrowserScripts {
             if (window.__glypdl_sniffer_installed__) return;
             window.__glypdl_sniffer_installed__ = true;
 
+            var lastReportedHref = window.location.href;
+
+            function notifyUrlChange() {
+                try {
+                    var current = window.location.href;
+                    if (current && current !== lastReportedHref) {
+                        lastReportedHref = current;
+                        if (window.$JS_INTERFACE_NAME && typeof window.$JS_INTERFACE_NAME.reportUrlChange === 'function') {
+                            window.$JS_INTERFACE_NAME.reportUrlChange(current, document.title || '');
+                        }
+                        scanElements();
+                    }
+                } catch(e) {}
+            }
+
+            // Hook history.pushState (used by YouTube Shorts, Instagram Reels, Twitter, TikTok, etc.)
+            var origPushState = history.pushState;
+            history.pushState = function() {
+                var res = origPushState.apply(this, arguments);
+                notifyUrlChange();
+                return res;
+            };
+
+            // Hook history.replaceState
+            var origReplaceState = history.replaceState;
+            history.replaceState = function() {
+                var res = origReplaceState.apply(this, arguments);
+                notifyUrlChange();
+                return res;
+            };
+
+            window.addEventListener('popstate', notifyUrlChange);
+            window.addEventListener('hashchange', notifyUrlChange);
+            window.addEventListener('scrollend', notifyUrlChange);
+            window.addEventListener('touchend', function() {
+                setTimeout(notifyUrlChange, 200);
+                setTimeout(notifyUrlChange, 600);
+            });
+
+            // Failsafe timer for dynamic single-page applications like YouTube Shorts
+            setInterval(notifyUrlChange, 750);
+
             function sendCandidate(url, poster, mime, isBlob) {
                 if (!url || typeof url !== 'string') return;
                 var trimmed = url.trim();
@@ -133,10 +175,11 @@ object BrowserScripts {
                 };
             }
 
-            // Initial scan & MutationObserver for SPA changes
+            // Initial scan & MutationObserver for dynamic DOM changes
             scanElements();
             if (window.MutationObserver) {
                 var observer = new MutationObserver(function() {
+                    notifyUrlChange();
                     scanElements();
                 });
                 if (document.body) {

@@ -18,84 +18,155 @@
 
 package com.glypdl.android.service.browser
 
+import android.content.Context
+import java.io.File
+import java.io.FileInputStream
 import java.net.URI
 
 /**
- * Lightweight in-app browser ad and tracker blocker.
+ * High-performance ad and tracker blocker powered by uBlock Origin & community filter rules.
  *
- * Inspects request URLs against known ad networks, tracking telemetry, and intrusive
- * pop-up domains. Blocks them from loading and prevents them from poisoning media detection.
+ * Supports domain/subdomain matching, whitelist/exception rules, and path keyword filters.
  */
 object AdBlocker {
 
-    private val AD_DOMAINS = setOf(
-        "doubleclick.net",
-        "googlesyndication.com",
-        "googleadservices.com",
-        "adservice.google.com",
-        "pagead2.googlesyndication.com",
-        "adnxs.com",
-        "scorecardresearch.com",
-        "taboola.com",
-        "outbrain.com",
-        "popads.net",
-        "popcash.net",
-        "propellerads.com",
-        "exoclick.com",
-        "adsterra.com",
-        "trafficjunky.net",
-        "moatads.com",
-        "amazon-adsystem.com",
-        "criteo.com",
-        "criteo.net",
-        "rubiconproject.com",
-        "openx.net",
-        "pubmatic.com",
-        "casalemedia.com",
-        "smartadserver.com",
-        "yieldmo.com",
-        "applovin.com",
-        "inmobi.com",
-        "chartbeat.net",
-        "hotjar.com",
-        "clarity.ms",
-        "adcolony.com",
-        "vungle.com",
-        "unityads.unity3d.com",
-        "ironsrc.com"
+    private const val ASSET_FILE = "adblock/ublock_filters.txt"
+    private const val CACHE_DIR = "adblock"
+    private const val CACHE_FILE = "ublock_filters.txt"
+
+    @Volatile
+    private var isInitialized = false
+
+    private val blockedDomains = hashSetOf<String>()
+    private val whitelistedDomains = hashSetOf<String>()
+    private val pathKeywords = arrayListOf<String>()
+
+    private val DEFAULT_PATH_KEYWORDS = listOf(
+        "/ads/", "/adserver/", "/ad_stream/", "/pagead/", "/advert/", "/ads.js", "/prebid"
     )
 
-    private val AD_PATH_KEYWORDS = listOf(
-        "/ads/",
-        "/adserver/",
-        "/ad_stream/",
-        "/pagead/",
-        "/advert/",
-        "/ads.js",
-        "/prebid"
+    // Fallback domains if asset loading is unavailable
+    private val FALLBACK_DOMAINS = setOf(
+        "doubleclick.net", "googlesyndication.com", "googleadservices.com",
+        "adservice.google.com", "pagead2.googlesyndication.com", "adnxs.com",
+        "scorecardresearch.com", "taboola.com", "outbrain.com", "popads.net",
+        "popcash.net", "propellerads.com", "exoclick.com", "adsterra.com",
+        "trafficjunky.net", "moatads.com", "amazon-adsystem.com", "criteo.com",
+        "criteo.net", "rubiconproject.com", "openx.net", "pubmatic.com",
+        "casalemedia.com", "smartadserver.com", "yieldmo.com", "applovin.com",
+        "inmobi.com", "chartbeat.net", "hotjar.com", "clarity.ms",
+        "adcolony.com", "vungle.com", "unityads.unity3d.com", "ironsrc.com"
     )
+
+    init {
+        // Pre-populate with fallback domains so static checks work immediately even before init(context)
+        blockedDomains.addAll(FALLBACK_DOMAINS)
+        pathKeywords.addAll(DEFAULT_PATH_KEYWORDS)
+    }
 
     /**
-     * Checks if the given URL belongs to an ad network or tracking service.
+     * Initializes the filter rules. Loads cached updated rules from filesDir if available;
+     * otherwise loads the bundled community asset. Safe to call multiple times.
+     */
+    fun init(context: Context) {
+        if (isInitialized) return
+        synchronized(this) {
+            if (isInitialized) return
+            loadRules(context)
+            isInitialized = true
+        }
+    }
+
+    fun getRuleCount(): Int = blockedDomains.size
+
+    fun loadRules(context: Context) {
+        try {
+            val localCache = File(context.filesDir, "$CACHE_DIR/$CACHE_FILE")
+            val stream = if (localCache.exists() && localCache.length() > 0) {
+                FileInputStream(localCache)
+            } else {
+                context.assets.open(ASSET_FILE)
+            }
+
+            val rules = UblockFilterParser.parse(stream)
+            synchronized(this) {
+                blockedDomains.clear()
+                blockedDomains.addAll(rules.blockedDomains)
+                whitelistedDomains.clear()
+                whitelistedDomains.addAll(rules.whitelistedDomains)
+                pathKeywords.clear()
+                pathKeywords.addAll(rules.pathKeywords)
+            }
+        } catch (_: Exception) {
+            synchronized(this) {
+                blockedDomains.addAll(FALLBACK_DOMAINS)
+                pathKeywords.addAll(DEFAULT_PATH_KEYWORDS)
+            }
+        }
+    }
+
+    /**
+     * Reloads rules from a newly downloaded file.
+     */
+    fun reloadRules(file: File) {
+        if (!file.exists()) return
+        try {
+            val rules = UblockFilterParser.parse(FileInputStream(file))
+            synchronized(this) {
+                blockedDomains.clear()
+                blockedDomains.addAll(rules.blockedDomains)
+                whitelistedDomains.clear()
+                whitelistedDomains.addAll(rules.whitelistedDomains)
+                pathKeywords.clear()
+                pathKeywords.addAll(rules.pathKeywords)
+            }
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Checks if the given URL is an ad or tracker according to uBlock Origin community rules.
      */
     fun isAd(url: String): Boolean {
         if (url.isBlank()) return false
         val uri = try { URI(url) } catch (_: Exception) { return false }
         val host = uri.host?.lowercase() ?: return false
 
-        for (domain in AD_DOMAINS) {
-            if (host == domain || host.endsWith(".$domain")) {
-                return true
-            }
-        }
+        // 1. Check whitelist / exception rules first
+        if (isHostWhitelisted(host)) return false
 
+        // 2. Check domain / subdomain blocklist
+        if (isHostBlocked(host)) return true
+
+        // 3. Check path keyword rules
         val path = uri.path?.lowercase() ?: ""
-        for (keyword in AD_PATH_KEYWORDS) {
-            if (path.contains(keyword)) {
-                return true
+        if (path.isNotEmpty()) {
+            for (kw in pathKeywords) {
+                if (path.contains(kw)) return true
             }
         }
 
+        return false
+    }
+
+    private fun isHostWhitelisted(host: String): Boolean {
+        if (whitelistedDomains.contains(host)) return true
+        var dotIdx = host.indexOf('.')
+        while (dotIdx != -1) {
+            val parent = host.substring(dotIdx + 1)
+            if (whitelistedDomains.contains(parent)) return true
+            dotIdx = host.indexOf('.', dotIdx + 1)
+        }
+        return false
+    }
+
+    private fun isHostBlocked(host: String): Boolean {
+        if (blockedDomains.contains(host)) return true
+        var dotIdx = host.indexOf('.')
+        while (dotIdx != -1) {
+            val parent = host.substring(dotIdx + 1)
+            if (blockedDomains.contains(parent)) return true
+            dotIdx = host.indexOf('.', dotIdx + 1)
+        }
         return false
     }
 }

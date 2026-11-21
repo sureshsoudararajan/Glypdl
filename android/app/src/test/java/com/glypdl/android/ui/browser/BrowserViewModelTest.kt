@@ -312,4 +312,21 @@ class BrowserViewModelTest {
 
         coVerify { settingsRepository.setBrowserAdBlockEnabled(false) }
     }
+
+    @Test
+    fun `onUrlChangedViaJs updates active tab url, currentUrl, and title`() {
+        val viewModel = createViewModel()
+        viewModel.onPageStarted("https://m.youtube.com/")
+        assertEquals("https://m.youtube.com/", viewModel.uiState.value.currentUrl)
+
+        viewModel.onUrlChangedViaJs("https://m.youtube.com/shorts/OnJPmKH", "Exciting Short Video")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals("https://m.youtube.com/shorts/OnJPmKH", state.currentUrl)
+        assertEquals("https://m.youtube.com/shorts/OnJPmKH", state.inputUrl)
+        assertEquals("Exciting Short Video", state.title)
+
+        coVerify { browserRepository.recordVisit("https://m.youtube.com/shorts/OnJPmKH", "Exciting Short Video") }
+    }
 }
