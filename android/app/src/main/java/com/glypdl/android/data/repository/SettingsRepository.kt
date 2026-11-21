@@ -106,6 +106,15 @@ class SettingsRepository @Inject constructor(
 
         /** Whether to automatically embed subtitles into video when downloading. */
         val EMBED_SUBTITLES_DEFAULT = booleanPreferencesKey("embed_subtitles_default")
+
+        /** Default search engine for in-app browser ("duckduckgo", "google", "bing", "startpage"). */
+        val BROWSER_SEARCH_ENGINE = stringPreferencesKey("browser_search_engine")
+
+        /** Whether the in-app browser automatically detects media. */
+        val BROWSER_AUTO_DETECT = booleanPreferencesKey("browser_auto_detect")
+
+        /** Whether the in-app browser requests desktop sites by default. */
+        val BROWSER_DESKTOP_MODE_DEFAULT = booleanPreferencesKey("browser_desktop_mode_default")
     }
 
     // Reactive Flow Getters
@@ -247,4 +256,13 @@ class SettingsRepository @Inject constructor(
     suspend fun setDefaultSubtitleFormat(value: String) { dataStore.edit { it[DEFAULT_SUBTITLE_FORMAT] = value } }
     suspend fun setPreferredSubtitleLanguages(value: String) { dataStore.edit { it[PREFERRED_SUBTITLE_LANGUAGES] = value } }
     suspend fun setEmbedSubtitlesDefault(value: Boolean) { dataStore.edit { it[EMBED_SUBTITLES_DEFAULT] = value } }
+
+    /** In-app browser settings */
+    val browserSearchEngine: Flow<String> = dataStore.data.map { it[BROWSER_SEARCH_ENGINE] ?: "duckduckgo" }
+    val browserAutoDetect: Flow<Boolean> = dataStore.data.map { it[BROWSER_AUTO_DETECT] ?: true }
+    val browserDesktopModeDefault: Flow<Boolean> = dataStore.data.map { it[BROWSER_DESKTOP_MODE_DEFAULT] ?: false }
+
+    suspend fun setBrowserSearchEngine(value: String) { dataStore.edit { it[BROWSER_SEARCH_ENGINE] = value } }
+    suspend fun setBrowserAutoDetect(value: Boolean) { dataStore.edit { it[BROWSER_AUTO_DETECT] = value } }
+    suspend fun setBrowserDesktopModeDefault(value: Boolean) { dataStore.edit { it[BROWSER_DESKTOP_MODE_DEFAULT] = value } }
 }

@@ -12,10 +12,14 @@ package com.glypdl.android.data.local
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.glypdl.android.data.local.dao.BookmarkDao
+import com.glypdl.android.data.local.dao.BrowserHistoryDao
 import com.glypdl.android.data.local.dao.DownloadDao
 import com.glypdl.android.data.local.dao.HistoryDao
 import com.glypdl.android.data.local.dao.SavedStatusDao
 import com.glypdl.android.data.local.dao.SubtitleDao
+import com.glypdl.android.data.local.entity.BookmarkEntity
+import com.glypdl.android.data.local.entity.BrowserHistoryEntity
 import com.glypdl.android.data.local.entity.DownloadEntity
 import com.glypdl.android.data.local.entity.HistoryEntity
 import com.glypdl.android.data.local.entity.SavedStatusEntity
@@ -42,9 +46,11 @@ import com.glypdl.android.data.local.entity.SubtitleFileEntity
         DownloadEntity::class,
         HistoryEntity::class,
         SavedStatusEntity::class,
-        SubtitleFileEntity::class
+        SubtitleFileEntity::class,
+        BookmarkEntity::class,
+        BrowserHistoryEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -69,4 +75,8 @@ abstract class GlypdlDatabase : RoomDatabase() {
      * Provides access to database operations on the `subtitle_files` table.
      */
     abstract fun subtitleDao(): SubtitleDao
+
+    abstract fun bookmarkDao(): BookmarkDao
+
+    abstract fun browserHistoryDao(): BrowserHistoryDao
 }

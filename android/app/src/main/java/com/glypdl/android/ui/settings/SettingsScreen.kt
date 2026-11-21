@@ -78,6 +78,9 @@ fun SettingsScreen(
     val askBeforeDownload by viewModel.askBeforeDownload.collectAsState()
     val autoUpdateYtDlp by viewModel.autoUpdateYtDlp.collectAsState()
     val downloadDirUri by viewModel.downloadDirUri.collectAsState()
+    val browserSearchEngine by viewModel.browserSearchEngine.collectAsState()
+    val browserAutoDetect by viewModel.browserAutoDetect.collectAsState()
+    val browserDesktopModeDefault by viewModel.browserDesktopModeDefault.collectAsState()
     val engineStatus by viewModel.engineStatus.collectAsState()
     val isEngineBusy by viewModel.isEngineBusy.collectAsState()
     val engineActionMessage by viewModel.engineActionMessage.collectAsState()
@@ -103,6 +106,8 @@ fun SettingsScreen(
     var formatDialogVisible by remember { mutableStateOf(false) }
     var videoCodecDialogVisible by remember { mutableStateOf(false) }
     var audioFormatDialogVisible by remember { mutableStateOf(false) }
+    var searchEngineDialogVisible by remember { mutableStateOf(false) }
+    var clearBrowsingDataDialogVisible by remember { mutableStateOf(false) }
     var showWelcomeTour by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -1210,6 +1215,70 @@ fun SettingsScreen(
                 }
             }
 
+            // 8.5 IN-APP BROWSER SECTION
+            item {
+                SettingsGroupCard(title = "In-App Browser") {
+                    SettingsSelectRow(
+                        icon = Icons.Default.Language,
+                        title = "Search engine",
+                        subtitle = "Default search engine used in address bar",
+                        currentValue = browserSearchEngine.replaceFirstChar { it.uppercase() },
+                        onClick = { searchEngineDialogVisible = true }
+                    )
+
+                    SettingsItemDivider()
+
+                    SettingsSwitchRow(
+                        icon = Icons.Default.VideoLibrary,
+                        title = "Automatic media detection",
+                        subtitle = "Automatically detect downloadable videos and streams",
+                        checked = browserAutoDetect,
+                        onCheckedChange = { viewModel.setBrowserAutoDetect(it) }
+                    )
+
+                    SettingsItemDivider()
+
+                    SettingsSwitchRow(
+                        icon = Icons.Default.DesktopWindows,
+                        title = "Desktop mode default",
+                        subtitle = "Request desktop websites by default in new tabs",
+                        checked = browserDesktopModeDefault,
+                        onCheckedChange = { viewModel.setBrowserDesktopModeDefault(it) }
+                    )
+
+                    SettingsItemDivider()
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { clearBrowsingDataDialogVisible = true }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.DeleteSweep,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Clear browsing data",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = "Clear history, cookies, and cached web data",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
             // 9. AUTHOR & PROJECT SECTION
             item {
                 SettingsGroupCard(title = "Author & Project") {
@@ -1670,6 +1739,63 @@ fun SettingsScreen(
                 audioFormatDialogVisible = false
             },
             onDismiss = { audioFormatDialogVisible = false }
+        )
+    }
+
+    // Search Engine Selection Dialog
+    if (searchEngineDialogVisible) {
+        val searchEngineOptions = listOf(
+            "duckduckgo" to "DuckDuckGo (Privacy focused)",
+            "google" to "Google",
+            "bing" to "Bing",
+            "startpage" to "StartPage (Private Google search)"
+        )
+        SettingsSelectionDialog(
+            title = "Default Search Engine",
+            options = searchEngineOptions,
+            selectedKey = browserSearchEngine.lowercase(),
+            onSelect = {
+                viewModel.setBrowserSearchEngine(it)
+                searchEngineDialogVisible = false
+            },
+            onDismiss = { searchEngineDialogVisible = false }
+        )
+    }
+
+    // Clear Browsing Data Dialog
+    if (clearBrowsingDataDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { clearBrowsingDataDialogVisible = false },
+            icon = {
+                Icon(
+                    Icons.Default.DeleteSweep,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            title = { Text("Clear Browsing Data?") },
+            text = {
+                Text("This will delete all browsing history, cached web files, and site cookies. This action cannot be undone.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.clearBrowsingData(context)
+                        clearBrowsingDataDialogVisible = false
+                        Toast.makeText(context, "Browsing data cleared", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Clear Data")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { clearBrowsingDataDialogVisible = false }) {
+                    Text("Cancel")
+                }
+            }
         )
     }
 

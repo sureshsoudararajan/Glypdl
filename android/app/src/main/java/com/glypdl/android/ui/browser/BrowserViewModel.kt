@@ -18,10 +18,15 @@
 
 package com.glypdl.android.ui.browser
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.glypdl.android.data.local.entity.BookmarkEntity
+import com.glypdl.android.data.local.entity.BrowserHistoryEntity
 import com.glypdl.android.data.model.*
+import com.glypdl.android.data.repository.BrowserRepository
+import com.glypdl.android.data.repository.SettingsRepository
 import com.glypdl.android.service.DownloadManager
 import com.glypdl.android.service.browser.DashParser
 import com.glypdl.android.service.browser.HlsParser
@@ -31,10 +36,7 @@ import com.glypdl.android.service.browser.MediaSniffer
 import com.glypdl.android.util.FileNameSanitizer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.net.URLEncoder
@@ -43,6 +45,8 @@ import java.util.UUID
 import javax.inject.Inject
 
 data class BrowserUiState(
+    val tabs: List<BrowserTab> = listOf(BrowserTab(id = "default_tab")),
+    val activeTabId: String = "default_tab",
     val currentUrl: String = "https://duckduckgo.com",
     val inputUrl: String = "https://duckduckgo.com",
     val title: String = "Browser",
@@ -55,6 +59,13 @@ data class BrowserUiState(
     val errorMessage: String? = null,
     val sslErrorDialogUrl: String? = null,
     val isMediaSheetVisible: Boolean = false,
+    val isTabSwitcherVisible: Boolean = false,
+    val isBookmarksHistoryVisible: Boolean = false,
+    val isBookmarked: Boolean = false,
+    val isFindInPageVisible: Boolean = false,
+    val findQuery: String = "",
+    val findCurrentIndex: Int = 0,
+    val findTotalMatches: Int = 0,
     val selectedQualityMedia: DetectedMedia? = null,
     val snackbarMessage: String? = null
 )
@@ -64,14 +75,24 @@ class BrowserViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val mediaSniffer: MediaSniffer,
     private val mediaProber: MediaProber,
-    private val downloadManager: DownloadManager
+    private val downloadManager: DownloadManager,
+    private val browserRepository: BrowserRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val initialUrl: String = savedStateHandle.get<String>("url")
         ?.takeIf { it.isNotBlank() } ?: "https://duckduckgo.com"
 
+    private val initialTab = BrowserTab(
+        id = UUID.randomUUID().toString(),
+        url = initialUrl,
+        title = "New Tab"
+    )
+
     private val _uiState = MutableStateFlow(
         BrowserUiState(
+            tabs = listOf(initialTab),
+            activeTabId = initialTab.id,
             currentUrl = initialUrl,
             inputUrl = initialUrl
         )
@@ -79,6 +100,29 @@ class BrowserViewModel @Inject constructor(
     val uiState: StateFlow<BrowserUiState> = _uiState.asStateFlow()
 
     val detectedMedia: StateFlow<List<DetectedMedia>> = mediaSniffer.detectedMediaFlow
+    val bookmarks: StateFlow<List<BookmarkEntity>> = browserRepository.getAllBookmarks()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val history: StateFlow<List<BrowserHistoryEntity>> = browserRepository.getAllHistory()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private var defaultSearchEngine: String = "duckduckgo"
+    private var isAutoDetectEnabled: Boolean = true
+
+    init {
+        viewModelScope.launch {
+            settingsRepository.browserSearchEngine.collect { defaultSearchEngine = it }
+        }
+        viewModelScope.launch {
+            settingsRepository.browserAutoDetect.collect { isAutoDetectEnabled = it }
+        }
+        viewModelScope.launch {
+            settingsRepository.browserDesktopModeDefault.collect { defaultDesktop ->
+                if (defaultDesktop && !_uiState.value.isDesktopMode) {
+                    _uiState.update { it.copy(isDesktopMode = true) }
+                }
+            }
+        }
+    }
 
     fun onInputUrlChange(newInput: String) {
         _uiState.update { it.copy(inputUrl = newInput) }
@@ -86,8 +130,12 @@ class BrowserViewModel @Inject constructor(
 
     fun onSubmitInput(input: String) {
         val resolvedUrl = resolveUrlOrSearch(input.trim())
-        _uiState.update {
-            it.copy(
+        _uiState.update { state ->
+            val updatedTabs = state.tabs.map { tab ->
+                if (tab.id == state.activeTabId) tab.copy(url = resolvedUrl) else tab
+            }
+            state.copy(
+                tabs = updatedTabs,
                 currentUrl = resolvedUrl,
                 inputUrl = resolvedUrl,
                 errorMessage = null
@@ -96,9 +144,15 @@ class BrowserViewModel @Inject constructor(
     }
 
     fun onPageStarted(url: String) {
-        mediaSniffer.resetForPage(url)
-        _uiState.update {
-            it.copy(
+        if (isAutoDetectEnabled) {
+            mediaSniffer.resetForPage(url)
+        }
+        _uiState.update { state ->
+            val updatedTabs = state.tabs.map { tab ->
+                if (tab.id == state.activeTabId) tab.copy(url = url) else tab
+            }
+            state.copy(
+                tabs = updatedTabs,
                 currentUrl = url,
                 inputUrl = url,
                 isLoading = true,
@@ -106,11 +160,20 @@ class BrowserViewModel @Inject constructor(
                 isSecure = url.startsWith("https://", ignoreCase = true)
             )
         }
+        checkBookmarkStatus(url)
     }
 
     fun onPageFinished(url: String, canBack: Boolean, canForward: Boolean) {
-        _uiState.update {
-            it.copy(
+        _uiState.update { state ->
+            val updatedTabs = state.tabs.map { tab ->
+                if (tab.id == state.activeTabId) tab.copy(
+                    url = url,
+                    canGoBack = canBack,
+                    canGoForward = canForward
+                ) else tab
+            }
+            state.copy(
+                tabs = updatedTabs,
                 currentUrl = url,
                 inputUrl = url,
                 isLoading = false,
@@ -118,6 +181,11 @@ class BrowserViewModel @Inject constructor(
                 canGoForward = canForward,
                 isSecure = url.startsWith("https://", ignoreCase = true)
             )
+        }
+        checkBookmarkStatus(url)
+        // Record in browsing history
+        viewModelScope.launch {
+            browserRepository.recordVisit(url, _uiState.value.title)
         }
     }
 
@@ -132,7 +200,12 @@ class BrowserViewModel @Inject constructor(
 
     fun onTitleReceived(title: String) {
         if (title.isNotBlank() && !title.startsWith("http://") && !title.startsWith("https://")) {
-            _uiState.update { it.copy(title = title) }
+            _uiState.update { state ->
+                val updatedTabs = state.tabs.map { tab ->
+                    if (tab.id == state.activeTabId) tab.copy(title = title) else tab
+                }
+                state.copy(title = title, tabs = updatedTabs)
+            }
         }
     }
 
@@ -186,10 +259,182 @@ class BrowserViewModel @Inject constructor(
         _uiState.update { it.copy(snackbarMessage = null) }
     }
 
+    // Tabs Management
+    fun showTabSwitcher() {
+        _uiState.update { it.copy(isTabSwitcherVisible = true) }
+    }
+
+    fun hideTabSwitcher() {
+        _uiState.update { it.copy(isTabSwitcherVisible = false) }
+    }
+
+    fun openNewTab(url: String = "https://duckduckgo.com") {
+        val newTab = BrowserTab(
+            id = UUID.randomUUID().toString(),
+            url = url,
+            title = "New Tab"
+        )
+        _uiState.update { state ->
+            state.copy(
+                tabs = state.tabs + newTab,
+                activeTabId = newTab.id,
+                currentUrl = newTab.url,
+                inputUrl = newTab.url,
+                isTabSwitcherVisible = false
+            )
+        }
+        mediaSniffer.resetForPage(url)
+    }
+
+    fun switchTab(tabId: String) {
+        val targetTab = _uiState.value.tabs.find { it.id == tabId } ?: return
+        _uiState.update {
+            it.copy(
+                activeTabId = tabId,
+                currentUrl = targetTab.url,
+                inputUrl = targetTab.url,
+                title = targetTab.title,
+                canGoBack = targetTab.canGoBack,
+                canGoForward = targetTab.canGoForward,
+                isTabSwitcherVisible = false
+            )
+        }
+        mediaSniffer.resetForPage(targetTab.url)
+    }
+
+    fun closeTab(tabId: String) {
+        val currentTabs = _uiState.value.tabs
+        if (currentTabs.size <= 1) {
+            // If last tab is closed, reset to home tab
+            val freshTab = BrowserTab(url = "https://duckduckgo.com", title = "New Tab")
+            _uiState.update {
+                it.copy(
+                    tabs = listOf(freshTab),
+                    activeTabId = freshTab.id,
+                    currentUrl = freshTab.url,
+                    inputUrl = freshTab.url,
+                    isTabSwitcherVisible = false
+                )
+            }
+            return
+        }
+
+        val remaining = currentTabs.filter { it.id != tabId }
+        val nextActiveId = if (tabId == _uiState.value.activeTabId) {
+            remaining.last().id
+        } else {
+            _uiState.value.activeTabId
+        }
+        val nextActiveTab = remaining.first { it.id == nextActiveId }
+
+        _uiState.update {
+            it.copy(
+                tabs = remaining,
+                activeTabId = nextActiveId,
+                currentUrl = nextActiveTab.url,
+                inputUrl = nextActiveTab.url,
+                title = nextActiveTab.title
+            )
+        }
+    }
+
+    fun closeAllTabs() {
+        val freshTab = BrowserTab(url = "https://duckduckgo.com", title = "New Tab")
+        _uiState.update {
+            it.copy(
+                tabs = listOf(freshTab),
+                activeTabId = freshTab.id,
+                currentUrl = freshTab.url,
+                inputUrl = freshTab.url,
+                isTabSwitcherVisible = false
+            )
+        }
+    }
+
+    // Bookmarks and History
+    fun showBookmarksHistory() {
+        _uiState.update { it.copy(isBookmarksHistoryVisible = true) }
+    }
+
+    fun hideBookmarksHistory() {
+        _uiState.update { it.copy(isBookmarksHistoryVisible = false) }
+    }
+
+    private fun checkBookmarkStatus(url: String) {
+        viewModelScope.launch {
+            val bookmarked = browserRepository.isBookmarked(url)
+            _uiState.update { it.copy(isBookmarked = bookmarked) }
+        }
+    }
+
+    fun toggleBookmarkCurrentPage() {
+        viewModelScope.launch {
+            val url = _uiState.value.currentUrl
+            val title = _uiState.value.title
+            if (_uiState.value.isBookmarked) {
+                browserRepository.removeBookmark(url)
+                _uiState.update { it.copy(isBookmarked = false, snackbarMessage = "Bookmark removed") }
+            } else {
+                browserRepository.addBookmark(url, title)
+                _uiState.update { it.copy(isBookmarked = true, snackbarMessage = "Bookmark saved") }
+            }
+        }
+    }
+
+    fun deleteBookmark(id: Long) {
+        viewModelScope.launch {
+            browserRepository.removeBookmarkById(id)
+            checkBookmarkStatus(_uiState.value.currentUrl)
+        }
+    }
+
+    fun deleteHistoryItem(id: Long) {
+        viewModelScope.launch {
+            browserRepository.deleteHistoryById(id)
+        }
+    }
+
+    fun clearHistory() {
+        viewModelScope.launch {
+            browserRepository.clearHistory()
+            _uiState.update { it.copy(snackbarMessage = "Browsing history cleared") }
+        }
+    }
+
+    fun clearAllBrowsingData(context: Context) {
+        viewModelScope.launch {
+            browserRepository.clearAllBrowsingData(context)
+            _uiState.update { it.copy(snackbarMessage = "All browsing data cleared") }
+        }
+    }
+
+    // Find in Page
+    fun showFindInPage() {
+        _uiState.update { it.copy(isFindInPageVisible = true, findQuery = "") }
+    }
+
+    fun hideFindInPage() {
+        _uiState.update { it.copy(isFindInPageVisible = false, findQuery = "", findTotalMatches = 0) }
+    }
+
+    fun onFindQueryChange(query: String) {
+        _uiState.update { it.copy(findQuery = query) }
+    }
+
+    fun onFindResult(activeMatchOrdinal: Int, numberOfMatches: Int) {
+        _uiState.update {
+            it.copy(
+                findCurrentIndex = activeMatchOrdinal,
+                findTotalMatches = numberOfMatches
+            )
+        }
+    }
+
     /**
      * Layer A: Handle network request intercepted in WebViewClient.shouldInterceptRequest.
      */
     fun onNetworkResourceIntercepted(url: String, headers: Map<String, String>) {
+        if (!isAutoDetectEnabled) return
         if (url.isBlank() || MediaClassifier.isAdOrTrackingUrl(url) || MediaClassifier.isSegmentOrChunk(url)) return
 
         val kind = MediaClassifier.classify(url)
@@ -206,7 +451,6 @@ class BrowserViewModel @Inject constructor(
                 parseManifestIfStreaming(candidateId, url, kind, headers)
             }
         } else {
-            // If URL path has ambiguous hints, probe it in background
             val lower = url.lowercase()
             if (lower.contains("videoplayback") || lower.contains("/stream") || lower.contains("media")) {
                 viewModelScope.launch(Dispatchers.IO) {
@@ -235,6 +479,7 @@ class BrowserViewModel @Inject constructor(
      * Layer B: Handle DOM / JS reported media from injected scripts.
      */
     fun onDomMediaReported(jsonPayload: String) {
+        if (!isAutoDetectEnabled) return
         try {
             val json = JSONObject(jsonPayload)
             val url = json.optString("url")
@@ -325,9 +570,6 @@ class BrowserViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Enqueues a detected media item into the Glypdl download pipeline.
-     */
     fun downloadDetectedMedia(media: DetectedMedia) {
         viewModelScope.launch {
             val rawTitle = media.pageTitle?.takeIf { it.isNotBlank() }
@@ -390,6 +632,11 @@ class BrowserViewModel @Inject constructor(
         }
 
         val encoded = URLEncoder.encode(input, StandardCharsets.UTF_8.toString())
-        return "https://duckduckgo.com/?q=$encoded"
+        return when (defaultSearchEngine.lowercase()) {
+            "google" -> "https://www.google.com/search?q=$encoded"
+            "bing" -> "https://www.bing.com/search?q=$encoded"
+            "startpage" -> "https://www.startpage.com/sp/search?query=$encoded"
+            else -> "https://duckduckgo.com/?q=$encoded"
+        }
     }
 }

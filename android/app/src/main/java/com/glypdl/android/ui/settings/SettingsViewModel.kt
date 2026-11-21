@@ -18,6 +18,7 @@ package com.glypdl.android.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.glypdl.android.data.repository.BrowserRepository
 import com.glypdl.android.data.repository.SettingsRepository
 import com.glypdl.android.service.YtDlpService
 import com.glypdl.android.service.engine.EngineStatus
@@ -40,7 +41,8 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val ytDlpService: YtDlpService,
     private val authCookieManager: com.glypdl.android.service.auth.AuthCookieManager,
-    private val appUpdateManager: AppUpdateManager
+    private val appUpdateManager: AppUpdateManager,
+    private val browserRepository: BrowserRepository
 ) : ViewModel() {
 
     val authPlatforms = com.glypdl.android.service.auth.AuthCookieManager.SUPPORTED_PLATFORMS
@@ -100,6 +102,15 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "best")
 
     val embedSubtitlesDefault: StateFlow<Boolean> = settingsRepository.embedSubtitlesDefault
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val browserSearchEngine: StateFlow<String> = settingsRepository.browserSearchEngine
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "duckduckgo")
+
+    val browserAutoDetect: StateFlow<Boolean> = settingsRepository.browserAutoDetect
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val browserDesktopModeDefault: StateFlow<Boolean> = settingsRepository.browserDesktopModeDefault
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _engineStatus = MutableStateFlow<EngineStatus?>(null)
@@ -268,4 +279,9 @@ class SettingsViewModel @Inject constructor(
     fun createShareLogsIntent(context: android.content.Context): android.content.Intent? {
         return com.glypdl.android.util.DiagnosticLogger.createShareIntent(context)
     }
+
+    fun setBrowserSearchEngine(engine: String) = viewModelScope.launch { settingsRepository.setBrowserSearchEngine(engine) }
+    fun setBrowserAutoDetect(enabled: Boolean) = viewModelScope.launch { settingsRepository.setBrowserAutoDetect(enabled) }
+    fun setBrowserDesktopModeDefault(enabled: Boolean) = viewModelScope.launch { settingsRepository.setBrowserDesktopModeDefault(enabled) }
+    fun clearBrowsingData(context: android.content.Context) = viewModelScope.launch { browserRepository.clearAllBrowsingData(context) }
 }

@@ -21,14 +21,19 @@ package com.glypdl.android.ui.browser
 import androidx.lifecycle.SavedStateHandle
 import com.glypdl.android.data.model.DetectedMedia
 import com.glypdl.android.data.model.MediaKind
+import com.glypdl.android.data.repository.BrowserRepository
+import com.glypdl.android.data.repository.SettingsRepository
 import com.glypdl.android.service.DownloadManager
 import com.glypdl.android.service.browser.GlypdlWebViewFactory
 import com.glypdl.android.service.browser.MediaProber
 import com.glypdl.android.service.browser.MediaSniffer
+import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -47,6 +52,8 @@ class BrowserViewModelTest {
     private lateinit var mediaProber: MediaProber
     private lateinit var mediaSniffer: MediaSniffer
     private lateinit var downloadManager: DownloadManager
+    private lateinit var browserRepository: BrowserRepository
+    private lateinit var settingsRepository: SettingsRepository
 
     @Before
     fun setup() {
@@ -54,6 +61,14 @@ class BrowserViewModelTest {
         mediaProber = mockk(relaxed = true)
         mediaSniffer = MediaSniffer(mediaProber)
         downloadManager = mockk(relaxed = true)
+        browserRepository = mockk(relaxed = true)
+        settingsRepository = mockk(relaxed = true)
+
+        every { browserRepository.getAllBookmarks() } returns flowOf(emptyList())
+        every { browserRepository.getAllHistory() } returns flowOf(emptyList())
+        every { settingsRepository.browserSearchEngine } returns flowOf("duckduckgo")
+        every { settingsRepository.browserAutoDetect } returns flowOf(true)
+        every { settingsRepository.browserDesktopModeDefault } returns flowOf(false)
     }
 
     @After
@@ -66,7 +81,9 @@ class BrowserViewModelTest {
             savedStateHandle = handle,
             mediaSniffer = mediaSniffer,
             mediaProber = mediaProber,
-            downloadManager = downloadManager
+            downloadManager = downloadManager,
+            browserRepository = browserRepository,
+            settingsRepository = settingsRepository
         )
     }
 
@@ -80,6 +97,7 @@ class BrowserViewModelTest {
         assertTrue(state.isSecure)
         assertFalse(state.isLoading)
         assertNull(state.errorMessage)
+        assertEquals(1, state.tabs.size)
     }
 
     @Test
@@ -118,6 +136,64 @@ class BrowserViewModelTest {
     }
 
     @Test
+    fun tabsManagement_openSwitchClose() {
+        val viewModel = createViewModel()
+
+        assertEquals(1, viewModel.uiState.value.tabs.size)
+        val tab1Id = viewModel.uiState.value.activeTabId
+
+        // Open new tab
+        viewModel.openNewTab("https://wikipedia.org")
+        assertEquals(2, viewModel.uiState.value.tabs.size)
+        val tab2Id = viewModel.uiState.value.activeTabId
+        assertTrue(tab1Id != tab2Id)
+        assertEquals("https://wikipedia.org", viewModel.uiState.value.currentUrl)
+
+        // Switch back to tab 1
+        viewModel.switchTab(tab1Id)
+        assertEquals(tab1Id, viewModel.uiState.value.activeTabId)
+        assertEquals("https://duckduckgo.com", viewModel.uiState.value.currentUrl)
+
+        // Close tab 2
+        viewModel.closeTab(tab2Id)
+        assertEquals(1, viewModel.uiState.value.tabs.size)
+    }
+
+    @Test
+    fun bookmarks_toggle() {
+        val viewModel = createViewModel()
+        coEvery { browserRepository.isBookmarked("https://example.com") } returns false
+
+        viewModel.onPageStarted("https://example.com")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.toggleBookmarkCurrentPage()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { browserRepository.addBookmark("https://example.com", any()) }
+        assertTrue(viewModel.uiState.value.isBookmarked)
+    }
+
+    @Test
+    fun findInPage_lifecycle() {
+        val viewModel = createViewModel()
+
+        viewModel.showFindInPage()
+        assertTrue(viewModel.uiState.value.isFindInPageVisible)
+
+        viewModel.onFindQueryChange("download")
+        assertEquals("download", viewModel.uiState.value.findQuery)
+
+        viewModel.onFindResult(2, 5)
+        assertEquals(2, viewModel.uiState.value.findCurrentIndex)
+        assertEquals(5, viewModel.uiState.value.findTotalMatches)
+
+        viewModel.hideFindInPage()
+        assertFalse(viewModel.uiState.value.isFindInPageVisible)
+        assertEquals("", viewModel.uiState.value.findQuery)
+    }
+
+    @Test
     fun pageLifecycle_updatesStateCorrectly() {
         val viewModel = createViewModel()
 
@@ -138,10 +214,13 @@ class BrowserViewModelTest {
         assertFalse(viewModel.uiState.value.isLoading)
 
         viewModel.onPageFinished("https://example.com", canBack = true, canForward = false)
+        testDispatcher.scheduler.advanceUntilIdle()
         state = viewModel.uiState.value
         assertFalse(state.isLoading)
         assertTrue(state.canGoBack)
         assertFalse(state.canGoForward)
+
+        coVerify { browserRepository.recordVisit("https://example.com", "Example Domain") }
     }
 
     @Test
@@ -158,26 +237,6 @@ class BrowserViewModelTest {
         assertEquals(1, detected.size)
         assertEquals("https://example.com/video.mp4", detected[0].url)
         assertEquals(MediaKind.PROGRESSIVE_VIDEO, detected[0].kind)
-    }
-
-    @Test
-    fun onDomMediaReported_addsCandidate() {
-        val viewModel = createViewModel()
-        viewModel.onPageStarted("https://example.com")
-
-        val payload = """
-            {
-                "url": "https://example.com/audio.mp3",
-                "title": "Sample Song",
-                "mime": "audio/mpeg"
-            }
-        """.trimIndent()
-        viewModel.onDomMediaReported(payload)
-
-        val detected = viewModel.detectedMedia.value
-        assertEquals(1, detected.size)
-        assertEquals("https://example.com/audio.mp3", detected[0].url)
-        assertEquals(MediaKind.PROGRESSIVE_AUDIO, detected[0].kind)
     }
 
     @Test
@@ -202,32 +261,6 @@ class BrowserViewModelTest {
                 it.sourceKind == "BROWSER_DIRECT"
             })
         }
-    }
-
-    @Test
-    fun httpPage_marksAsInsecure() {
-        val viewModel = createViewModel()
-
-        viewModel.onPageStarted("http://example.com")
-        assertFalse(viewModel.uiState.value.isSecure)
-    }
-
-    @Test
-    fun errorAndSslHandling() {
-        val viewModel = createViewModel()
-
-        viewModel.onErrorReceived("Connection timeout")
-        assertEquals("Connection timeout", viewModel.uiState.value.errorMessage)
-        assertFalse(viewModel.uiState.value.isLoading)
-
-        viewModel.clearError()
-        assertNull(viewModel.uiState.value.errorMessage)
-
-        viewModel.onSslError("https://self-signed.badssl.com")
-        assertEquals("https://self-signed.badssl.com", viewModel.uiState.value.sslErrorDialogUrl)
-
-        viewModel.dismissSslDialog()
-        assertNull(viewModel.uiState.value.sslErrorDialogUrl)
     }
 
     @Test

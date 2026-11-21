@@ -43,11 +43,16 @@ fun AddressBar(
     isLoading: Boolean,
     isSecure: Boolean,
     isDesktopMode: Boolean,
+    isBookmarked: Boolean = false,
     onUrlChange: (String) -> Unit,
     onSubmitUrl: (String) -> Unit,
     onReload: () -> Unit,
     onStop: () -> Unit,
     onToggleDesktop: () -> Unit,
+    onToggleBookmark: () -> Unit = {},
+    onOpenBookmarksHistory: () -> Unit = {},
+    onFindInPage: () -> Unit = {},
+    onClearBrowsingData: () -> Unit = {},
     onShare: () -> Unit,
     onOpenExternal: () -> Unit,
     onCopyUrl: () -> Unit,
@@ -185,6 +190,40 @@ fun AddressBar(
                         }
                     )
                     DropdownMenuItem(
+                        text = { Text(if (isBookmarked) "Remove bookmark" else "Bookmark page") },
+                        onClick = {
+                            onToggleBookmark()
+                            menuExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                contentDescription = null,
+                                tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Bookmarks & History") },
+                        onClick = {
+                            onOpenBookmarksHistory()
+                            menuExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.Bookmarks, contentDescription = null)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Find in page") },
+                        onClick = {
+                            onFindInPage()
+                            menuExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.FindInPage, contentDescription = null)
+                        }
+                    )
+                    DropdownMenuItem(
                         text = { Text("Copy link") },
                         onClick = {
                             onCopyUrl()
@@ -212,6 +251,17 @@ fun AddressBar(
                         },
                         leadingIcon = {
                             Icon(Icons.Default.OpenInBrowser, contentDescription = null)
+                        }
+                    )
+                    HorizontalDivider()
+                    DropdownMenuItem(
+                        text = { Text("Clear browsing data", color = MaterialTheme.colorScheme.error) },
+                        onClick = {
+                            onClearBrowsingData()
+                            menuExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                         }
                     )
                 }

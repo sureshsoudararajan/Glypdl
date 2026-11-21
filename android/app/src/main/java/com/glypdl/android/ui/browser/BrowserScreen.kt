@@ -47,11 +47,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.glypdl.android.data.model.MediaKind
 import com.glypdl.android.service.browser.BrowserScripts
 import com.glypdl.android.service.browser.GlypdlWebViewFactory
-import com.glypdl.android.ui.browser.components.AddressBar
-import com.glypdl.android.ui.browser.components.DetectedMediaSheet
-import com.glypdl.android.ui.browser.components.QualityPickerSheet
+import com.glypdl.android.service.browser.MediaClassifier
+import com.glypdl.android.ui.browser.components.*
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -63,12 +63,17 @@ fun BrowserScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val detectedMediaList by viewModel.detectedMedia.collectAsState()
+    val bookmarks by viewModel.bookmarks.collectAsState()
+    val history by viewModel.history.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
     BackHandler(enabled = true) {
-        if (webViewRef?.canGoBack() == true) {
+        if (uiState.isFindInPageVisible) {
+            webViewRef?.clearMatches()
+            viewModel.hideFindInPage()
+        } else if (webViewRef?.canGoBack() == true) {
             webViewRef?.goBack()
         } else {
             onNavigateBack()
@@ -85,6 +90,15 @@ fun BrowserScreen(
                 wv.settings.userAgentString = GlypdlWebViewFactory.sanitizeUserAgent(defaultUa)
             }
             wv.reload()
+        }
+    }
+
+    // Handle active tab changes
+    LaunchedEffect(uiState.activeTabId) {
+        webViewRef?.let { wv ->
+            if (wv.url != uiState.currentUrl) {
+                wv.loadUrl(uiState.currentUrl)
+            }
         }
     }
 
@@ -107,44 +121,72 @@ fun BrowserScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
-                AddressBar(
-                    url = uiState.inputUrl,
-                    isLoading = uiState.isLoading,
-                    isSecure = uiState.isSecure,
-                    isDesktopMode = uiState.isDesktopMode,
-                    onUrlChange = { viewModel.onInputUrlChange(it) },
-                    onSubmitUrl = { target ->
-                        viewModel.onSubmitInput(target)
-                        val resolved = viewModel.resolveUrlOrSearch(target)
-                        webViewRef?.loadUrl(resolved)
-                    },
-                    onReload = {
-                        viewModel.clearError()
-                        webViewRef?.reload()
-                    },
-                    onStop = { webViewRef?.stopLoading() },
-                    onToggleDesktop = { viewModel.toggleDesktopMode() },
-                    onShare = {
-                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, uiState.currentUrl)
+                if (uiState.isFindInPageVisible) {
+                    FindInPageBar(
+                        query = uiState.findQuery,
+                        currentIndex = uiState.findCurrentIndex,
+                        totalMatches = uiState.findTotalMatches,
+                        onQueryChange = { q ->
+                            viewModel.onFindQueryChange(q)
+                            webViewRef?.findAllAsync(q)
+                        },
+                        onNextMatch = { webViewRef?.findNext(true) },
+                        onPrevMatch = { webViewRef?.findNext(false) },
+                        onClose = {
+                            webViewRef?.clearMatches()
+                            viewModel.hideFindInPage()
                         }
-                        context.startActivity(Intent.createChooser(shareIntent, "Share Link"))
-                    },
-                    onOpenExternal = {
-                        try {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uiState.currentUrl))
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "Could not open external browser", Toast.LENGTH_SHORT).show()
+                    )
+                } else {
+                    AddressBar(
+                        url = uiState.inputUrl,
+                        isLoading = uiState.isLoading,
+                        isSecure = uiState.isSecure,
+                        isDesktopMode = uiState.isDesktopMode,
+                        isBookmarked = uiState.isBookmarked,
+                        onUrlChange = { viewModel.onInputUrlChange(it) },
+                        onSubmitUrl = { target ->
+                            viewModel.onSubmitInput(target)
+                            val resolved = viewModel.resolveUrlOrSearch(target)
+                            webViewRef?.loadUrl(resolved)
+                        },
+                        onReload = {
+                            viewModel.clearError()
+                            webViewRef?.reload()
+                        },
+                        onStop = { webViewRef?.stopLoading() },
+                        onToggleDesktop = { viewModel.toggleDesktopMode() },
+                        onToggleBookmark = { viewModel.toggleBookmarkCurrentPage() },
+                        onOpenBookmarksHistory = { viewModel.showBookmarksHistory() },
+                        onFindInPage = {
+                            viewModel.showFindInPage()
+                            webViewRef?.setFindListener { activeMatchOrdinal, numberOfMatches, _ ->
+                                viewModel.onFindResult(activeMatchOrdinal, numberOfMatches)
+                            }
+                        },
+                        onClearBrowsingData = { viewModel.clearAllBrowsingData(context) },
+                        onShare = {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, uiState.currentUrl)
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share Link"))
+                        },
+                        onOpenExternal = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uiState.currentUrl))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Could not open external browser", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onCopyUrl = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("URL", uiState.currentUrl))
+                            Toast.makeText(context, "Link copied to clipboard", Toast.LENGTH_SHORT).show()
                         }
-                    },
-                    onCopyUrl = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("URL", uiState.currentUrl))
-                        Toast.makeText(context, "Link copied to clipboard", Toast.LENGTH_SHORT).show()
-                    }
-                )
+                    )
+                }
 
                 if (uiState.isLoading) {
                     LinearProgressIndicator(
@@ -195,10 +237,23 @@ fun BrowserScreen(
                         Icon(Icons.Default.Home, contentDescription = "Home")
                     }
 
+                    // Tabs Count Button
+                    IconButton(onClick = { viewModel.showTabSwitcher() }) {
+                        BadgedBox(
+                            badge = {
+                                Badge {
+                                    Text("${uiState.tabs.size}")
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.FilterNone, contentDescription = "Tabs")
+                        }
+                    }
+
                     // Layer C: Download this page with yt-dlp
                     FilledTonalButton(
                         onClick = { onNavigateToAnalyze(uiState.currentUrl) },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                     ) {
                         Icon(
                             Icons.Default.Download,
@@ -206,7 +261,7 @@ fun BrowserScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Download Page", style = MaterialTheme.typography.labelMedium)
+                        Text("Page", style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
@@ -245,6 +300,21 @@ fun BrowserScreen(
                 factory = { ctx ->
                     GlypdlWebViewFactory.createWebView(ctx).apply {
                         webViewRef = this
+
+                        // Long press link/image handler
+                        setOnLongClickListener {
+                            val result = hitTestResult
+                            val extra = result.extra
+                            if (!extra.isNullOrBlank()) {
+                                val kind = MediaClassifier.classify(extra)
+                                if (kind != null) {
+                                    viewModel.onNetworkResourceIntercepted(extra, emptyMap())
+                                    Toast.makeText(ctx, "Media link captured", Toast.LENGTH_SHORT).show()
+                                    return@setOnLongClickListener true
+                                }
+                            }
+                            false
+                        }
 
                         // Layer B: Add Javascript Interface for DOM reported media
                         addJavascriptInterface(
@@ -291,7 +361,7 @@ fun BrowserScreen(
                                     val headers = request.requestHeaders ?: emptyMap()
                                     viewModel.onNetworkResourceIntercepted(urlStr, headers)
                                 }
-                                return null // Always allow WebView to load resource normally
+                                return null
                             }
 
                             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -442,6 +512,36 @@ fun BrowserScreen(
                 viewModel.enqueueDownloadRequest(request)
             },
             onDismiss = { viewModel.dismissQualityPicker() }
+        )
+    }
+
+    // Tab Switcher BottomSheet
+    if (uiState.isTabSwitcherVisible) {
+        TabSwitcher(
+            tabs = uiState.tabs,
+            activeTabId = uiState.activeTabId,
+            onSelectTab = { tabId -> viewModel.switchTab(tabId) },
+            onCloseTab = { tabId -> viewModel.closeTab(tabId) },
+            onNewTab = { viewModel.openNewTab() },
+            onCloseAllTabs = { viewModel.closeAllTabs() },
+            onDismiss = { viewModel.hideTabSwitcher() }
+        )
+    }
+
+    // Bookmarks and History BottomSheet
+    if (uiState.isBookmarksHistoryVisible) {
+        BookmarksHistorySheet(
+            bookmarks = bookmarks,
+            history = history,
+            onSelectUrl = { targetUrl ->
+                viewModel.onSubmitInput(targetUrl)
+                webViewRef?.loadUrl(viewModel.resolveUrlOrSearch(targetUrl))
+                viewModel.hideBookmarksHistory()
+            },
+            onDeleteBookmark = { id -> viewModel.deleteBookmark(id) },
+            onDeleteHistoryItem = { id -> viewModel.deleteHistoryItem(id) },
+            onClearHistory = { viewModel.clearHistory() },
+            onDismiss = { viewModel.hideBookmarksHistory() }
         )
     }
 

@@ -14,6 +14,8 @@ import androidx.room.Room
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.glypdl.android.data.local.GlypdlDatabase
+import com.glypdl.android.data.local.dao.BookmarkDao
+import com.glypdl.android.data.local.dao.BrowserHistoryDao
 import com.glypdl.android.data.local.dao.DownloadDao
 import com.glypdl.android.data.local.dao.HistoryDao
 import com.glypdl.android.data.local.dao.SavedStatusDao
@@ -94,6 +96,32 @@ object DatabaseModule {
         }
     }
 
+    val MIGRATION_6_7 = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `bookmarks` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `url` TEXT NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL
+                )
+            """.trimIndent())
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_bookmarks_url` ON `bookmarks` (`url`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_bookmarks_createdAt` ON `bookmarks` (`createdAt`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `browser_history` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `url` TEXT NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `visitedAt` INTEGER NOT NULL
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_browser_history_url` ON `browser_history` (`url`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_browser_history_visitedAt` ON `browser_history` (`visitedAt`)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): GlypdlDatabase {
@@ -102,7 +130,7 @@ object DatabaseModule {
             GlypdlDatabase::class.java,
             "glypdl_database"
         )
-        .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+        .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
         .fallbackToDestructiveMigration()
         .build()
     }
@@ -129,5 +157,17 @@ object DatabaseModule {
     @Singleton
     fun provideSubtitleDao(database: GlypdlDatabase): SubtitleDao {
         return database.subtitleDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideBookmarkDao(database: GlypdlDatabase): BookmarkDao {
+        return database.bookmarkDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideBrowserHistoryDao(database: GlypdlDatabase): BrowserHistoryDao {
+        return database.browserHistoryDao()
     }
 }
