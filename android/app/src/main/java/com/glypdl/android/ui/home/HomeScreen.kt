@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.*
@@ -50,7 +51,8 @@ fun HomeScreen(
     onNavigateToHistory: () -> Unit,
     onNavigateToDownloadDetail: (String) -> Unit,
     onNavigateToStatusSaver: () -> Unit = {},
-    onNavigateToSubtitles: () -> Unit = {}
+    onNavigateToSubtitles: () -> Unit = {},
+    onNavigateToBrowser: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var downloadToDelete by remember { mutableStateOf<DownloadEntity?>(null) }
@@ -82,6 +84,9 @@ fun HomeScreen(
                     actionIconContentColor = MaterialTheme.colorScheme.onBackground
                 ),
                 actions = {
+                    IconButton(onClick = onNavigateToBrowser) {
+                        Icon(Icons.Default.Language, contentDescription = "Browser")
+                    }
                     IconButton(onClick = onNavigateToSubtitles) {
                         Icon(Icons.Default.Subtitles, contentDescription = "Subtitles")
                     }

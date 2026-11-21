@@ -49,4 +49,15 @@ sealed class Screen(val route: String) {
             return if (!downloadId.isNullOrBlank()) "subtitles?downloadId=$downloadId" else "subtitles"
         }
     }
+
+    object Browser : Screen("browser?url={url}") {
+        fun createRoute(url: String? = null): String {
+            return if (!url.isNullOrBlank()) {
+                val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
+                "browser?url=$encodedUrl"
+            } else {
+                "browser"
+            }
+        }
+    }
 }

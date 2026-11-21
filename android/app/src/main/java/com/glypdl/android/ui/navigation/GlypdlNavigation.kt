@@ -50,6 +50,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import com.glypdl.android.data.repository.SettingsRepository
 import com.glypdl.android.ui.analyze.AnalyzeScreen
+import com.glypdl.android.ui.browser.BrowserScreen
 import com.glypdl.android.ui.downloads.DownloadDetailScreen
 import com.glypdl.android.ui.downloads.DownloadsScreen
 import com.glypdl.android.ui.history.HistoryScreen
@@ -71,7 +72,9 @@ fun GlypdlRootApp(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    val showBottomBar = currentRoute != Screen.Welcome.route && currentRoute != Screen.StatusPreview.route
+    val showBottomBar = currentRoute != Screen.Welcome.route &&
+        currentRoute != Screen.StatusPreview.route &&
+        currentRoute?.startsWith("browser") != true
 
     Scaffold(
         bottomBar = {
@@ -206,6 +209,9 @@ fun GlypdlNavHost(
                 },
                 onNavigateToSubtitles = {
                     navController.navigate(Screen.Subtitles.createRoute())
+                },
+                onNavigateToBrowser = {
+                    navController.navigate(Screen.Browser.createRoute())
                 }
             )
         }
@@ -291,6 +297,31 @@ fun GlypdlNavHost(
         ) {
             StatusPreviewScreen(
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.Browser.route,
+            arguments = listOf(
+                navArgument("url") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) {
+            BrowserScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAnalyze = { url ->
+                    navController.navigate(Screen.Analyze.createRoute(url))
+                },
+                onNavigateToDownloads = {
+                    navController.navigate(Screen.Downloads.route) {
+                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
             )
         }
     }

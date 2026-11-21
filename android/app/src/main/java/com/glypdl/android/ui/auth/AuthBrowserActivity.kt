@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.glypdl.android.service.auth.AuthCookieManager
+import com.glypdl.android.service.browser.GlypdlWebViewFactory
 import com.glypdl.android.ui.theme.GlypdlTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -149,35 +150,9 @@ class AuthBrowserActivity : ComponentActivity() {
                             factory = { context ->
                                 WebView(context).apply {
                                     this@AuthBrowserActivity.webView = this
-                                    layoutParams = ViewGroup.LayoutParams(
-                                        ViewGroup.LayoutParams.MATCH_PARENT,
-                                        ViewGroup.LayoutParams.MATCH_PARENT
-                                    )
-                                    isFocusable = true
-                                    isFocusableInTouchMode = true
-
-                                    settings.apply {
-                                        javaScriptEnabled = true
-                                        domStorageEnabled = true
-                                        databaseEnabled = true
-                                        // Security: block insecure mixed content to protect credentials from MITM
-                                        mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                                        // Security: disable local file access from WebView
-                                        allowFileAccess = false
-                                        allowContentAccess = false
-                                        useWideViewPort = true
-                                        loadWithOverviewMode = true
-                                        setSupportZoom(true)
-                                        builtInZoomControls = true
-                                        displayZoomControls = false
-                                        javaScriptCanOpenWindowsAutomatically = true
-                                        setSupportMultipleWindows(false)
-                                        // Remove the "; wv" indicator to prevent sites (e.g. Instagram) from blocking WebView
-                                        val defaultUa = userAgentString
-                                        userAgentString = defaultUa.replace("; wv", "")
-                                    }
-                                    CookieManager.getInstance().setAcceptCookie(true)
-                                    CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                                    GlypdlWebViewFactory.configureWebView(this)
+                                    settings.javaScriptCanOpenWindowsAutomatically = true
+                                    settings.setSupportMultipleWindows(false)
 
                                     webChromeClient = object : WebChromeClient() {
                                         override fun onProgressChanged(view: WebView?, newProgress: Int) {
