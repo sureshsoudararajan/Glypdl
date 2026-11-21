@@ -45,6 +45,7 @@ fun TabSwitcher(
     onSelectTab: (String) -> Unit,
     onCloseTab: (String) -> Unit,
     onNewTab: () -> Unit,
+    onNewIncognitoTab: () -> Unit = {},
     onCloseAllTabs: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -78,6 +79,10 @@ fun TabSwitcher(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = onCloseAllTabs) {
                         Text("Close All", color = MaterialTheme.colorScheme.error)
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    FilledTonalIconButton(onClick = onNewIncognitoTab) {
+                        Icon(Icons.Default.VisibilityOff, contentDescription = "New Incognito Tab", tint = MaterialTheme.colorScheme.tertiary)
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                     FilledTonalIconButton(onClick = onNewTab) {
@@ -121,12 +126,37 @@ fun TabSwitcher(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    Icons.Default.Public,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    if (tab.isIncognito) {
+                                        Icon(
+                                            Icons.Default.VisibilityOff,
+                                            contentDescription = "Incognito",
+                                            tint = MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = MaterialTheme.colorScheme.tertiaryContainer
+                                        ) {
+                                            Text(
+                                                text = "Incognito",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                    } else {
+                                        Icon(
+                                            Icons.Default.Public,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
                                 IconButton(
                                     onClick = { onCloseTab(tab.id) },
                                     modifier = Modifier.size(24.dp)

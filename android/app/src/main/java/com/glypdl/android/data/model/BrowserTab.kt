@@ -26,5 +26,6 @@ data class BrowserTab(
     val title: String = "New Tab",
     val isDesktopMode: Boolean = false,
     val canGoBack: Boolean = false,
-    val canGoForward: Boolean = false
+    val canGoForward: Boolean = false,
+    val isIncognito: Boolean = false
 )

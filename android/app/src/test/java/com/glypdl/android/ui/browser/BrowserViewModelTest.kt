@@ -69,6 +69,7 @@ class BrowserViewModelTest {
         every { settingsRepository.browserSearchEngine } returns flowOf("duckduckgo")
         every { settingsRepository.browserAutoDetect } returns flowOf(true)
         every { settingsRepository.browserDesktopModeDefault } returns flowOf(false)
+        every { settingsRepository.browserAdBlockEnabled } returns flowOf(true)
     }
 
     @After
@@ -285,5 +286,30 @@ class BrowserViewModelTest {
         assertFalse(desktopUa.contains("; wv"))
         assertTrue(desktopUa.contains("X11; Linux x86_64"))
         assertFalse(desktopUa.contains("Mobile Safari"))
+    }
+
+    @Test
+    fun `incognito tab does not record history visits`() {
+        val viewModel = createViewModel()
+        viewModel.openNewTab("https://duckduckgo.com", isIncognito = true)
+
+        val state = viewModel.uiState.value
+        assertTrue(state.isIncognito)
+
+        viewModel.onPageFinished("https://private-example.com", canBack = false, canForward = false)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 0) { browserRepository.recordVisit("https://private-example.com", any()) }
+    }
+
+    @Test
+    fun `toggleAdBlock toggles setting in repository`() {
+        val viewModel = createViewModel()
+        coEvery { settingsRepository.setBrowserAdBlockEnabled(any()) } returns Unit
+
+        viewModel.toggleAdBlock()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { settingsRepository.setBrowserAdBlockEnabled(false) }
     }
 }

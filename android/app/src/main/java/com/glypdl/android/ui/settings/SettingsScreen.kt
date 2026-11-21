@@ -81,6 +81,7 @@ fun SettingsScreen(
     val browserSearchEngine by viewModel.browserSearchEngine.collectAsState()
     val browserAutoDetect by viewModel.browserAutoDetect.collectAsState()
     val browserDesktopModeDefault by viewModel.browserDesktopModeDefault.collectAsState()
+    val browserAdBlockEnabled by viewModel.browserAdBlockEnabled.collectAsState()
     val engineStatus by viewModel.engineStatus.collectAsState()
     val isEngineBusy by viewModel.isEngineBusy.collectAsState()
     val engineActionMessage by viewModel.engineActionMessage.collectAsState()
@@ -1244,6 +1245,16 @@ fun SettingsScreen(
                         subtitle = "Request desktop websites by default in new tabs",
                         checked = browserDesktopModeDefault,
                         onCheckedChange = { viewModel.setBrowserDesktopModeDefault(it) }
+                    )
+
+                    SettingsItemDivider()
+
+                    SettingsSwitchRow(
+                        icon = Icons.Default.Shield,
+                        title = "Block ads & trackers",
+                        subtitle = "Block intrusive ads, banners, and telemetry trackers",
+                        checked = browserAdBlockEnabled,
+                        onCheckedChange = { viewModel.setBrowserAdBlockEnabled(it) }
                     )
 
                     SettingsItemDivider()

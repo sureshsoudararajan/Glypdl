@@ -113,6 +113,9 @@ class SettingsViewModel @Inject constructor(
     val browserDesktopModeDefault: StateFlow<Boolean> = settingsRepository.browserDesktopModeDefault
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    val browserAdBlockEnabled: StateFlow<Boolean> = settingsRepository.browserAdBlockEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
     private val _engineStatus = MutableStateFlow<EngineStatus?>(null)
     val engineStatus: StateFlow<EngineStatus?> = _engineStatus.asStateFlow()
 
@@ -283,5 +286,6 @@ class SettingsViewModel @Inject constructor(
     fun setBrowserSearchEngine(engine: String) = viewModelScope.launch { settingsRepository.setBrowserSearchEngine(engine) }
     fun setBrowserAutoDetect(enabled: Boolean) = viewModelScope.launch { settingsRepository.setBrowserAutoDetect(enabled) }
     fun setBrowserDesktopModeDefault(enabled: Boolean) = viewModelScope.launch { settingsRepository.setBrowserDesktopModeDefault(enabled) }
+    fun setBrowserAdBlockEnabled(enabled: Boolean) = viewModelScope.launch { settingsRepository.setBrowserAdBlockEnabled(enabled) }
     fun clearBrowsingData(context: android.content.Context) = viewModelScope.launch { browserRepository.clearAllBrowsingData(context) }
 }

@@ -115,6 +115,9 @@ class SettingsRepository @Inject constructor(
 
         /** Whether the in-app browser requests desktop sites by default. */
         val BROWSER_DESKTOP_MODE_DEFAULT = booleanPreferencesKey("browser_desktop_mode_default")
+
+        /** Whether the in-app browser blocks ads and trackers. */
+        val BROWSER_AD_BLOCK_ENABLED = booleanPreferencesKey("browser_ad_block_enabled")
     }
 
     // Reactive Flow Getters
@@ -261,8 +264,10 @@ class SettingsRepository @Inject constructor(
     val browserSearchEngine: Flow<String> = dataStore.data.map { it[BROWSER_SEARCH_ENGINE] ?: "duckduckgo" }
     val browserAutoDetect: Flow<Boolean> = dataStore.data.map { it[BROWSER_AUTO_DETECT] ?: true }
     val browserDesktopModeDefault: Flow<Boolean> = dataStore.data.map { it[BROWSER_DESKTOP_MODE_DEFAULT] ?: false }
+    val browserAdBlockEnabled: Flow<Boolean> = dataStore.data.map { it[BROWSER_AD_BLOCK_ENABLED] ?: true }
 
     suspend fun setBrowserSearchEngine(value: String) { dataStore.edit { it[BROWSER_SEARCH_ENGINE] = value } }
     suspend fun setBrowserAutoDetect(value: Boolean) { dataStore.edit { it[BROWSER_AUTO_DETECT] = value } }
     suspend fun setBrowserDesktopModeDefault(value: Boolean) { dataStore.edit { it[BROWSER_DESKTOP_MODE_DEFAULT] = value } }
+    suspend fun setBrowserAdBlockEnabled(value: Boolean) { dataStore.edit { it[BROWSER_AD_BLOCK_ENABLED] = value } }
 }

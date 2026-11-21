@@ -44,12 +44,15 @@ fun AddressBar(
     isSecure: Boolean,
     isDesktopMode: Boolean,
     isBookmarked: Boolean = false,
+    isIncognito: Boolean = false,
+    isAdBlockEnabled: Boolean = true,
     onUrlChange: (String) -> Unit,
     onSubmitUrl: (String) -> Unit,
     onReload: () -> Unit,
     onStop: () -> Unit,
     onToggleDesktop: () -> Unit,
     onToggleBookmark: () -> Unit = {},
+    onToggleAdBlock: () -> Unit = {},
     onOpenBookmarksHistory: () -> Unit = {},
     onFindInPage: () -> Unit = {},
     onClearBrowsingData: () -> Unit = {},
@@ -88,7 +91,14 @@ fun AddressBar(
                     )
                 },
                 leadingIcon = {
-                    if (isSecure) {
+                    if (isIncognito) {
+                        Icon(
+                            Icons.Default.VisibilityOff,
+                            contentDescription = "Incognito Mode",
+                            tint = MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    } else if (isSecure) {
                         Icon(
                             Icons.Default.Lock,
                             contentDescription = "Secure Connection",
@@ -211,6 +221,20 @@ fun AddressBar(
                         },
                         leadingIcon = {
                             Icon(Icons.Default.Bookmarks, contentDescription = null)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(if (isAdBlockEnabled) "Ad Blocker: On" else "Ad Blocker: Off") },
+                        onClick = {
+                            onToggleAdBlock()
+                            menuExpanded = false
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (isAdBlockEnabled) Icons.Default.Shield else Icons.Default.Block,
+                                contentDescription = null,
+                                tint = if (isAdBlockEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
                         }
                     )
                     DropdownMenuItem(

@@ -26,6 +26,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.net.http.SslError
+import android.view.View
 import android.webkit.*
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -40,6 +41,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,6 +50,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.glypdl.android.data.model.MediaKind
+import com.glypdl.android.service.browser.AdBlocker
 import com.glypdl.android.service.browser.BrowserScripts
 import com.glypdl.android.service.browser.GlypdlWebViewFactory
 import com.glypdl.android.service.browser.MediaClassifier
@@ -68,9 +71,15 @@ fun BrowserScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var customView by remember { mutableStateOf<View?>(null) }
+    var customViewCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
 
     BackHandler(enabled = true) {
-        if (uiState.isFindInPageVisible) {
+        if (customView != null) {
+            customViewCallback?.onCustomViewHidden()
+            customView = null
+            customViewCallback = null
+        } else if (uiState.isFindInPageVisible) {
             webViewRef?.clearMatches()
             viewModel.hideFindInPage()
         } else if (webViewRef?.canGoBack() == true) {
@@ -144,6 +153,8 @@ fun BrowserScreen(
                         isSecure = uiState.isSecure,
                         isDesktopMode = uiState.isDesktopMode,
                         isBookmarked = uiState.isBookmarked,
+                        isIncognito = uiState.isIncognito,
+                        isAdBlockEnabled = uiState.isAdBlockEnabled,
                         onUrlChange = { viewModel.onInputUrlChange(it) },
                         onSubmitUrl = { target ->
                             viewModel.onSubmitInput(target)
@@ -157,6 +168,7 @@ fun BrowserScreen(
                         onStop = { webViewRef?.stopLoading() },
                         onToggleDesktop = { viewModel.toggleDesktopMode() },
                         onToggleBookmark = { viewModel.toggleBookmarkCurrentPage() },
+                        onToggleAdBlock = { viewModel.toggleAdBlock() },
                         onOpenBookmarksHistory = { viewModel.showBookmarksHistory() },
                         onFindInPage = {
                             viewModel.showFindInPage()
@@ -348,6 +360,16 @@ fun BrowserScreen(
                             override fun onReceivedTitle(view: WebView?, title: String?) {
                                 title?.let { viewModel.onTitleReceived(it) }
                             }
+
+                            override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                                customView = view
+                                customViewCallback = callback
+                            }
+
+                            override fun onHideCustomView() {
+                                customView = null
+                                customViewCallback = null
+                            }
                         }
 
                         webViewClient = object : WebViewClient() {
@@ -356,11 +378,20 @@ fun BrowserScreen(
                                 view: WebView?,
                                 request: WebResourceRequest?
                             ): WebResourceResponse? {
-                                request?.url?.let { uri ->
-                                    val urlStr = uri.toString()
-                                    val headers = request.requestHeaders ?: emptyMap()
-                                    viewModel.onNetworkResourceIntercepted(urlStr, headers)
+                                val uri = request?.url ?: return null
+                                val urlStr = uri.toString()
+
+                                // Block ads and intrusive tracking
+                                if (uiState.isAdBlockEnabled && AdBlocker.isAd(urlStr)) {
+                                    return WebResourceResponse(
+                                        "text/plain",
+                                        "UTF-8",
+                                        java.io.ByteArrayInputStream(ByteArray(0))
+                                    )
                                 }
+
+                                val headers = request.requestHeaders ?: emptyMap()
+                                viewModel.onNetworkResourceIntercepted(urlStr, headers)
                                 return null
                             }
 
@@ -523,6 +554,7 @@ fun BrowserScreen(
             onSelectTab = { tabId -> viewModel.switchTab(tabId) },
             onCloseTab = { tabId -> viewModel.closeTab(tabId) },
             onNewTab = { viewModel.openNewTab() },
+            onNewIncognitoTab = { viewModel.openNewTab(isIncognito = true) },
             onCloseAllTabs = { viewModel.closeAllTabs() },
             onDismiss = { viewModel.hideTabSwitcher() }
         )
@@ -577,5 +609,19 @@ fun BrowserScreen(
                 }
             }
         )
+    }
+
+    // Fullscreen HTML5 Video Custom View Overlay
+    if (customView != null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            AndroidView(
+                factory = { customView!! },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }

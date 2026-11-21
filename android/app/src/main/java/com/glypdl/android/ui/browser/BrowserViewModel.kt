@@ -55,6 +55,8 @@ data class BrowserUiState(
     val canGoBack: Boolean = false,
     val canGoForward: Boolean = false,
     val isDesktopMode: Boolean = false,
+    val isIncognito: Boolean = false,
+    val isAdBlockEnabled: Boolean = true,
     val isSecure: Boolean = true,
     val errorMessage: String? = null,
     val sslErrorDialogUrl: String? = null,
@@ -122,6 +124,11 @@ class BrowserViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch {
+            settingsRepository.browserAdBlockEnabled.collect { enabled ->
+                _uiState.update { it.copy(isAdBlockEnabled = enabled) }
+            }
+        }
     }
 
     fun onInputUrlChange(newInput: String) {
@@ -183,9 +190,13 @@ class BrowserViewModel @Inject constructor(
             )
         }
         checkBookmarkStatus(url)
-        // Record in browsing history
-        viewModelScope.launch {
-            browserRepository.recordVisit(url, _uiState.value.title)
+        // Record in browsing history if not incognito
+        val currentTab = _uiState.value.tabs.find { it.id == _uiState.value.activeTabId }
+        val isIncognito = currentTab?.isIncognito ?: _uiState.value.isIncognito
+        if (!isIncognito && url.isNotBlank() && !url.startsWith("about:") && !url.startsWith("data:")) {
+            viewModelScope.launch {
+                browserRepository.recordVisit(url, _uiState.value.title)
+            }
         }
     }
 
@@ -268,11 +279,20 @@ class BrowserViewModel @Inject constructor(
         _uiState.update { it.copy(isTabSwitcherVisible = false) }
     }
 
-    fun openNewTab(url: String = "https://duckduckgo.com") {
+    fun toggleAdBlock() {
+        val next = !_uiState.value.isAdBlockEnabled
+        viewModelScope.launch {
+            settingsRepository.setBrowserAdBlockEnabled(next)
+        }
+    }
+
+    fun openNewTab(url: String = "https://duckduckgo.com", isIncognito: Boolean = false) {
         val newTab = BrowserTab(
             id = UUID.randomUUID().toString(),
             url = url,
-            title = "New Tab"
+            title = if (isIncognito) "Incognito Tab" else "New Tab",
+            isDesktopMode = _uiState.value.isDesktopMode,
+            isIncognito = isIncognito
         )
         _uiState.update { state ->
             state.copy(
@@ -280,6 +300,11 @@ class BrowserViewModel @Inject constructor(
                 activeTabId = newTab.id,
                 currentUrl = newTab.url,
                 inputUrl = newTab.url,
+                title = newTab.title,
+                isIncognito = isIncognito,
+                isDesktopMode = newTab.isDesktopMode,
+                canGoBack = false,
+                canGoForward = false,
                 isTabSwitcherVisible = false
             )
         }
@@ -294,6 +319,8 @@ class BrowserViewModel @Inject constructor(
                 currentUrl = targetTab.url,
                 inputUrl = targetTab.url,
                 title = targetTab.title,
+                isDesktopMode = targetTab.isDesktopMode,
+                isIncognito = targetTab.isIncognito,
                 canGoBack = targetTab.canGoBack,
                 canGoForward = targetTab.canGoForward,
                 isTabSwitcherVisible = false
@@ -313,6 +340,8 @@ class BrowserViewModel @Inject constructor(
                     activeTabId = freshTab.id,
                     currentUrl = freshTab.url,
                     inputUrl = freshTab.url,
+                    title = freshTab.title,
+                    isIncognito = false,
                     isTabSwitcherVisible = false
                 )
             }
@@ -333,7 +362,9 @@ class BrowserViewModel @Inject constructor(
                 activeTabId = nextActiveId,
                 currentUrl = nextActiveTab.url,
                 inputUrl = nextActiveTab.url,
-                title = nextActiveTab.title
+                title = nextActiveTab.title,
+                isDesktopMode = nextActiveTab.isDesktopMode,
+                isIncognito = nextActiveTab.isIncognito
             )
         }
     }
@@ -346,9 +377,12 @@ class BrowserViewModel @Inject constructor(
                 activeTabId = freshTab.id,
                 currentUrl = freshTab.url,
                 inputUrl = freshTab.url,
+                title = freshTab.title,
+                isIncognito = false,
                 isTabSwitcherVisible = false
             )
         }
+        mediaSniffer.resetForPage(freshTab.url)
     }
 
     // Bookmarks and History
