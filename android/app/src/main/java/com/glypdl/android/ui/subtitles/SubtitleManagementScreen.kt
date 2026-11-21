@@ -217,7 +217,11 @@ fun SubtitleManagementScreen(
                         SubtitleItemCard(
                             subtitle = subtitle,
                             onOpen = {
-                                StorageHelper.openSubtitle(context, subtitle.contentUri)
+                                if (subtitle.isEmbedded) {
+                                    StorageHelper.openMedia(context, subtitle.contentUri, false)
+                                } else {
+                                    StorageHelper.openSubtitle(context, subtitle.contentUri)
+                                }
                             },
                             onShare = {
                                 StorageHelper.shareSubtitle(context, subtitle.contentUri, subtitle.mediaTitle)
@@ -321,8 +325,10 @@ private fun SubtitleItemCard(
                 }
 
                 Row {
-                    IconButton(onClick = onShare) {
-                        Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(20.dp))
+                    if (!subtitle.isEmbedded) {
+                        IconButton(onClick = onShare) {
+                            Icon(Icons.Default.Share, contentDescription = "Share", modifier = Modifier.size(20.dp))
+                        }
                     }
                     IconButton(onClick = onDelete) {
                         Icon(

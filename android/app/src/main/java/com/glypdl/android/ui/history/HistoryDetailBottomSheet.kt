@@ -472,7 +472,11 @@ fun HistoryDetailBottomSheet(
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
                                     .clickable {
-                                        StorageHelper.openSubtitle(context, sub.contentUri)
+                                        if (sub.isEmbedded) {
+                                            StorageHelper.openMedia(context, sub.contentUri, false)
+                                        } else {
+                                            StorageHelper.openSubtitle(context, sub.contentUri)
+                                        }
                                     }
                                     .padding(vertical = 6.dp, horizontal = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -490,28 +494,53 @@ fun HistoryDetailBottomSheet(
                                         modifier = Modifier.size(20.dp)
                                     )
                                     Column {
-                                        Text(
-                                            text = "${sub.languageName} (${sub.languageCode.uppercase()})",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                        val subSize = if (sub.fileSize > 0L) {
-                                            Formatter.formatShortFileSize(context, sub.fileSize)
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = "${sub.languageName} (${sub.languageCode.uppercase()})",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            if (sub.isEmbedded) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                                ) {
+                                                    Text(
+                                                        text = "EMBEDDED",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        val subInfoText = if (sub.isEmbedded) {
+                                            "Embedded track in video"
                                         } else {
-                                            Formatter.formatShortFileSize(context, StorageHelper.getFileSizeFromUri(context, sub.contentUri))
+                                            val subSize = if (sub.fileSize > 0L) {
+                                                Formatter.formatShortFileSize(context, sub.fileSize)
+                                            } else {
+                                                Formatter.formatShortFileSize(context, StorageHelper.getFileSizeFromUri(context, sub.contentUri))
+                                            }
+                                            "${sub.format.uppercase()} • $subSize"
                                         }
                                         Text(
-                                            text = "${sub.format.uppercase()} • $subSize",
+                                            text = subInfoText,
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
 
-                                IconButton(onClick = {
-                                    StorageHelper.shareSubtitle(context, sub.contentUri, sub.mediaTitle)
-                                }) {
-                                    Icon(Icons.Default.Share, contentDescription = "Share Subtitle", modifier = Modifier.size(18.dp))
+                                if (!sub.isEmbedded) {
+                                    IconButton(onClick = {
+                                        StorageHelper.shareSubtitle(context, sub.contentUri, sub.mediaTitle)
+                                    }) {
+                                        Icon(Icons.Default.Share, contentDescription = "Share Subtitle", modifier = Modifier.size(18.dp))
+                                    }
                                 }
                             }
                         }
