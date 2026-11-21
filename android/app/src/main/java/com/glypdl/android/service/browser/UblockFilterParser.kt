@@ -34,12 +34,24 @@ data class UblockFilterRules(
  */
 object UblockFilterParser {
 
-    private val NEVER_BLOCK_DOMAINS = setOf(
-        "google.com", "bing.com", "duckduckgo.com", "youtube.com", "amazon.com",
-        "facebook.com", "github.com", "instagram.com", "reddit.com", "startpage.com",
-        "ecosia.org", "qwant.com", "wikipedia.org", "yahoo.com", "twitter.com",
-        "x.com", "tiktok.com", "twitch.tv", "vimeo.com", "soundcloud.com", "dailymotion.com"
-    )
+    private fun isEssentialPlatformDomain(domain: String): Boolean {
+        val lower = domain.lowercase()
+        for (p in AdBlocker.ESSENTIAL_PLATFORM_DOMAINS) {
+            if (lower == p || lower.endsWith(".$p")) {
+                if (lower.startsWith("adservice.") ||
+                    lower.startsWith("pagead") ||
+                    lower.startsWith("googleadservices") ||
+                    lower.startsWith("ads.") ||
+                    lower.startsWith("mail-ads.") ||
+                    lower.startsWith("partnerad.")
+                ) {
+                    return false
+                }
+                return true
+            }
+        }
+        return false
+    }
 
     fun parse(inputStream: InputStream): UblockFilterRules {
         val blocked = hashSetOf<String>()
@@ -68,11 +80,7 @@ object UblockFilterParser {
                 if (trimmed.startsWith("||")) {
                     val raw = trimmed.removePrefix("||")
                     val domain = raw.substringBefore('^').substringBefore('$').substringBefore('/').trim().lowercase()
-                    if (domain.isNotEmpty() &&
-                        !NEVER_BLOCK_DOMAINS.contains(domain) &&
-                        !NEVER_BLOCK_DOMAINS.contains(domain.removePrefix("www.")) &&
-                        !NEVER_BLOCK_DOMAINS.contains(domain.removePrefix("m."))
-                    ) {
+                    if (domain.isNotEmpty() && !isEssentialPlatformDomain(domain)) {
                         blocked.add(domain)
                     }
                     continue

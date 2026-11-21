@@ -725,7 +725,6 @@
 ||aa.pornvideotop.com^
 ||aaddzz.com^
 ||aas.medialaben.no^
-||aax-eu-dub.amazon.com^
 ||aaxads.com^
 ||ab.blogs.es^
 ||abacho.net^
@@ -1347,7 +1346,6 @@
 ||adserver.ariase.org^
 ||adserver.bdoce.cl^
 ||adserver.betandwin.de^
-||adserver.bing.com^
 ||adserver.bizedge.com^
 ||adserver.bizhat.com^
 ||adserver.break-even.it^
@@ -1702,7 +1700,6 @@
 ||analytics.freezehost.pro^
 ||analytics.fsicomics.com^
 ||analytics.fullstak.pl^
-||analytics.google.com^
 ||analytics.htmedia.in^
 ||analytics.inlinemanual.com^
 ||analytics.jst.ai^
@@ -1726,9 +1723,7 @@
 ||analytics.swiggy.com^
 ||analytics.tempy.email^
 ||analytics.tiendaenoferta.com^
-||analytics.tiktok.com^
 ||analytics.xelondigital.com^
-||analytics.yahoo.com^
 ||analyticsapi.happypancake.net^
 ||analytiwave.com^
 ||anapatformacion.org^
@@ -1772,7 +1767,6 @@
 ||aomicwallet.github.io^
 ||ap.appl-er.com^
 ||api-ext.bixbitemarketing.com^
-||api-widget.soundcloud.com^
 ||api.affiliations.site^
 ||api.amplitude.com^
 ||api.appmetrica.yandex.ru^
@@ -1783,7 +1777,6 @@
 ||api.eu.amplitude.com^
 ||api.flipkart.com^
 ||api.gitbook.com^
-||api.github.com^
 ||api.intelligems.io^
 ||api.intensifier.de^
 ||api.intentiq.com^
@@ -2096,7 +2089,6 @@
 ||basically-balk.com^
 ||basketballbelieve.com^
 ||baskettexture.com^
-||bat.bing.com^
 ||bat.bing.net^
 ||bavaria-cup.ru^
 ||bbcwebhosting.com^
@@ -2500,7 +2492,6 @@
 ||c0nt4ct-me.pages.dev^
 ||c1exchange.com^
 ||c212.net^
-||c2shb.pubgw.yahoo.com^
 ||cache.cloudswiftcdn.com^
 ||cachesrv-whatsapp.com^
 ||caitlin.top^
@@ -2833,7 +2824,6 @@
 ||clientapi-whatsapp.com^
 ||clientcdn-whatsapp.com^
 ||clientgear.com^
-||clientmetrics-pa.googleapis.com^
 ||clikerz.net^
 ||cliksolution.com^
 ||clinicaimplantologica3d.com^
@@ -2949,7 +2939,6 @@
 ||contextweb.com^
 ||contoso-travel.com^
 ||contrack.link^
-||contributor.google.com^
 ||control.kochava.com^
 ||controlium.net^
 ||converge-digital.com^
@@ -3029,7 +3018,6 @@
 ||craktraffic.com^
 ||crashchance.com^
 ||crashlytics.com^
-||crashlyticsreports-pa.googleapis.com^
 ||cratecamera.com^
 ||crawlability.com^
 ||crazyegg.com^
@@ -3777,7 +3765,6 @@
 ||fingerprint.com^
 ||fireads.online^
 ||fireads.org^
-||firebase.googleapis.com^
 ||firebaseapp.com^
 ||firefox-zh.com.cn^
 ||firestream.to^
@@ -3829,7 +3816,6 @@
 ||flow.page^
 ||floweryflavor.com^
 ||flowgo.com^
-||fls-na.amazon.com^
 ||flsaudio.com^
 ||fluentcleaner.org^
 ||flurry.com^
@@ -3937,7 +3923,6 @@
 ||fullth-loto.com^
 ||functionalcrown.com^
 ||functionalfeather.com^
-||fundingchoicesmessages.google.com^
 ||funklicks.com^
 ||funnelytics.io^
 ||funtoyplanet.com^
@@ -4140,10 +4125,7 @@
 ||googlea.eu.cc^
 ||googleadservices.com^
 ||googleanalytics.com^
-||googleapis.com^
 ||googleeplay.com^
-||googleusercontent.com^
-||googlevideo.com^
 ||goqon.com^
 ||gostats.com^
 ||gotgayporn.com^
@@ -4187,7 +4169,6 @@
 ||grouchybrothers.com^
 ||groundtruth.com^
 ||group-postban.firebaseapp.com^
-||groups.google.com^
 ||growthrx.in^
 ||grpcurl.com^
 ||grtyb.com^
@@ -5240,7 +5221,6 @@
 ||makoto-in-room.wixsite.com^
 ||malayalam.samayam.com^
 ||malenirt.site^
-||maliva-mcs.byteoversea.com^
 ||maltiverse.lt.acemlnc.com^
 ||mamagathering.org^
 ||mamak.jp^
@@ -5275,7 +5255,6 @@
 ||marketing.nyi.net^
 ||marketing.osijek031.com^
 ||marketingcloudapis.com^
-||marketingsolutions.yahoo.com^
 ||marketiqhub.com^
 ||marketo.com^
 ||marlowpillow.sjv.io^
@@ -5323,8 +5302,6 @@
 ||mcdonal.fujicandy-balibalione.net^
 ||mciun.com^
 ||mcpedl.com^
-||mcs-va.tiktok.com^
-||mcs-va.tiktokv.com^
 ||mct-niger.com^
 ||md-nx.com^
 ||me08mo.com^
@@ -5521,8 +5498,6 @@
 ||moliyachi.com^
 ||momentary.link^
 ||mon-mrlay-suivi.com^
-||mon-va.byteoversea.com^
-||mon.byteoversea.com^
 ||monad.network^
 ||monamedia.net^
 ||monarchads.com^
@@ -6191,7 +6166,6 @@
 ||phpstat.cntcm.com.cn^
 ||pi-tarina.com^
 ||pi.pdfjs.express^
-||pi.reddit.com^
 ||pianetamountainbike.it^
 ||piano.io^
 ||piasukai.xyz^
@@ -6235,7 +6209,6 @@
 ||plausibleio.workers.dev^
 ||play-lustgoddess.com^
 ||play.funfourmob.com^
-||play.google.com^
 ||play4traffic.com^
 ||playbrain.io^
 ||playcomla.com.ar^
@@ -6572,7 +6545,6 @@
 ||raresummer.com^
 ||rate.ru^
 ||rating-shave.com^
-||raw.githubusercontent.com^
 ||rawgit.com^
 ||ray-dium.cyou^
 ||rayjump.com^
@@ -7045,7 +7017,6 @@
 ||shop-bitboxswiss.de^
 ||shop-links.co^
 ||shopee.^
-||shopping.yahoo.com^
 ||shoppingads.com^
 ||short.es^
 ||short.pe^
@@ -7106,7 +7077,6 @@
 ||siteimproveanalytics.io^
 ||siteintercept.qualtrics.com^
 ||sitemeter.com^
-||sites.google.com^
 ||sitio-interno.com^
 ||sixscissors.com^
 ||sixsigmatraffic.com^
@@ -7179,7 +7149,6 @@
 ||smsy24.pl^
 ||snapads.com^
 ||snazzypoodle.com^
-||sndcdn.com^
 ||snfee.com^
 ||snoobi.com^
 ||sobatkeren.^
@@ -7356,7 +7325,6 @@
 ||static.toiimg.com^
 ||static.tvtropes.org^
 ||static.vocento.com^
-||static.xx.fbcdn.net^
 ||static.xxxbunker.com^
 ||static.znews.vn^
 ||staticads.btopenworld.com^
@@ -7409,7 +7377,6 @@
 ||stomachscience.com^
 ||stomatico.com^
 ||stopstomach.com^
-||storage.googleapis.com^
 ||storageapi-new.fleek.co^
 ||store.steampowered.com^
 ||storetail.io^
@@ -7532,7 +7499,6 @@
 ||synd.edgecdnc.com^
 ||syndication.exoclick.com^
 ||syndication.gcdnanalytics.com^
-||syndication.twitter.com^
 ||synonymoussticks.com^
 ||syntax-whatsapp.com^
 ||sysauth-whatsapp.com^
@@ -8066,7 +8032,6 @@
 ||uarating.com^
 ||uazweb-whatsapp.com^
 ||ucfunnel.com^
-||udc.yahoo.com^
 ||udkcrj.com^
 ||udncoeln.com^
 ||udp-whatsapp.com^
@@ -8550,7 +8515,6 @@
 ||www-facebook.^
 ||www-facebooks.^
 ||www-facebooks.com.vn^
-||www-google-analytics.l.google.com^
 ||www-mechanicsbank.co.com^
 ||www-mechonics.top^
 ||www-mfacebook.^
@@ -8665,7 +8629,6 @@
 ||yourlustmedia.com^
 ||yourskiss.com^
 ||yourube.com^
-||youtu.be^
 ||youtuba.com^
 ||youtuberevanced.^
 ||youtubevanced.^

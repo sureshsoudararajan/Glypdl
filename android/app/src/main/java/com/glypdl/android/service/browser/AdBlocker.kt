@@ -45,15 +45,29 @@ object AdBlocker {
         "/ads/", "/adserver/", "/ad_stream/", "/pagead/", "/advert/", "/ads.js", "/prebid"
     )
 
-    val CORE_SAFE_DOMAINS = setOf(
+    val ESSENTIAL_PLATFORM_DOMAINS = setOf(
+        // Google & YouTube & CDNs
         "google.com", "google.co.in", "google.co.uk", "google.ca", "google.de", "google.fr", "google.co.jp",
-        "duckduckgo.com", "bing.com", "yahoo.com", "search.yahoo.com",
-        "startpage.com", "ecosia.org", "qwant.com", "wikipedia.org", "wikimedia.org",
-        "youtube.com", "m.youtube.com", "youtu.be",
-        "reddit.com", "instagram.com", "twitter.com", "x.com",
-        "facebook.com", "tiktok.com", "twitch.tv", "github.com",
-        "amazon.com", "ebay.com", "vimeo.com", "soundcloud.com", "dailymotion.com"
+        "youtube.com", "youtu.be", "googlevideo.com", "googleusercontent.com",
+        "googleapis.com", "gstatic.com", "ytimg.com", "ggpht.com",
+        // Meta (Facebook, Instagram, WhatsApp)
+        "facebook.com", "fbcdn.net", "fbsbx.com", "instagram.com", "cdninstagram.com",
+        "threads.net", "whatsapp.com", "meta.com",
+        // X / Twitter
+        "twitter.com", "x.com", "twimg.com", "t.co",
+        // Reddit
+        "reddit.com", "redditmedia.com", "redditstatic.com", "redd.it",
+        // TikTok
+        "tiktok.com", "tiktokv.com", "byteoversea.com", "ibytedtos.com",
+        // Media platforms & search engines
+        "duckduckgo.com", "bing.com", "yahoo.com", "startpage.com", "ecosia.org", "qwant.com",
+        "wikipedia.org", "wikimedia.org", "twitch.tv", "ttvnw.net", "jtvnw.net",
+        "vimeo.com", "vimeocdn.com", "soundcloud.com", "sndcdn.com", "dailymotion.com", "dmcdn.net",
+        "github.com", "githubassets.com", "githubusercontent.com", "amazon.com", "ebay.com"
     )
+
+    // For backwards compatibility
+    val CORE_SAFE_DOMAINS = ESSENTIAL_PLATFORM_DOMAINS
 
     // Fallback domains if asset loading is unavailable
     private val FALLBACK_DOMAINS = setOf(
@@ -92,6 +106,17 @@ object AdBlocker {
     fun loadRules(context: Context) {
         try {
             val localCache = File(context.filesDir, "$CACHE_DIR/$CACHE_FILE")
+            // Invalidate stale local cache if it contains broken platform or CDN blocking
+            if (localCache.exists()) {
+                val cachedContent = try { localCache.bufferedReader().use { it.readText() } } catch (_: Exception) { "" }
+                if (cachedContent.contains("googlevideo.com") ||
+                    cachedContent.contains("static.xx.fbcdn.net") ||
+                    cachedContent.contains("google.com^") ||
+                    cachedContent.contains("googleusercontent.com")
+                ) {
+                    localCache.delete()
+                }
+            }
             val stream = if (localCache.exists() && localCache.length() > 0) {
                 FileInputStream(localCache)
             } else {
@@ -166,8 +191,13 @@ object AdBlocker {
     }
 
     private fun isSafeDomain(host: String): Boolean {
-        val clean = host.removePrefix("www.").removePrefix("m.")
-        return CORE_SAFE_DOMAINS.contains(clean) || CORE_SAFE_DOMAINS.contains(host)
+        val lower = host.lowercase()
+        for (domain in ESSENTIAL_PLATFORM_DOMAINS) {
+            if (lower == domain || lower.endsWith(".$domain")) {
+                return true
+            }
+        }
+        return false
     }
 
     private fun isExplicitAdSubdomain(host: String): Boolean {
@@ -177,8 +207,10 @@ object AdBlocker {
                 lower.startsWith("googleadservices") ||
                 lower.startsWith("ads.") ||
                 lower.startsWith("ad.") ||
-                lower.startsWith("analytics.") ||
-                lower.contains("doubleclick")
+                lower.startsWith("mail-ads.") ||
+                lower.startsWith("ogads-") ||
+                lower.startsWith("partnerad.") ||
+                lower.startsWith("doubleclick")
     }
 
     private fun isHostWhitelisted(host: String): Boolean {
