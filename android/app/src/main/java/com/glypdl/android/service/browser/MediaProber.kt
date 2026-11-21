@@ -127,4 +127,25 @@ class MediaProber @Inject constructor() {
     fun clearPage(pageUrl: String) {
         pageProbeCount.remove(pageUrl)
     }
+
+    suspend fun fetchText(urlStr: String, headers: Map<String, String> = emptyMap()): String? = withContext(Dispatchers.IO) {
+        var conn: HttpURLConnection? = null
+        try {
+            val url = URL(urlStr)
+            conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 5000
+            conn.readTimeout = 5000
+            headers["User-Agent"]?.let { conn.setRequestProperty("User-Agent", it) }
+            headers["Referer"]?.let { conn.setRequestProperty("Referer", it) }
+            headers["Cookie"]?.let { conn.setRequestProperty("Cookie", it) }
+            if (conn.responseCode in 200..299) {
+                conn.inputStream.bufferedReader().use { it.readText() }
+            } else null
+        } catch (_: Exception) {
+            null
+        } finally {
+            try { conn?.disconnect() } catch (_: Exception) {}
+        }
+    }
 }

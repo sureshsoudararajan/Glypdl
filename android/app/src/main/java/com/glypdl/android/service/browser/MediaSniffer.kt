@@ -63,10 +63,11 @@ class MediaSniffer @Inject constructor(
         posterUrl: String? = null,
         headers: Map<String, String> = emptyMap(),
         source: DetectionSource = DetectionSource.NETWORK,
-        isDrmProtected: Boolean = false
-    ) {
-        if (url.isBlank() || url.startsWith("blob:") || url.startsWith("data:")) return
-        if (MediaClassifier.isAdOrTrackingUrl(url) || MediaClassifier.isSegmentOrChunk(url)) return
+        isDrmProtected: Boolean = false,
+        variants: List<com.glypdl.android.data.model.MediaVariant> = emptyList()
+    ): String? {
+        if (url.isBlank() || url.startsWith("blob:") || url.startsWith("data:")) return null
+        if (MediaClassifier.isAdOrTrackingUrl(url) || MediaClassifier.isSegmentOrChunk(url)) return null
 
         val normalizedUrl = normalizeMediaUrl(url)
         val id = generateMediaId(normalizedUrl, kind)
@@ -84,12 +85,31 @@ class MediaSniffer @Inject constructor(
             isLive = false,
             isDrmProtected = isDrmProtected,
             posterUrl = posterUrl,
+            variants = variants,
             headers = headers,
             source = source,
             detectedAt = System.currentTimeMillis()
         )
 
         mediaItems[id] = item
+        updateFilteredList()
+        return id
+    }
+
+    fun updateCandidateVariants(
+        id: String,
+        variants: List<com.glypdl.android.data.model.MediaVariant>,
+        isLive: Boolean,
+        isDrmProtected: Boolean,
+        durationMs: Long?
+    ) {
+        val existing = mediaItems[id] ?: return
+        mediaItems[id] = existing.copy(
+            variants = variants,
+            isLive = isLive,
+            isDrmProtected = isDrmProtected,
+            durationMs = durationMs ?: existing.durationMs
+        )
         updateFilteredList()
     }
 

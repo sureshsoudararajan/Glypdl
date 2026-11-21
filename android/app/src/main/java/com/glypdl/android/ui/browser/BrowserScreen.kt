@@ -51,6 +51,7 @@ import com.glypdl.android.service.browser.BrowserScripts
 import com.glypdl.android.service.browser.GlypdlWebViewFactory
 import com.glypdl.android.ui.browser.components.AddressBar
 import com.glypdl.android.ui.browser.components.DetectedMediaSheet
+import com.glypdl.android.ui.browser.components.QualityPickerSheet
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -415,13 +416,32 @@ fun BrowserScreen(
         DetectedMediaSheet(
             mediaList = detectedMediaList,
             onDownloadMedia = { media ->
-                viewModel.downloadDetectedMedia(media)
+                if (media.variants.isNotEmpty()) {
+                    viewModel.onSelectQualityMedia(media)
+                } else {
+                    viewModel.downloadDetectedMedia(media)
+                }
             },
             onAnalyzeMedia = { media ->
-                viewModel.hideMediaSheet()
-                onNavigateToAnalyze(media.url)
+                if (media.variants.isNotEmpty()) {
+                    viewModel.onSelectQualityMedia(media)
+                } else {
+                    viewModel.hideMediaSheet()
+                    onNavigateToAnalyze(media.url)
+                }
             },
             onDismiss = { viewModel.hideMediaSheet() }
+        )
+    }
+
+    // Quality & Rendition Picker Sheet
+    uiState.selectedQualityMedia?.let { qualityMedia ->
+        QualityPickerSheet(
+            media = qualityMedia,
+            onConfirmDownload = { request ->
+                viewModel.enqueueDownloadRequest(request)
+            },
+            onDismiss = { viewModel.dismissQualityPicker() }
         )
     }
 

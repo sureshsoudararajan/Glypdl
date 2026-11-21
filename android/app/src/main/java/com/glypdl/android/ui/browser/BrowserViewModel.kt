@@ -23,6 +23,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.glypdl.android.data.model.*
 import com.glypdl.android.service.DownloadManager
+import com.glypdl.android.service.browser.DashParser
+import com.glypdl.android.service.browser.HlsParser
 import com.glypdl.android.service.browser.MediaClassifier
 import com.glypdl.android.service.browser.MediaProber
 import com.glypdl.android.service.browser.MediaSniffer
@@ -53,6 +55,7 @@ data class BrowserUiState(
     val errorMessage: String? = null,
     val sslErrorDialogUrl: String? = null,
     val isMediaSheetVisible: Boolean = false,
+    val selectedQualityMedia: DetectedMedia? = null,
     val snackbarMessage: String? = null
 )
 
@@ -171,6 +174,14 @@ class BrowserViewModel @Inject constructor(
         _uiState.update { it.copy(isMediaSheetVisible = false) }
     }
 
+    fun onSelectQualityMedia(media: DetectedMedia?) {
+        _uiState.update { it.copy(selectedQualityMedia = media) }
+    }
+
+    fun dismissQualityPicker() {
+        _uiState.update { it.copy(selectedQualityMedia = null) }
+    }
+
     fun clearSnackbarMessage() {
         _uiState.update { it.copy(snackbarMessage = null) }
     }
@@ -183,7 +194,7 @@ class BrowserViewModel @Inject constructor(
 
         val kind = MediaClassifier.classify(url)
         if (kind != null) {
-            mediaSniffer.addCandidate(
+            val candidateId = mediaSniffer.addCandidate(
                 url = url,
                 pageUrl = _uiState.value.currentUrl,
                 pageTitle = _uiState.value.title,
@@ -191,6 +202,9 @@ class BrowserViewModel @Inject constructor(
                 headers = headers,
                 source = DetectionSource.NETWORK
             )
+            if (candidateId != null && (kind == MediaKind.HLS || kind == MediaKind.DASH)) {
+                parseManifestIfStreaming(candidateId, url, kind, headers)
+            }
         } else {
             // If URL path has ambiguous hints, probe it in background
             val lower = url.lowercase()
@@ -198,7 +212,7 @@ class BrowserViewModel @Inject constructor(
                 viewModelScope.launch(Dispatchers.IO) {
                     val probeResult = mediaProber.probeUrl(url, _uiState.value.currentUrl, headers)
                     if (probeResult.isMedia && probeResult.kind != null) {
-                        mediaSniffer.addCandidate(
+                        val candidateId = mediaSniffer.addCandidate(
                             url = url,
                             pageUrl = _uiState.value.currentUrl,
                             pageTitle = _uiState.value.title,
@@ -208,6 +222,9 @@ class BrowserViewModel @Inject constructor(
                             headers = headers,
                             source = DetectionSource.PROBE
                         )
+                        if (candidateId != null && (probeResult.kind == MediaKind.HLS || probeResult.kind == MediaKind.DASH)) {
+                            parseManifestIfStreaming(candidateId, url, probeResult.kind, headers)
+                        }
                     }
                 }
             }
@@ -227,26 +244,31 @@ class BrowserViewModel @Inject constructor(
             val mime = json.optString("mime").takeIf { !it.isNullOrBlank() }
             val title = json.optString("title").takeIf { !it.isNullOrBlank() } ?: _uiState.value.title
 
+            val headers = mapOf(
+                "Referer" to _uiState.value.currentUrl,
+                "User-Agent" to "Mozilla/5.0 (Linux; Android 14) Mobile Safari/537.36"
+            )
+
             val kind = MediaClassifier.classify(url, mime)
             if (kind != null) {
-                mediaSniffer.addCandidate(
+                val candidateId = mediaSniffer.addCandidate(
                     url = url,
                     pageUrl = _uiState.value.currentUrl,
                     pageTitle = title,
                     kind = kind,
                     mime = mime,
                     posterUrl = poster,
-                    headers = mapOf(
-                        "Referer" to _uiState.value.currentUrl,
-                        "User-Agent" to "Mozilla/5.0 (Linux; Android 14) Mobile Safari/537.36"
-                    ),
+                    headers = headers,
                     source = DetectionSource.DOM
                 )
+                if (candidateId != null && (kind == MediaKind.HLS || kind == MediaKind.DASH)) {
+                    parseManifestIfStreaming(candidateId, url, kind, headers)
+                }
             } else {
                 viewModelScope.launch(Dispatchers.IO) {
                     val probeResult = mediaProber.probeUrl(url, _uiState.value.currentUrl)
                     if (probeResult.isMedia && probeResult.kind != null) {
-                        mediaSniffer.addCandidate(
+                        val candidateId = mediaSniffer.addCandidate(
                             url = url,
                             pageUrl = _uiState.value.currentUrl,
                             pageTitle = title,
@@ -254,16 +276,53 @@ class BrowserViewModel @Inject constructor(
                             mime = probeResult.mimeType,
                             sizeBytes = probeResult.contentLength,
                             posterUrl = poster,
-                            headers = mapOf(
-                                "Referer" to _uiState.value.currentUrl,
-                                "User-Agent" to "Mozilla/5.0 (Linux; Android 14) Mobile Safari/537.36"
-                            ),
+                            headers = headers,
                             source = DetectionSource.DOM
                         )
+                        if (candidateId != null && (probeResult.kind == MediaKind.HLS || probeResult.kind == MediaKind.DASH)) {
+                            parseManifestIfStreaming(candidateId, url, probeResult.kind, headers)
+                        }
                     }
                 }
             }
         } catch (_: Exception) {}
+    }
+
+    private fun parseManifestIfStreaming(
+        candidateId: String,
+        url: String,
+        kind: MediaKind,
+        headers: Map<String, String>
+    ) {
+        if (kind != MediaKind.HLS && kind != MediaKind.DASH) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val manifestText = mediaProber.fetchText(url, headers) ?: return@launch
+            when (kind) {
+                MediaKind.HLS -> {
+                    val result = HlsParser.parse(manifestText, url)
+                    val durationMs = result.durationSeconds?.let { (it * 1000).toLong() }
+                    mediaSniffer.updateCandidateVariants(
+                        id = candidateId,
+                        variants = result.variants,
+                        isLive = result.isLive,
+                        isDrmProtected = result.isDrmProtected,
+                        durationMs = durationMs
+                    )
+                }
+                MediaKind.DASH -> {
+                    val result = DashParser.parse(manifestText, url)
+                    val durationMs = result.durationSeconds?.let { (it * 1000).toLong() }
+                    mediaSniffer.updateCandidateVariants(
+                        id = candidateId,
+                        variants = result.videoVariants + result.audioVariants,
+                        isLive = result.isLive,
+                        isDrmProtected = result.isDrmProtected,
+                        durationMs = durationMs
+                    )
+                }
+                else -> {}
+            }
+        }
     }
 
     /**
@@ -301,11 +360,18 @@ class BrowserViewModel @Inject constructor(
                 requiresAuth = true
             )
 
+            enqueueDownloadRequest(request)
+        }
+    }
+
+    fun enqueueDownloadRequest(request: DownloadRequest) {
+        viewModelScope.launch {
             downloadManager.enqueueDownload(request)
             _uiState.update {
                 it.copy(
                     isMediaSheetVisible = false,
-                    snackbarMessage = "Added \"$safeTitle\" to Downloads"
+                    selectedQualityMedia = null,
+                    snackbarMessage = "Added \"${request.title}\" to Downloads"
                 )
             }
         }
