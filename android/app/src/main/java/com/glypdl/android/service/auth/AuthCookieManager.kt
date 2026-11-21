@@ -122,7 +122,11 @@ class AuthCookieManager @Inject constructor(
                         val isSession = name.equals("sessionid", ignoreCase = true) ||
                                        name.equals("c_user", ignoreCase = true) ||
                                        name.equals("xs", ignoreCase = true) ||
-                                       name.equals("ds_user_id", ignoreCase = true)
+                                       name.equals("ds_user_id", ignoreCase = true) ||
+                                       name.equals("csrftoken", ignoreCase = true) ||
+                                       name.equals("auth_token", ignoreCase = true) ||
+                                       name.equals("SAPISID", ignoreCase = true) ||
+                                       name.equals("SSID", ignoreCase = true)
                         val expiry = if (isSession) 0L else (System.currentTimeMillis() / 1000) + (30L * 24 * 3600)
 
                         writer.write("$dotDomain\tTRUE\t/\tTRUE\t$expiry\t$name\t$value\n")
@@ -173,6 +177,52 @@ class AuthCookieManager @Inject constructor(
         val key = resolveDomainKey(urlOrDomain)
         val file = File(cookiesDir, "${key}.txt")
         return if (isValidCookieFile(file)) file else null
+    }
+
+    /**
+     * Extracts and synchronizes cookies from Android WebView's CookieManager
+     * across relevant domain and subdomains (e.g. .instagram.com, .i.instagram.com).
+     */
+    fun syncCookiesFromCookieManager(urlOrDomain: String): Boolean {
+        return try {
+            val cm = android.webkit.CookieManager.getInstance()
+            cm.flush()
+            val domainKey = resolveDomainKey(urlOrDomain)
+            val cookieMap = mutableMapOf<String, String>()
+            val urlsToProbe = listOf(
+                if (urlOrDomain.startsWith("http")) urlOrDomain else "https://$urlOrDomain",
+                "https://$domainKey",
+                "https://www.$domainKey",
+                "https://m.$domainKey",
+                "https://i.$domainKey",
+                "https://api.$domainKey"
+            ).distinct()
+
+            for (probeUrl in urlsToProbe) {
+                val c = cm.getCookie(probeUrl)
+                if (!c.isNullOrBlank()) {
+                    c.split(";").forEach { pair ->
+                        val trimmed = pair.trim()
+                        if (trimmed.contains("=")) {
+                            val k = trimmed.substringBefore("=").trim()
+                            val v = trimmed.substringAfter("=").trim()
+                            if (k.isNotEmpty() && v.isNotEmpty()) {
+                                cookieMap[k] = v
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (cookieMap.isNotEmpty()) {
+                val combined = cookieMap.entries.joinToString("; ") { "${it.key}=${it.value}" }
+                saveCookies(domainKey, combined)
+            } else {
+                false
+            }
+        } catch (e: Exception) {
+            false
+        }
     }
 
     fun hasCookies(domainKey: String): Boolean {

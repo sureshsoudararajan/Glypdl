@@ -133,15 +133,21 @@ object BrowserScripts {
                 var trimmed = url.trim();
                 if (!trimmed || trimmed.startsWith('data:') || trimmed.length > 2048) return;
                 try {
-                    var absoluteUrl = new URL(trimmed, window.location.href).href;
+                    var isPlatformBlob = isBlob && (
+                        window.location.hostname.indexOf('instagram.com') !== -1 ||
+                        window.location.hostname.indexOf('youtube.com') !== -1 ||
+                        window.location.hostname.indexOf('tiktok.com') !== -1
+                    );
+                    var candidateTarget = isPlatformBlob ? window.location.href : trimmed;
+                    var absoluteUrl = new URL(candidateTarget, window.location.href).href;
                     var resolvedPoster = poster || extractPoster(null);
                     var payload = JSON.stringify({
                         url: absoluteUrl,
                         poster: resolvedPoster ? new URL(resolvedPoster, window.location.href).href : null,
-                        mime: mime || null,
+                        mime: mime || (isPlatformBlob ? "video/mp4" : null),
                         title: extractPageTitle(),
                         account: extractAccount(),
-                        isBlob: !!isBlob
+                        isBlob: isPlatformBlob ? false : !!isBlob
                     });
                     if (window.$JS_INTERFACE_NAME && typeof window.$JS_INTERFACE_NAME.reportMedia === 'function') {
                         window.$JS_INTERFACE_NAME.reportMedia(payload);
@@ -151,6 +157,17 @@ object BrowserScripts {
 
             function scanElements() {
                 try {
+                    // Instagram Story / Reel / Post: promote page URL when video element is present
+                    if (window.location.hostname.indexOf('instagram.com') !== -1) {
+                        var path = window.location.pathname;
+                        if (path.indexOf('/stories/') !== -1 || path.indexOf('/reel/') !== -1 || path.indexOf('/p/') !== -1) {
+                            var igVideo = document.querySelector('video');
+                            if (igVideo) {
+                                sendCandidate(window.location.href, extractPoster(igVideo), "video/mp4", false);
+                            }
+                        }
+                    }
+
                     // Video elements
                     var videos = document.querySelectorAll('video');
                     for (var i = 0; i < videos.length; i++) {

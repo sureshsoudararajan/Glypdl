@@ -86,7 +86,8 @@ class BrowserViewModel @Inject constructor(
     private val mediaProber: MediaProber,
     private val downloadManager: DownloadManager,
     private val browserRepository: BrowserRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val authCookieManager: com.glypdl.android.service.auth.AuthCookieManager
 ) : ViewModel() {
 
     private val initialUrl: String = savedStateHandle.get<String>("url")
@@ -227,6 +228,12 @@ class BrowserViewModel @Inject constructor(
             viewModelScope.launch {
                 browserRepository.recordVisit(url, _uiState.value.title)
             }
+            // Auto-synchronize browser login session cookies with AuthCookieManager for yt-dlp & Settings
+            if (url.contains("instagram.com") || url.contains("facebook.com") || url.contains("youtube.com") || url.contains("twitter.com") || url.contains("x.com") || url.contains("tiktok.com")) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    authCookieManager.syncCookiesFromCookieManager(url)
+                }
+            }
         }
     }
 
@@ -258,6 +265,11 @@ class BrowserViewModel @Inject constructor(
 
         val currentTab = _uiState.value.tabs.find { it.id == _uiState.value.activeTabId }
         val isIncognito = currentTab?.isIncognito ?: _uiState.value.isIncognito
+        if (!isIncognito && (newUrl.contains("instagram.com") || newUrl.contains("facebook.com") || newUrl.contains("youtube.com") || newUrl.contains("twitter.com") || newUrl.contains("x.com") || newUrl.contains("tiktok.com"))) {
+            viewModelScope.launch(Dispatchers.IO) {
+                authCookieManager.syncCookiesFromCookieManager(newUrl)
+            }
+        }
         if (!isIncognito) {
             viewModelScope.launch {
                 browserRepository.recordVisit(newUrl, title ?: _uiState.value.title)
@@ -643,7 +655,8 @@ class BrowserViewModel @Inject constructor(
                     mime = mime,
                     posterUrl = poster,
                     headers = headers,
-                    source = DetectionSource.DOM
+                    source = DetectionSource.DOM,
+                    accountName = account
                 )
                 if (candidateId != null && (kind == MediaKind.HLS || kind == MediaKind.DASH)) {
                     parseManifestIfStreaming(candidateId, url, kind, headers)

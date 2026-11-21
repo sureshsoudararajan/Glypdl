@@ -79,6 +79,10 @@ class MediaClassifierTest {
         assertNull(MediaClassifier.classify("https://example.com/video/init.mp4"))
         assertTrue(MediaClassifier.isSegmentOrChunk("https://example.com/stream/segment-1.ts"))
         assertTrue(MediaClassifier.isSegmentOrChunk("https://example.com/stream/init-v1.mp4"))
+        // Instagram and YouTube DASH byte-range fragments
+        assertTrue(MediaClassifier.isSegmentOrChunk("https://instagram.fcjb5-2.fna.fbcdn.net/o1/v/t2/f2/m78/video.mp4?bytestart=147954&byteend=221882"))
+        assertTrue(MediaClassifier.isSegmentOrChunk("https://rr1---sn-4g5ednss.googlevideo.com/videoplayback?id=123&range=0-1000"))
+        assertNull(MediaClassifier.classify("https://instagram.fcjb5-2.fna.fbcdn.net/o1/v/t2/f2/m78/video.mp4?bytestart=147954&byteend=221882"))
     }
 
     @Test

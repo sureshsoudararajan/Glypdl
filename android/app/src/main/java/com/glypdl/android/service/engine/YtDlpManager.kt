@@ -518,6 +518,12 @@ class YtDlpManager @Inject constructor(
             else -> UrlValidator.sanitizeUrl(url)
         }
 
+        // Auto-synchronize cookies from WebView CookieManager for platforms requiring session tokens
+        val isInstagramTarget = UrlValidator.isInstagramUrl(targetUrl)
+        if (isInstagramTarget || isStory || UrlValidator.isFacebookUrl(targetUrl)) {
+            authCookieManager.syncCookiesFromCookieManager(targetUrl)
+        }
+
         // Phase 1: Always attempt anonymous extraction first (NO cookies attached)
         val anonymousResult = executeExtractInfo(targetUrl, url, cookieFile = null, timeoutMs = timeoutMs, installed = installed)
         if (anonymousResult.isSuccess) {
@@ -529,9 +535,11 @@ class YtDlpManager @Inject constructor(
         val shouldRetryWithAuth = error is GlypdlError.AuthenticationRequired ||
                 error is GlypdlError.PrivateContent ||
                 error is GlypdlError.EmptyMediaResponse ||
-                (isStory && error is GlypdlError.ExtractorError)
+                (isStory && error is GlypdlError.ExtractorError) ||
+                isInstagramTarget
 
         if (shouldRetryWithAuth) {
+            authCookieManager.syncCookiesFromCookieManager(targetUrl)
             val savedCookieFile = authCookieManager.getCookieFile(targetUrl)
             if (savedCookieFile != null && authCookieManager.isValidCookieFile(savedCookieFile)) {
                 val authResult = executeExtractInfo(targetUrl, url, cookieFile = savedCookieFile, timeoutMs = timeoutMs, installed = installed)
@@ -761,15 +769,21 @@ class YtDlpManager @Inject constructor(
     ): Result<String> = withContext(Dispatchers.IO) {
         val installed = getInstalledVersion()
         try {
-            val isInstagram = UrlValidator.isInstagramUrl(request.url)
-            val isFacebook = UrlValidator.isFacebookUrl(request.url)
-            val isStory = UrlValidator.isInstagramStory(request.url)
-            val requestedStoryId = if (isStory) UrlValidator.extractInstagramStoryId(request.url) else null
+            val effectiveUrl = when {
+                !request.pageUrl.isNullOrBlank() && (UrlValidator.isInstagramUrl(request.pageUrl) || UrlValidator.isYouTubeUrl(request.pageUrl) || UrlValidator.isFacebookUrl(request.pageUrl)) &&
+                        (request.url.contains("fbcdn.net") || request.url.contains("cdninstagram.com") || request.url.contains("googlevideo.com")) -> request.pageUrl
+                else -> request.url
+            }
+
+            val isInstagram = UrlValidator.isInstagramUrl(effectiveUrl)
+            val isFacebook = UrlValidator.isFacebookUrl(effectiveUrl)
+            val isStory = UrlValidator.isInstagramStory(effectiveUrl)
+            val requestedStoryId = if (isStory) UrlValidator.extractInstagramStoryId(effectiveUrl) else null
 
             val targetUrl = when {
-                isStory -> UrlValidator.canonicalizeInstagramStoryUrl(request.url)
-                isFacebook -> UrlValidator.canonicalizeFacebookUrl(request.url)
-                else -> request.url
+                isStory -> UrlValidator.canonicalizeInstagramStoryUrl(effectiveUrl)
+                isFacebook -> UrlValidator.canonicalizeFacebookUrl(effectiveUrl)
+                else -> effectiveUrl
             }
 
             val dlRequest = YoutubeDLRequest(targetUrl)
@@ -777,16 +791,13 @@ class YtDlpManager @Inject constructor(
             dlRequest.addOption("--verbose")
 
             val isBrowserDownload = request.sourceKind?.startsWith("BROWSER") == true
-            val cookieFile = if (request.requiresAuth || isBrowserDownload) {
-                val candidateUrl = request.pageUrl ?: targetUrl
-                try {
-                    val rawCookies = android.webkit.CookieManager.getInstance().getCookie(candidateUrl)
-                    if (!rawCookies.isNullOrBlank()) {
-                        val domainKey = authCookieManager.resolveDomainKey(candidateUrl)
-                        authCookieManager.saveCookies(domainKey, rawCookies)
-                    }
-                } catch (_: Exception) {}
-                authCookieManager.getCookieFile(request.pageUrl ?: targetUrl) ?: authCookieManager.getCookieFile(targetUrl)
+            val syncUrl = request.pageUrl ?: targetUrl
+            try {
+                authCookieManager.syncCookiesFromCookieManager(syncUrl)
+            } catch (_: Exception) {}
+
+            val cookieFile = if (request.requiresAuth || isBrowserDownload || isInstagram || isStory) {
+                authCookieManager.getCookieFile(syncUrl) ?: authCookieManager.getCookieFile(targetUrl)
             } else {
                 null
             }
@@ -850,15 +861,19 @@ class YtDlpManager @Inject constructor(
                 dlRequest.addOption("--postprocessor-args", "Merger:-threads 4")
             }
 
-            // Safe Unicode truncation to <= 80 bytes in UTF-8 to prevent [Errno 36] File name too long
-            val safeTitle = com.glypdl.android.util.FileNameSanitizer.safeFsTitle(request.title, 80)
+            // Safe Unicode truncation to <= 60 bytes in UTF-8 to prevent [Errno 36] File name too long
+            val safeTitle = com.glypdl.android.util.FileNameSanitizer.safeFsTitle(request.title, 60)
             val filenameTemplate = if (safeTitle.isNotBlank()) {
-                "${safeTitle}_%(id)s.%(ext)s"
+                "${safeTitle}_%(id).16s.%(ext)s"
             } else {
-                "%(id)s.%(ext)s"
+                "%(id).32s.%(ext)s"
             }
 
-            val outputPath = File(downloadDir, filenameTemplate).absolutePath
+            val dir = File(downloadDir)
+            if (!dir.exists()) {
+                dir.mkdirs()
+            }
+            val outputPath = File(dir, filenameTemplate).absolutePath
             dlRequest.addOption("-o", outputPath)
 
             if (!subOpts.isSubtitlesOnly && !request.isAudioOnly && (effectiveFormat.contains("+") || effectiveFormat.contains("bestvideo") || subOpts.shouldEmbed)) {

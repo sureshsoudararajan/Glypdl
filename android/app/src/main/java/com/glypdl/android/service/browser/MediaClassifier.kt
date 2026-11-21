@@ -67,6 +67,23 @@ object MediaClassifier {
      * Determines whether the candidate URL is a segment, fragment, or chunk that should not be listed as standalone media.
      */
     fun isSegmentOrChunk(url: String): Boolean {
+        val lowerUrl = url.lowercase(Locale.ROOT)
+
+        // 1. Segment query parameters and partial byte-ranges (Instagram, YouTube, and other DASH/HLS CDNs)
+        // e.g. bytestart=147954&byteend=221882, &sq=1, &range=100-200
+        if (lowerUrl.contains("bytestart=") ||
+            lowerUrl.contains("byteend=") ||
+            lowerUrl.contains("dash_ln_") ||
+            lowerUrl.contains("live-dash") ||
+            lowerUrl.contains("&sq=") ||
+            lowerUrl.contains("?sq=") ||
+            lowerUrl.contains("sq/") ||
+            (lowerUrl.contains("fbcdn.net") && lowerUrl.contains("range=")) ||
+            (lowerUrl.contains("googlevideo.com") && lowerUrl.contains("range="))
+        ) {
+            return true
+        }
+
         val path = extractPath(url).lowercase(Locale.ROOT)
         val ext = extractExtension(path)
 

@@ -54,6 +54,7 @@ class BrowserViewModelTest {
     private lateinit var downloadManager: DownloadManager
     private lateinit var browserRepository: BrowserRepository
     private lateinit var settingsRepository: SettingsRepository
+    private lateinit var authCookieManager: com.glypdl.android.service.auth.AuthCookieManager
 
     @Before
     fun setup() {
@@ -63,6 +64,7 @@ class BrowserViewModelTest {
         downloadManager = mockk(relaxed = true)
         browserRepository = mockk(relaxed = true)
         settingsRepository = mockk(relaxed = true)
+        authCookieManager = mockk(relaxed = true)
 
         every { browserRepository.getAllBookmarks() } returns flowOf(emptyList())
         every { browserRepository.getAllHistory() } returns flowOf(emptyList())
@@ -84,7 +86,8 @@ class BrowserViewModelTest {
             mediaProber = mediaProber,
             downloadManager = downloadManager,
             browserRepository = browserRepository,
-            settingsRepository = settingsRepository
+            settingsRepository = settingsRepository,
+            authCookieManager = authCookieManager
         )
     }
 

@@ -64,7 +64,8 @@ class MediaSniffer @Inject constructor(
         headers: Map<String, String> = emptyMap(),
         source: DetectionSource = DetectionSource.NETWORK,
         isDrmProtected: Boolean = false,
-        variants: List<com.glypdl.android.data.model.MediaVariant> = emptyList()
+        variants: List<com.glypdl.android.data.model.MediaVariant> = emptyList(),
+        accountName: String? = null
     ): String? {
         if (url.isBlank() || url.startsWith("blob:") || url.startsWith("data:")) return null
         if (MediaClassifier.isAdOrTrackingUrl(url) || MediaClassifier.isSegmentOrChunk(url)) return null
@@ -76,7 +77,8 @@ class MediaSniffer @Inject constructor(
         val smartTitle = MediaClassifier.generateSmartTitle(
             pageUrl = effectivePageUrl,
             pageTitle = pageTitle,
-            candidateUrl = url
+            candidateUrl = url,
+            accountName = accountName
         )
         val resolvedPoster = MediaClassifier.resolvePosterUrl(
             pageUrl = effectivePageUrl,
