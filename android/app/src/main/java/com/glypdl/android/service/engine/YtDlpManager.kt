@@ -335,7 +335,8 @@ class YtDlpManager @Inject constructor(
     fun applyPlatformOptions(
         request: YoutubeDLRequest,
         url: String,
-        cookieFile: File? = null
+        cookieFile: File? = null,
+        customHeaders: Map<String, String>? = null
     ) {
         val isInstagram = UrlValidator.isInstagramUrl(url)
         val isFacebook = UrlValidator.isFacebookUrl(url)
@@ -343,25 +344,39 @@ class YtDlpManager @Inject constructor(
 
         request.addOption("--no-check-certificates")
 
-        // Instagram and Facebook extractors require desktop browser User-Agent to return
-        // web GraphQL / RelayPrefetchedStreamCache responses instead of mobile app redirects.
-        // YouTube extractor manages its own internal client spoofing and user-agents; overriding
-        // global user-agent or referer on YouTube breaks timedtext API and triggers HTTP 429.
-        if (isInstagram || isFacebook) {
-            request.addOption("--user-agent", DESKTOP_USER_AGENT)
-        } else if (!isYouTube) {
-            request.addOption("--user-agent", DEFAULT_USER_AGENT)
-        }
+        // If custom headers provided (e.g. from browser detection), prioritize them
+        if (!customHeaders.isNullOrEmpty()) {
+            customHeaders["User-Agent"]?.let { request.addOption("--user-agent", it) }
+            customHeaders["Referer"]?.let { request.addOption("--referer", it) }
+            customHeaders["Origin"]?.let { request.addOption("--add-header", "Origin:$it") }
+            for ((key, value) in customHeaders) {
+                if (key.equals("User-Agent", ignoreCase = true) ||
+                    key.equals("Referer", ignoreCase = true) ||
+                    key.equals("Origin", ignoreCase = true)
+                ) continue
+                request.addOption("--add-header", "$key:$value")
+            }
+        } else {
+            // Instagram and Facebook extractors require desktop browser User-Agent to return
+            // web GraphQL / RelayPrefetchedStreamCache responses instead of mobile app redirects.
+            // YouTube extractor manages its own internal client spoofing and user-agents; overriding
+            // global user-agent or referer on YouTube breaks timedtext API and triggers HTTP 429.
+            if (isInstagram || isFacebook) {
+                request.addOption("--user-agent", DESKTOP_USER_AGENT)
+            } else if (!isYouTube) {
+                request.addOption("--user-agent", DEFAULT_USER_AGENT)
+            }
 
-        if (isInstagram) {
-            request.addOption("--referer", "https://www.instagram.com/")
-        } else if (isFacebook) {
-            request.addOption("--referer", "https://www.facebook.com/")
-            request.addOption("--add-header", "Sec-Fetch-Mode:navigate")
-            request.addOption("--add-header", "Sec-Fetch-Site:none")
-            request.addOption("--add-header", "Sec-Fetch-Dest:document")
-        } else if (!isYouTube) {
-            request.addOption("--referer", url)
+            if (isInstagram) {
+                request.addOption("--referer", "https://www.instagram.com/")
+            } else if (isFacebook) {
+                request.addOption("--referer", "https://www.facebook.com/")
+                request.addOption("--add-header", "Sec-Fetch-Mode:navigate")
+                request.addOption("--add-header", "Sec-Fetch-Site:none")
+                request.addOption("--add-header", "Sec-Fetch-Dest:document")
+            } else if (!isYouTube) {
+                request.addOption("--referer", url)
+            }
         }
 
         if (cookieFile != null && authCookieManager.isValidCookieFile(cookieFile)) {
@@ -761,12 +776,21 @@ class YtDlpManager @Inject constructor(
             dlRequest.addOption("--no-playlist")
             dlRequest.addOption("--verbose")
 
-            val cookieFile = if (request.requiresAuth) {
-                authCookieManager.getCookieFile(targetUrl)
+            val isBrowserDownload = request.sourceKind?.startsWith("BROWSER") == true
+            val cookieFile = if (request.requiresAuth || isBrowserDownload) {
+                val candidateUrl = request.pageUrl ?: targetUrl
+                try {
+                    val rawCookies = android.webkit.CookieManager.getInstance().getCookie(candidateUrl)
+                    if (!rawCookies.isNullOrBlank()) {
+                        val domainKey = authCookieManager.resolveDomainKey(candidateUrl)
+                        authCookieManager.saveCookies(domainKey, rawCookies)
+                    }
+                } catch (_: Exception) {}
+                authCookieManager.getCookieFile(request.pageUrl ?: targetUrl) ?: authCookieManager.getCookieFile(targetUrl)
             } else {
                 null
             }
-            applyPlatformOptions(dlRequest, targetUrl, cookieFile)
+            applyPlatformOptions(dlRequest, targetUrl, cookieFile, request.headers)
 
             val effectiveFormat = if (isInstagram || isFacebook) {
                 when {

@@ -19,18 +19,60 @@
 package com.glypdl.android.ui.browser
 
 import androidx.lifecycle.SavedStateHandle
+import com.glypdl.android.data.model.DetectedMedia
+import com.glypdl.android.data.model.MediaKind
+import com.glypdl.android.service.DownloadManager
 import com.glypdl.android.service.browser.GlypdlWebViewFactory
+import com.glypdl.android.service.browser.MediaProber
+import com.glypdl.android.service.browser.MediaSniffer
+import io.mockk.coVerify
+import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class BrowserViewModelTest {
+
+    private val testDispatcher = StandardTestDispatcher()
+    private lateinit var mediaProber: MediaProber
+    private lateinit var mediaSniffer: MediaSniffer
+    private lateinit var downloadManager: DownloadManager
+
+    @Before
+    fun setup() {
+        Dispatchers.setMain(testDispatcher)
+        mediaProber = mockk(relaxed = true)
+        mediaSniffer = MediaSniffer(mediaProber)
+        downloadManager = mockk(relaxed = true)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
+
+    private fun createViewModel(handle: SavedStateHandle = SavedStateHandle()): BrowserViewModel {
+        return BrowserViewModel(
+            savedStateHandle = handle,
+            mediaSniffer = mediaSniffer,
+            mediaProber = mediaProber,
+            downloadManager = downloadManager
+        )
+    }
 
     @Test
     fun defaultInitialState_loadsDuckDuckGo() {
-        val viewModel = BrowserViewModel(SavedStateHandle())
+        val viewModel = createViewModel()
         val state = viewModel.uiState.value
 
         assertEquals("https://duckduckgo.com", state.currentUrl)
@@ -43,7 +85,7 @@ class BrowserViewModelTest {
     @Test
     fun passedUrl_loadsSpecifiedUrl() {
         val handle = SavedStateHandle(mapOf("url" to "https://example.com/test"))
-        val viewModel = BrowserViewModel(handle)
+        val viewModel = createViewModel(handle)
         val state = viewModel.uiState.value
 
         assertEquals("https://example.com/test", state.currentUrl)
@@ -52,7 +94,7 @@ class BrowserViewModelTest {
 
     @Test
     fun resolveUrlOrSearch_handlesDirectUrls() {
-        val viewModel = BrowserViewModel(SavedStateHandle())
+        val viewModel = createViewModel()
 
         assertEquals("https://example.com", viewModel.resolveUrlOrSearch("https://example.com"))
         assertEquals("http://insecure.site", viewModel.resolveUrlOrSearch("http://insecure.site"))
@@ -60,7 +102,7 @@ class BrowserViewModelTest {
 
     @Test
     fun resolveUrlOrSearch_handlesDomainsWithoutScheme() {
-        val viewModel = BrowserViewModel(SavedStateHandle())
+        val viewModel = createViewModel()
 
         assertEquals("https://wikipedia.org", viewModel.resolveUrlOrSearch("wikipedia.org"))
         assertEquals("https://github.com/trending", viewModel.resolveUrlOrSearch("github.com/trending"))
@@ -68,7 +110,7 @@ class BrowserViewModelTest {
 
     @Test
     fun resolveUrlOrSearch_handlesSearchQueries() {
-        val viewModel = BrowserViewModel(SavedStateHandle())
+        val viewModel = createViewModel()
 
         val resolved = viewModel.resolveUrlOrSearch("open source android downloader")
         assertTrue(resolved.startsWith("https://duckduckgo.com/?q="))
@@ -77,7 +119,7 @@ class BrowserViewModelTest {
 
     @Test
     fun pageLifecycle_updatesStateCorrectly() {
-        val viewModel = BrowserViewModel(SavedStateHandle())
+        val viewModel = createViewModel()
 
         viewModel.onPageStarted("https://example.com")
         var state = viewModel.uiState.value
@@ -103,8 +145,68 @@ class BrowserViewModelTest {
     }
 
     @Test
+    fun onNetworkResourceIntercepted_detectsMedia() {
+        val viewModel = createViewModel()
+        viewModel.onPageStarted("https://example.com")
+
+        viewModel.onNetworkResourceIntercepted(
+            url = "https://example.com/video.mp4",
+            headers = mapOf("Referer" to "https://example.com")
+        )
+
+        val detected = viewModel.detectedMedia.value
+        assertEquals(1, detected.size)
+        assertEquals("https://example.com/video.mp4", detected[0].url)
+        assertEquals(MediaKind.PROGRESSIVE_VIDEO, detected[0].kind)
+    }
+
+    @Test
+    fun onDomMediaReported_addsCandidate() {
+        val viewModel = createViewModel()
+        viewModel.onPageStarted("https://example.com")
+
+        val payload = """
+            {
+                "url": "https://example.com/audio.mp3",
+                "title": "Sample Song",
+                "mime": "audio/mpeg"
+            }
+        """.trimIndent()
+        viewModel.onDomMediaReported(payload)
+
+        val detected = viewModel.detectedMedia.value
+        assertEquals(1, detected.size)
+        assertEquals("https://example.com/audio.mp3", detected[0].url)
+        assertEquals(MediaKind.PROGRESSIVE_AUDIO, detected[0].kind)
+    }
+
+    @Test
+    fun downloadDetectedMedia_enqueuesViaDownloadManager() {
+        val viewModel = createViewModel()
+        val media = DetectedMedia(
+            id = "test-media-1",
+            url = "https://example.com/clip.mp4",
+            pageUrl = "https://example.com",
+            pageTitle = "Exciting Clip",
+            kind = MediaKind.PROGRESSIVE_VIDEO,
+            ext = "mp4"
+        )
+
+        viewModel.downloadDetectedMedia(media)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify {
+            downloadManager.enqueueDownload(match {
+                it.url == "https://example.com/clip.mp4" &&
+                it.title.contains("Exciting Clip") &&
+                it.sourceKind == "BROWSER_DIRECT"
+            })
+        }
+    }
+
+    @Test
     fun httpPage_marksAsInsecure() {
-        val viewModel = BrowserViewModel(SavedStateHandle())
+        val viewModel = createViewModel()
 
         viewModel.onPageStarted("http://example.com")
         assertFalse(viewModel.uiState.value.isSecure)
@@ -112,7 +214,7 @@ class BrowserViewModelTest {
 
     @Test
     fun errorAndSslHandling() {
-        val viewModel = BrowserViewModel(SavedStateHandle())
+        val viewModel = createViewModel()
 
         viewModel.onErrorReceived("Connection timeout")
         assertEquals("Connection timeout", viewModel.uiState.value.errorMessage)
@@ -130,7 +232,7 @@ class BrowserViewModelTest {
 
     @Test
     fun desktopModeToggle() {
-        val viewModel = BrowserViewModel(SavedStateHandle())
+        val viewModel = createViewModel()
         assertFalse(viewModel.uiState.value.isDesktopMode)
 
         viewModel.toggleDesktopMode()

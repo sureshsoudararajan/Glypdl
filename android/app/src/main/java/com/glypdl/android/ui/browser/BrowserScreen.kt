@@ -29,7 +29,7 @@ import android.net.http.SslError
 import android.webkit.*
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -45,8 +45,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
+import com.glypdl.android.service.browser.BrowserScripts
 import com.glypdl.android.service.browser.GlypdlWebViewFactory
 import com.glypdl.android.ui.browser.components.AddressBar
+import com.glypdl.android.ui.browser.components.DetectedMediaSheet
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -57,7 +61,9 @@ fun BrowserScreen(
     onNavigateToDownloads: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val detectedMediaList by viewModel.detectedMedia.collectAsState()
     val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
     BackHandler(enabled = true) {
@@ -81,7 +87,23 @@ fun BrowserScreen(
         }
     }
 
+    // Handle snackbar notifications
+    LaunchedEffect(uiState.snackbarMessage) {
+        uiState.snackbarMessage?.let { msg ->
+            val result = snackbarHostState.showSnackbar(
+                message = msg,
+                actionLabel = "View",
+                duration = SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                onNavigateToDownloads()
+            }
+            viewModel.clearSnackbarMessage()
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
                 AddressBar(
@@ -187,6 +209,29 @@ fun BrowserScreen(
                     }
                 }
             }
+        },
+        floatingActionButton = {
+            AnimatedVisibility(
+                visible = detectedMediaList.isNotEmpty(),
+                enter = scaleIn() + fadeIn(),
+                exit = scaleOut() + fadeOut()
+            ) {
+                BadgedBox(
+                    badge = {
+                        Badge {
+                            Text("${detectedMediaList.size}")
+                        }
+                    }
+                ) {
+                    FloatingActionButton(
+                        onClick = { viewModel.showMediaSheet() },
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = "View detected media")
+                    }
+                }
+            }
         }
     ) { paddingValues ->
         Box(
@@ -200,6 +245,30 @@ fun BrowserScreen(
                     GlypdlWebViewFactory.createWebView(ctx).apply {
                         webViewRef = this
 
+                        // Layer B: Add Javascript Interface for DOM reported media
+                        addJavascriptInterface(
+                            object {
+                                @JavascriptInterface
+                                fun reportMedia(jsonPayload: String) {
+                                    post {
+                                        viewModel.onDomMediaReported(jsonPayload)
+                                    }
+                                }
+                            },
+                            BrowserScripts.JS_INTERFACE_NAME
+                        )
+
+                        // If DOCUMENT_START_SCRIPT is supported, inject early
+                        if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                            try {
+                                WebViewCompat.addDocumentStartJavaScript(
+                                    this,
+                                    BrowserScripts.INJECTION_SCRIPT,
+                                    setOf("*")
+                                )
+                            } catch (_: Exception) {}
+                        }
+
                         webChromeClient = object : WebChromeClient() {
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                                 viewModel.onProgressChanged(newProgress)
@@ -211,6 +280,19 @@ fun BrowserScreen(
                         }
 
                         webViewClient = object : WebViewClient() {
+                            // Layer A: Intercept network resource requests
+                            override fun shouldInterceptRequest(
+                                view: WebView?,
+                                request: WebResourceRequest?
+                            ): WebResourceResponse? {
+                                request?.url?.let { uri ->
+                                    val urlStr = uri.toString()
+                                    val headers = request.requestHeaders ?: emptyMap()
+                                    viewModel.onNetworkResourceIntercepted(urlStr, headers)
+                                }
+                                return null // Always allow WebView to load resource normally
+                            }
+
                             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                 val urlStr = request?.url?.toString() ?: return false
                                 val scheme = request.url.scheme?.lowercase() ?: return false
@@ -219,24 +301,23 @@ fun BrowserScreen(
                                     return false
                                 }
 
-                                // External schemes (intent://, tel:, mailto:)
                                 try {
                                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(urlStr))
                                     ctx.startActivity(intent)
-                                } catch (e: Exception) {
-                                    // Ignore unhandled external protocols
-                                }
+                                } catch (e: Exception) {}
                                 return true
                             }
 
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 super.onPageStarted(view, url, favicon)
                                 url?.let { viewModel.onPageStarted(it) }
+                                view?.evaluateJavascript(BrowserScripts.INJECTION_SCRIPT, null)
                             }
 
                             override fun onPageFinished(view: WebView?, url: String?) {
                                 super.onPageFinished(view, url)
                                 CookieManager.getInstance().flush()
+                                view?.evaluateJavascript(BrowserScripts.INJECTION_SCRIPT, null)
                                 url?.let {
                                     viewModel.onPageFinished(
                                         url = it,
@@ -264,7 +345,6 @@ fun BrowserScreen(
                                 handler: SslErrorHandler?,
                                 error: SslError?
                             ) {
-                                // Security: NEVER call handler.proceed() silently
                                 handler?.cancel()
                                 viewModel.onSslError(error?.url ?: uiState.currentUrl)
                             }
@@ -328,6 +408,21 @@ fun BrowserScreen(
                 }
             }
         }
+    }
+
+    // Detected Media BottomSheet
+    if (uiState.isMediaSheetVisible) {
+        DetectedMediaSheet(
+            mediaList = detectedMediaList,
+            onDownloadMedia = { media ->
+                viewModel.downloadDetectedMedia(media)
+            },
+            onAnalyzeMedia = { media ->
+                viewModel.hideMediaSheet()
+                onNavigateToAnalyze(media.url)
+            },
+            onDismiss = { viewModel.hideMediaSheet() }
+        )
     }
 
     // SSL Error Interstitial Dialog

@@ -64,6 +64,9 @@ data class DownloadEntity(
     val errorMessage: String?,
     val technicalLog: String? = null,
     val subtitleOptionsJson: String? = null,
+    val headersJson: String? = null,
+    val sourceKind: String? = null,
+    val pageUrl: String? = null,
     val createdAt: Long,
     val updatedAt: Long
 )

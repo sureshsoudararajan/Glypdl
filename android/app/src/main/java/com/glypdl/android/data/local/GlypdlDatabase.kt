@@ -44,7 +44,7 @@ import com.glypdl.android.data.local.entity.SubtitleFileEntity
         SavedStatusEntity::class,
         SubtitleFileEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

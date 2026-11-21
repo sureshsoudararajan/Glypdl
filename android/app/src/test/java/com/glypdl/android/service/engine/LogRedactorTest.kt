@@ -60,4 +60,27 @@ class LogRedactorTest {
 
         assertEquals(safe, output)
     }
+
+    @Test
+    fun testRedactSignedUrlAndQueryTokens() {
+        val signedUrl = "https://example.com/video.mp4?token=secretToken123&expires=1700000000&Signature=abcd9876xyz&AWSAccessKeyId=AKIAIOSFODNN7EXAMPLE"
+        val output = LogRedactor.redact(signedUrl)
+
+        assertFalse(output.contains("secretToken123"))
+        assertFalse(output.contains("abcd9876xyz"))
+        assertFalse(output.contains("AKIAIOSFODNN7EXAMPLE"))
+        assertTrue(output.contains("token=[REDACTED]"))
+        assertTrue(output.contains("Signature=[REDACTED]"))
+        assertTrue(output.contains("AWSAccessKeyId=[REDACTED]"))
+    }
+
+    @Test
+    fun testRedactAddHeaderOptions() {
+        val cmd = "yt-dlp --add-header 'Cookie: sessionid=secretSession123' --add-header 'Authorization: Bearer secretBearer123'"
+        val output = LogRedactor.redact(cmd)
+
+        assertFalse(output.contains("secretSession123"))
+        assertFalse(output.contains("secretBearer123"))
+        assertTrue(output.contains("[REDACTED]"))
+    }
 }

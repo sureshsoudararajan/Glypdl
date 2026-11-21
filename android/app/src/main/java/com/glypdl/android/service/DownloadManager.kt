@@ -67,6 +67,7 @@ class DownloadManager @Inject constructor(
         DiagnosticLogger.log("DownloadManager", "Enqueued task: ${request.title} (ID: ${request.id}, mode: ${request.subtitleOptions.mode})", LogLevel.INFO)
         requestMap[request.id] = request
         val subtitleJson = serializeSubtitleOptions(request.subtitleOptions)
+        val headersJson = serializeHeaders(request.headers)
         val entity = DownloadEntity(
             id = request.id,
             url = request.url,
@@ -85,6 +86,9 @@ class DownloadManager @Inject constructor(
             errorMessage = null,
             technicalLog = null,
             subtitleOptionsJson = subtitleJson,
+            headersJson = headersJson,
+            sourceKind = request.sourceKind,
+            pageUrl = request.pageUrl,
             createdAt = System.currentTimeMillis(),
             updatedAt = System.currentTimeMillis()
         )
@@ -138,6 +142,7 @@ class DownloadManager @Inject constructor(
 
                 val inMemoryRequest = requestMap[entity.id]
                 val subOptions = inMemoryRequest?.subtitleOptions ?: deserializeSubtitleOptions(entity.subtitleOptionsJson)
+                val restoredHeaders = inMemoryRequest?.headers ?: deserializeHeaders(entity.headersJson)
                 val request = inMemoryRequest ?: DownloadRequest(
                     id = entity.id,
                     url = entity.url,
@@ -148,7 +153,10 @@ class DownloadManager @Inject constructor(
                     resolution = entity.resolution,
                     isAudioOnly = entity.isAudioOnly,
                     destinationUri = entity.filePath,
-                    subtitleOptions = subOptions
+                    subtitleOptions = subOptions,
+                    headers = restoredHeaders,
+                    sourceKind = entity.sourceKind,
+                    pageUrl = entity.pageUrl
                 )
 
                 val stagingDir = com.glypdl.android.util.StorageHelper.getDefaultStagingDir(context)
@@ -752,5 +760,28 @@ class DownloadManager @Inject constructor(
         } catch (e: Exception) {
             SubtitleDownloadOptions()
         }
+    }
+
+    private fun serializeHeaders(headers: Map<String, String>): String? {
+        if (headers.isEmpty()) return null
+        val json = JSONObject()
+        for ((k, v) in headers) {
+            json.put(k, v)
+        }
+        return json.toString()
+    }
+
+    private fun deserializeHeaders(jsonStr: String?): Map<String, String> {
+        if (jsonStr.isNullOrBlank()) return emptyMap()
+        val result = mutableMapOf<String, String>()
+        try {
+            val json = JSONObject(jsonStr)
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                result[key] = json.optString(key)
+            }
+        } catch (_: Exception) {}
+        return result
     }
 }

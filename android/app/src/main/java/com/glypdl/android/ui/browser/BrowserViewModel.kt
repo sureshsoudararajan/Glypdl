@@ -20,14 +20,24 @@ package com.glypdl.android.ui.browser
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
-import com.glypdl.android.util.UrlValidator
+import androidx.lifecycle.viewModelScope
+import com.glypdl.android.data.model.*
+import com.glypdl.android.service.DownloadManager
+import com.glypdl.android.service.browser.MediaClassifier
+import com.glypdl.android.service.browser.MediaProber
+import com.glypdl.android.service.browser.MediaSniffer
+import com.glypdl.android.util.FileNameSanitizer
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import org.json.JSONObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 import javax.inject.Inject
 
 data class BrowserUiState(
@@ -41,12 +51,17 @@ data class BrowserUiState(
     val isDesktopMode: Boolean = false,
     val isSecure: Boolean = true,
     val errorMessage: String? = null,
-    val sslErrorDialogUrl: String? = null
+    val sslErrorDialogUrl: String? = null,
+    val isMediaSheetVisible: Boolean = false,
+    val snackbarMessage: String? = null
 )
 
 @HiltViewModel
 class BrowserViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle
+    savedStateHandle: SavedStateHandle,
+    private val mediaSniffer: MediaSniffer,
+    private val mediaProber: MediaProber,
+    private val downloadManager: DownloadManager
 ) : ViewModel() {
 
     private val initialUrl: String = savedStateHandle.get<String>("url")
@@ -59,6 +74,8 @@ class BrowserViewModel @Inject constructor(
         )
     )
     val uiState: StateFlow<BrowserUiState> = _uiState.asStateFlow()
+
+    val detectedMedia: StateFlow<List<DetectedMedia>> = mediaSniffer.detectedMediaFlow
 
     fun onInputUrlChange(newInput: String) {
         _uiState.update { it.copy(inputUrl = newInput) }
@@ -76,6 +93,7 @@ class BrowserViewModel @Inject constructor(
     }
 
     fun onPageStarted(url: String) {
+        mediaSniffer.resetForPage(url)
         _uiState.update {
             it.copy(
                 currentUrl = url,
@@ -145,6 +163,154 @@ class BrowserViewModel @Inject constructor(
         _uiState.update { it.copy(errorMessage = null) }
     }
 
+    fun showMediaSheet() {
+        _uiState.update { it.copy(isMediaSheetVisible = true) }
+    }
+
+    fun hideMediaSheet() {
+        _uiState.update { it.copy(isMediaSheetVisible = false) }
+    }
+
+    fun clearSnackbarMessage() {
+        _uiState.update { it.copy(snackbarMessage = null) }
+    }
+
+    /**
+     * Layer A: Handle network request intercepted in WebViewClient.shouldInterceptRequest.
+     */
+    fun onNetworkResourceIntercepted(url: String, headers: Map<String, String>) {
+        if (url.isBlank() || MediaClassifier.isAdOrTrackingUrl(url) || MediaClassifier.isSegmentOrChunk(url)) return
+
+        val kind = MediaClassifier.classify(url)
+        if (kind != null) {
+            mediaSniffer.addCandidate(
+                url = url,
+                pageUrl = _uiState.value.currentUrl,
+                pageTitle = _uiState.value.title,
+                kind = kind,
+                headers = headers,
+                source = DetectionSource.NETWORK
+            )
+        } else {
+            // If URL path has ambiguous hints, probe it in background
+            val lower = url.lowercase()
+            if (lower.contains("videoplayback") || lower.contains("/stream") || lower.contains("media")) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    val probeResult = mediaProber.probeUrl(url, _uiState.value.currentUrl, headers)
+                    if (probeResult.isMedia && probeResult.kind != null) {
+                        mediaSniffer.addCandidate(
+                            url = url,
+                            pageUrl = _uiState.value.currentUrl,
+                            pageTitle = _uiState.value.title,
+                            kind = probeResult.kind,
+                            mime = probeResult.mimeType,
+                            sizeBytes = probeResult.contentLength,
+                            headers = headers,
+                            source = DetectionSource.PROBE
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Layer B: Handle DOM / JS reported media from injected scripts.
+     */
+    fun onDomMediaReported(jsonPayload: String) {
+        try {
+            val json = JSONObject(jsonPayload)
+            val url = json.optString("url")
+            if (url.isBlank() || url.startsWith("blob:") || url.startsWith("data:")) return
+
+            val poster = json.optString("poster").takeIf { !it.isNullOrBlank() }
+            val mime = json.optString("mime").takeIf { !it.isNullOrBlank() }
+            val title = json.optString("title").takeIf { !it.isNullOrBlank() } ?: _uiState.value.title
+
+            val kind = MediaClassifier.classify(url, mime)
+            if (kind != null) {
+                mediaSniffer.addCandidate(
+                    url = url,
+                    pageUrl = _uiState.value.currentUrl,
+                    pageTitle = title,
+                    kind = kind,
+                    mime = mime,
+                    posterUrl = poster,
+                    headers = mapOf(
+                        "Referer" to _uiState.value.currentUrl,
+                        "User-Agent" to "Mozilla/5.0 (Linux; Android 14) Mobile Safari/537.36"
+                    ),
+                    source = DetectionSource.DOM
+                )
+            } else {
+                viewModelScope.launch(Dispatchers.IO) {
+                    val probeResult = mediaProber.probeUrl(url, _uiState.value.currentUrl)
+                    if (probeResult.isMedia && probeResult.kind != null) {
+                        mediaSniffer.addCandidate(
+                            url = url,
+                            pageUrl = _uiState.value.currentUrl,
+                            pageTitle = title,
+                            kind = probeResult.kind,
+                            mime = probeResult.mimeType,
+                            sizeBytes = probeResult.contentLength,
+                            posterUrl = poster,
+                            headers = mapOf(
+                                "Referer" to _uiState.value.currentUrl,
+                                "User-Agent" to "Mozilla/5.0 (Linux; Android 14) Mobile Safari/537.36"
+                            ),
+                            source = DetectionSource.DOM
+                        )
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Enqueues a detected media item into the Glypdl download pipeline.
+     */
+    fun downloadDetectedMedia(media: DetectedMedia) {
+        viewModelScope.launch {
+            val rawTitle = media.pageTitle?.takeIf { it.isNotBlank() }
+                ?: media.url.substringBefore('?').substringAfterLast('/')
+            val safeTitle = FileNameSanitizer.safeFsTitle(rawTitle)
+
+            val ext = media.ext?.takeIf { it.isNotBlank() }
+                ?: if (media.kind == MediaKind.PROGRESSIVE_AUDIO) "mp3" else "mp4"
+
+            val sourceKind = when (media.kind) {
+                MediaKind.HLS -> "BROWSER_HLS"
+                MediaKind.DASH -> "BROWSER_DASH"
+                MediaKind.PROGRESSIVE_AUDIO -> "BROWSER_AUDIO"
+                else -> "BROWSER_DIRECT"
+            }
+
+            val request = DownloadRequest(
+                id = UUID.randomUUID().toString(),
+                url = media.url,
+                title = safeTitle,
+                thumbnailUrl = media.posterUrl,
+                formatId = "best",
+                ext = ext,
+                resolution = "Best",
+                isAudioOnly = media.kind == MediaKind.PROGRESSIVE_AUDIO,
+                destinationUri = null,
+                headers = media.headers,
+                sourceKind = sourceKind,
+                pageUrl = media.pageUrl,
+                requiresAuth = true
+            )
+
+            downloadManager.enqueueDownload(request)
+            _uiState.update {
+                it.copy(
+                    isMediaSheetVisible = false,
+                    snackbarMessage = "Added \"$safeTitle\" to Downloads"
+                )
+            }
+        }
+    }
+
     fun resolveUrlOrSearch(input: String): String {
         if (input.isBlank()) return "https://duckduckgo.com"
 
@@ -152,13 +318,11 @@ class BrowserViewModel @Inject constructor(
             return input
         }
 
-        // Check if user entered something like domain.com or domain.com/path
         val domainPattern = Regex("^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(/.*)?$")
         if (domainPattern.matches(input) && !input.contains(" ")) {
             return "https://$input"
         }
 
-        // Otherwise resolve as DuckDuckGo search query
         val encoded = URLEncoder.encode(input, StandardCharsets.UTF_8.toString())
         return "https://duckduckgo.com/?q=$encoded"
     }

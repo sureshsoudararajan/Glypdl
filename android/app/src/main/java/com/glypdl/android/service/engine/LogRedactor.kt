@@ -23,6 +23,10 @@ object LogRedactor {
         Regex("(?i)(authorization[:=]\\s*)(Bearer\\s+)?([a-zA-Z0-9._~+/-]+=*)") to "$1Bearer [REDACTED]",
         Regex("(?i)(access_token[=:]\\s*)([a-zA-Z0-9._~+/-]+=*)") to "$1[REDACTED]",
         Regex("(?i)(api[_-]?key[=:]\\s*)([a-zA-Z0-9._~+/-]+=*)") to "$1[REDACTED]",
+        Regex("(?i)(--add-header\\s+[\"']?(?:cookie|authorization):\\s*)([^\"'\\r\\n]+)") to "$1[REDACTED]",
+
+        // URL query tokens and signed URL parameters
+        Regex("(?i)([?&](?:token|access_token|auth|sig|signature|key|api_key|expires|sp|se|sv|Signature|AWSAccessKeyId|x-amz-[a-zA-Z0-9-]+)=)([^&\\s]+)") to "$1[REDACTED]",
 
         // Passwords and credentials
         Regex("(?i)(password[=:]\\s*)([^&\\s]+)") to "$1[REDACTED]",

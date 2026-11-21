@@ -86,6 +86,14 @@ object DatabaseModule {
         }
     }
 
+    val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `downloads` ADD COLUMN `headersJson` TEXT DEFAULT NULL")
+            db.execSQL("ALTER TABLE `downloads` ADD COLUMN `sourceKind` TEXT DEFAULT NULL")
+            db.execSQL("ALTER TABLE `downloads` ADD COLUMN `pageUrl` TEXT DEFAULT NULL")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): GlypdlDatabase {
@@ -94,7 +102,7 @@ object DatabaseModule {
             GlypdlDatabase::class.java,
             "glypdl_database"
         )
-        .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
         .fallbackToDestructiveMigration()
         .build()
     }
