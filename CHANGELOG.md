@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.0] - 2026-11-21
+
+### Fixed
+- **Android playlist downloads**: selecting many videos from a playlist (for example 15) only queued the first few. The queue-building loop ran in the Analyze screen's ViewModel scope, and navigating to Downloads cleared that ViewModel and cancelled the loop part-way. Batches are now enqueued by the app-scoped download manager, so every selected video is queued and the concurrent-downloads limit applies as intended. Single-video downloads use the same hand-off.
+
+### Changed
+- Android version bumped to 5.1.0 (versionCode 11).
+
 ## [5.0.0] - 2026-11-21
 
 ### Added
