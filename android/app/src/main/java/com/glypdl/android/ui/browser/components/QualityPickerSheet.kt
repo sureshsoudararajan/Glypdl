@@ -39,6 +39,8 @@ import com.glypdl.android.data.model.DetectedMedia
 import com.glypdl.android.data.model.DownloadRequest
 import com.glypdl.android.data.model.MediaKind
 import com.glypdl.android.data.model.MediaVariant
+import com.glypdl.android.data.model.SubtitleDownloadMode
+import com.glypdl.android.data.model.SubtitleDownloadOptions
 import com.glypdl.android.util.FileNameSanitizer
 import java.util.UUID
 
@@ -47,6 +49,7 @@ import java.util.UUID
 fun QualityPickerSheet(
     media: DetectedMedia,
     onConfirmDownload: (DownloadRequest) -> Unit,
+    onAnalyzePage: (String) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -59,6 +62,7 @@ fun QualityPickerSheet(
     }
     var titleInput by remember { mutableStateOf(defaultTitle) }
     var isAudioOnly by remember { mutableStateOf(media.kind == MediaKind.PROGRESSIVE_AUDIO) }
+    var embedSubtitles by remember { mutableStateOf(media.kind != MediaKind.PROGRESSIVE_AUDIO) }
 
     val variants = media.variants
     var selectedVariant by remember {
@@ -133,7 +137,37 @@ fun QualityPickerSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Subtitle Options toggle
+            if (!isAudioOnly) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { embedSubtitles = !embedSubtitles },
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Subtitles, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("Embed Subtitles", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                Text("Extract and bake subtitles into video", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Switch(checked = embedSubtitles, onCheckedChange = { embedSubtitles = it })
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             if (!isAudioOnly && variants.isNotEmpty()) {
                 Text(
@@ -198,6 +232,16 @@ fun QualityPickerSheet(
             }
 
             // Download CTA
+            val subtitleOptions = if (embedSubtitles && !isAudioOnly) {
+                SubtitleDownloadOptions(
+                    mode = SubtitleDownloadMode.EMBED_SUBS,
+                    downloadAllLanguages = true,
+                    embedInVideo = true
+                )
+            } else {
+                SubtitleDownloadOptions(mode = SubtitleDownloadMode.MEDIA_ONLY)
+            }
+
             Button(
                 onClick = {
                     val targetUrl = selectedVariant?.url ?: media.url
@@ -222,7 +266,8 @@ fun QualityPickerSheet(
                         headers = media.headers,
                         sourceKind = sourceKind,
                         pageUrl = media.pageUrl,
-                        requiresAuth = true
+                        requiresAuth = true,
+                        subtitleOptions = subtitleOptions
                     )
                     onConfirmDownload(request)
                 },
@@ -234,6 +279,28 @@ fun QualityPickerSheet(
                 Icon(Icons.Default.Download, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Start Download", style = MaterialTheme.typography.titleSmall)
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Subtitle & Advanced Format Analysis CTA
+            OutlinedButton(
+                onClick = {
+                    onDismiss()
+                    onAnalyzePage(media.pageUrl.ifBlank { media.url })
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    Icons.Default.Subtitles,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Advanced Subtitle & Format Options", style = MaterialTheme.typography.labelLarge)
             }
         }
     }

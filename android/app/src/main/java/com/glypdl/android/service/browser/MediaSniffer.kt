@@ -71,12 +71,23 @@ class MediaSniffer @Inject constructor(
 
         val normalizedUrl = normalizeMediaUrl(url)
         val id = generateMediaId(normalizedUrl, kind)
+        val effectivePageUrl = pageUrl.ifBlank { currentPageUrl }
+
+        val smartTitle = MediaClassifier.generateSmartTitle(
+            pageUrl = effectivePageUrl,
+            pageTitle = pageTitle,
+            candidateUrl = url
+        )
+        val resolvedPoster = MediaClassifier.resolvePosterUrl(
+            pageUrl = effectivePageUrl,
+            rawPoster = posterUrl
+        )
 
         val item = DetectedMedia(
             id = id,
             url = url,
-            pageUrl = pageUrl.ifBlank { currentPageUrl },
-            pageTitle = pageTitle,
+            pageUrl = effectivePageUrl,
+            pageTitle = smartTitle,
             kind = kind,
             mime = mime,
             ext = MediaClassifier.extractExtension(url),
@@ -84,7 +95,7 @@ class MediaSniffer @Inject constructor(
             durationMs = durationMs,
             isLive = false,
             isDrmProtected = isDrmProtected,
-            posterUrl = posterUrl,
+            posterUrl = resolvedPoster,
             variants = variants,
             headers = headers,
             source = source,

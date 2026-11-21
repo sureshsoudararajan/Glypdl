@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -153,6 +154,13 @@ fun DetectedMediaCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Thumbnail / Icon
+            val defaultIcon = when (media.kind) {
+                MediaKind.PROGRESSIVE_AUDIO -> Icons.Default.MusicNote
+                MediaKind.HLS, MediaKind.DASH -> Icons.Default.LiveTv
+                else -> Icons.Default.Movie
+            }
+            val defaultPainter = rememberVectorPainter(defaultIcon)
+
             Box(
                 modifier = Modifier
                     .size(56.dp)
@@ -165,16 +173,14 @@ fun DetectedMediaCard(
                         model = media.posterUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
+                        placeholder = defaultPainter,
+                        error = defaultPainter,
+                        fallback = defaultPainter,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    val icon = when (media.kind) {
-                        MediaKind.PROGRESSIVE_AUDIO -> Icons.Default.MusicNote
-                        MediaKind.HLS, MediaKind.DASH -> Icons.Default.LiveTv
-                        else -> Icons.Default.Movie
-                    }
                     Icon(
-                        icon,
+                        defaultIcon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(28.dp)
@@ -267,6 +273,15 @@ fun DetectedMediaCard(
                         Icons.Default.ContentCopy,
                         contentDescription = "Copy link",
                         modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                IconButton(onClick = onAnalyze) {
+                    Icon(
+                        Icons.Default.Subtitles,
+                        contentDescription = "Subtitles & Formats",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
 

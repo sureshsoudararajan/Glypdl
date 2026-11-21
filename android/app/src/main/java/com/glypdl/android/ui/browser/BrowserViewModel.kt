@@ -156,6 +156,9 @@ class BrowserViewModel @Inject constructor(
 
     fun onSubmitInput(input: String) {
         val resolvedUrl = resolveUrlOrSearch(input.trim())
+        if (resolvedUrl == START_PAGE_URL) {
+            mediaSniffer.resetForPage(START_PAGE_URL)
+        }
         _uiState.update { state ->
             val updatedTabs = state.tabs.map { tab ->
                 if (tab.id == state.activeTabId) tab.copy(
@@ -372,10 +375,13 @@ class BrowserViewModel @Inject constructor(
         }
         if (url != START_PAGE_URL) {
             mediaSniffer.resetForPage(url)
+        } else {
+            mediaSniffer.resetForPage(START_PAGE_URL)
         }
     }
 
     fun navigateToStartPage() {
+        mediaSniffer.resetForPage(START_PAGE_URL)
         _uiState.update { state ->
             val updatedTabs = state.tabs.map { tab ->
                 if (tab.id == state.activeTabId) tab.copy(url = START_PAGE_URL, title = "New Tab") else tab
@@ -386,6 +392,7 @@ class BrowserViewModel @Inject constructor(
                 inputUrl = "",
                 title = "New Tab",
                 isLoading = false,
+                isMediaSheetVisible = false,
                 errorMessage = null
             )
         }
@@ -406,7 +413,9 @@ class BrowserViewModel @Inject constructor(
                 isTabSwitcherVisible = false
             )
         }
-        if (targetTab.url != START_PAGE_URL) {
+        if (targetTab.url == START_PAGE_URL) {
+            mediaSniffer.resetForPage(START_PAGE_URL)
+        } else {
             mediaSniffer.resetForPage(targetTab.url)
         }
     }
@@ -416,6 +425,7 @@ class BrowserViewModel @Inject constructor(
         if (currentTabs.size <= 1) {
             // If last tab is closed, reset to start page tab
             val freshTab = BrowserTab(url = START_PAGE_URL, title = "New Tab")
+            mediaSniffer.resetForPage(START_PAGE_URL)
             _uiState.update {
                 it.copy(
                     tabs = listOf(freshTab),
@@ -449,10 +459,16 @@ class BrowserViewModel @Inject constructor(
                 isIncognito = nextActiveTab.isIncognito
             )
         }
+        if (nextActiveTab.url == START_PAGE_URL) {
+            mediaSniffer.resetForPage(START_PAGE_URL)
+        } else {
+            mediaSniffer.resetForPage(nextActiveTab.url)
+        }
     }
 
     fun closeAllTabs() {
         val freshTab = BrowserTab(url = START_PAGE_URL, title = "New Tab")
+        mediaSniffer.resetForPage(START_PAGE_URL)
         _uiState.update {
             it.copy(
                 tabs = listOf(freshTab),
@@ -602,7 +618,15 @@ class BrowserViewModel @Inject constructor(
 
             val poster = json.optString("poster").takeIf { !it.isNullOrBlank() }
             val mime = json.optString("mime").takeIf { !it.isNullOrBlank() }
-            val title = json.optString("title").takeIf { !it.isNullOrBlank() } ?: _uiState.value.title
+            val rawTitle = json.optString("title").takeIf { !it.isNullOrBlank() } ?: _uiState.value.title
+            val account = json.optString("account").takeIf { !it.isNullOrBlank() }
+
+            val title = MediaClassifier.generateSmartTitle(
+                pageUrl = _uiState.value.currentUrl,
+                pageTitle = rawTitle,
+                candidateUrl = url,
+                accountName = account
+            )
 
             val headers = mapOf(
                 "Referer" to _uiState.value.currentUrl,

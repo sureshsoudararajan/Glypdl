@@ -164,4 +164,128 @@ object MediaClassifier {
 
         return null
     }
+
+    /**
+     * Generates a descriptive media title including account handle, platform context, and story/reel IDs.
+     */
+    fun generateSmartTitle(
+        pageUrl: String?,
+        pageTitle: String?,
+        candidateUrl: String? = null,
+        accountName: String? = null
+    ): String {
+        val safeUrl = pageUrl ?: ""
+        val safeTitle = pageTitle?.trim() ?: ""
+
+        // 1. Instagram Stories: e.g. https://www.instagram.com/stories/username/334455/
+        val instaStoryRegex = Regex("(?i)instagram\\.com/stories/([a-zA-Z0-9._]+)(?:/([0-9]+))?")
+        val storyMatch = instaStoryRegex.find(safeUrl)
+        if (storyMatch != null) {
+            val user = storyMatch.groupValues.getOrNull(1) ?: accountName ?: "User"
+            val storyId = storyMatch.groupValues.getOrNull(2)
+            return if (!storyId.isNullOrBlank()) "@$user • Story #$storyId" else "@$user • Story"
+        }
+
+        // 2. Instagram Reels / Posts: e.g. https://www.instagram.com/reel/C7xyz123/
+        val instaReelRegex = Regex("(?i)instagram\\.com/(?:reel|p)/([a-zA-Z0-9_-]+)")
+        val reelMatch = instaReelRegex.find(safeUrl)
+        if (reelMatch != null) {
+            val reelId = reelMatch.groupValues[1]
+            if (safeTitle.contains(" on Instagram:", ignoreCase = true)) {
+                val author = safeTitle.substringBefore(" on Instagram:", "").trim()
+                val desc = safeTitle.substringAfter(" on Instagram:", "").trim('"', ' ', '\'')
+                if (desc.isNotBlank()) {
+                    val preview = if (desc.length > 40) desc.take(40) + "..." else desc
+                    return "@$author: $preview"
+                }
+                if (author.isNotBlank()) return "@$author • Reel"
+            }
+            if (!accountName.isNullOrBlank()) {
+                return "@$accountName • Reel"
+            }
+            return "Instagram Reel • $reelId"
+        }
+
+        // 3. YouTube Shorts: e.g. https://m.youtube.com/shorts/12345
+        val ytShortsRegex = Regex("(?i)youtube\\.com/shorts/([a-zA-Z0-9_-]+)")
+        val shortsMatch = ytShortsRegex.find(safeUrl)
+        if (shortsMatch != null) {
+            val shortId = shortsMatch.groupValues[1]
+            val clean = safeTitle.removeSuffix(" - YouTube").removeSuffix("- YouTube").trim()
+            if (clean.isNotBlank() && !clean.equals("YouTube", ignoreCase = true)) {
+                return "YouTube Shorts • $clean"
+            }
+            return "YouTube Shorts • $shortId"
+        }
+
+        // 4. YouTube Watch: e.g. https://m.youtube.com/watch?v=12345
+        if (safeUrl.contains("youtube.com/watch", ignoreCase = true) || safeUrl.contains("youtu.be/", ignoreCase = true)) {
+            val clean = safeTitle.removeSuffix(" - YouTube").removeSuffix("- YouTube").trim()
+            if (clean.isNotBlank() && !clean.equals("YouTube", ignoreCase = true)) {
+                return clean
+            }
+        }
+
+        // 5. TikTok: e.g. https://www.tiktok.com/@username/video/12345
+        val tiktokRegex = Regex("(?i)tiktok\\.com/@([a-zA-Z0-9._]+)")
+        val tiktokMatch = tiktokRegex.find(safeUrl)
+        if (tiktokMatch != null) {
+            val user = tiktokMatch.groupValues[1]
+            return "@$user • TikTok"
+        }
+
+        // 6. Twitter / X: e.g. https://x.com/username/status/12345
+        val xRegex = Regex("(?i)(?:twitter|x)\\.com/([a-zA-Z0-9_]+)/status/")
+        val xMatch = xRegex.find(safeUrl)
+        if (xMatch != null) {
+            val user = xMatch.groupValues[1]
+            return "@$user • Post"
+        }
+
+        // 7. Reddit: e.g. https://www.reddit.com/r/videos/comments/...
+        val redditRegex = Regex("(?i)reddit\\.com/r/([a-zA-Z0-9_]+)")
+        val redditMatch = redditRegex.find(safeUrl)
+        if (redditMatch != null) {
+            val sub = redditMatch.groupValues[1]
+            val clean = safeTitle.removeSuffix(" : r/$sub").removeSuffix(" - Reddit").trim()
+            return if (clean.isNotBlank()) "r/$sub • $clean" else "r/$sub • Reddit Video"
+        }
+
+        // Fallback: If title is meaningful and not a generic site title
+        val genericTitles = setOf("instagram", "youtube", "stories • instagram", "browser", "new tab", "video", "")
+        if (safeTitle.lowercase() !in genericTitles) {
+            return safeTitle
+        }
+
+        if (!accountName.isNullOrBlank()) {
+            return "@$accountName Video"
+        }
+
+        // Fallback: clean media filename from candidateUrl
+        if (!candidateUrl.isNullOrBlank()) {
+            val name = candidateUrl.substringBefore('?').substringAfterLast('/')
+            if (name.isNotBlank() && name.length < 50 && !name.startsWith("videoplayback")) {
+                return name
+            }
+        }
+
+        return if (safeTitle.isNotBlank()) safeTitle else "Detected Media"
+    }
+
+    /**
+     * Resolves high-resolution video thumbnail from platform patterns if raw poster is missing.
+     */
+    fun resolvePosterUrl(pageUrl: String?, rawPoster: String?): String? {
+        if (!rawPoster.isNullOrBlank() && !rawPoster.startsWith("data:")) {
+            return rawPoster
+        }
+        val safeUrl = pageUrl ?: return null
+        val ytRegex = Regex("(?i)(?:watch\\?.*v=|/shorts/|youtu\\.be/)([a-zA-Z0-9_-]{11})")
+        val match = ytRegex.find(safeUrl)
+        if (match != null) {
+            val vid = match.groupValues[1]
+            return "https://i.ytimg.com/vi/$vid/hqdefault.jpg"
+        }
+        return null
+    }
 }

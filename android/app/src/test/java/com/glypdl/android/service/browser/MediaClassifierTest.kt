@@ -90,4 +90,40 @@ class MediaClassifierTest {
         assertNull(MediaClassifier.classify("https://stats.doubleclick.net/video.mp4"))
         assertTrue(MediaClassifier.isAdOrTrackingUrl("https://pagead2.googlesyndication.com/pagead/show_ads.js"))
     }
+
+    @Test
+    fun generateSmartTitle_instagramStory() {
+        val title = MediaClassifier.generateSmartTitle(
+            pageUrl = "https://www.instagram.com/stories/john_doe/123456789/",
+            pageTitle = "Stories • Instagram"
+        )
+        assertEquals("@john_doe • Story #123456789", title)
+    }
+
+    @Test
+    fun generateSmartTitle_instagramReel() {
+        val title = MediaClassifier.generateSmartTitle(
+            pageUrl = "https://www.instagram.com/reel/C8xyz123/",
+            pageTitle = "John Doe on Instagram: \"Amazing sunset!\""
+        )
+        assertEquals("@John Doe: Amazing sunset!", title)
+    }
+
+    @Test
+    fun generateSmartTitle_youtubeShorts() {
+        val title = MediaClassifier.generateSmartTitle(
+            pageUrl = "https://m.youtube.com/shorts/dQw4w9WgXcQ",
+            pageTitle = "Epic Dance Moves - YouTube"
+        )
+        assertEquals("YouTube Shorts • Epic Dance Moves", title)
+    }
+
+    @Test
+    fun resolvePosterUrl_youtubeFallback() {
+        val poster = MediaClassifier.resolvePosterUrl(
+            pageUrl = "https://m.youtube.com/shorts/dQw4w9WgXcQ",
+            rawPoster = null
+        )
+        assertEquals("https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg", poster)
+    }
 }

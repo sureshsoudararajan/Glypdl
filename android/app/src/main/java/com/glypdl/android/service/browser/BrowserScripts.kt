@@ -69,17 +69,78 @@ object BrowserScripts {
             // Failsafe timer for dynamic single-page applications like YouTube Shorts
             setInterval(notifyUrlChange, 750);
 
+            function extractAccount() {
+                try {
+                    var p = window.location.pathname;
+                    var sm = p.match(/\/stories\/([^\/?#]+)/);
+                    if (sm) return sm[1];
+                    var rm = p.match(/\/(?:reel|p)\/([^\/?#]+)/);
+                    if (rm) {
+                        var ogT = document.querySelector('meta[property="og:title"]');
+                        if (ogT && ogT.content) {
+                            var author = ogT.content.split(' on Instagram')[0];
+                            if (author) return author.trim();
+                        }
+                    }
+                    var ytChan = document.querySelector('ytm-reel-player-header-renderer .reel-player-header-channel-title, .shorts-author-name, [class*="channel-title"]');
+                    if (ytChan && ytChan.textContent && ytChan.textContent.trim()) {
+                        return ytChan.textContent.trim().replace(/^@/, '');
+                    }
+                    var instaUser = document.querySelector('header a[href^="/"], a[href^="/stories/"]');
+                    if (instaUser && instaUser.textContent && instaUser.textContent.trim()) {
+                        var u = instaUser.textContent.trim().replace(/^@/, '');
+                        if (u && u.length < 35 && u.indexOf(' ') === -1) return u;
+                    }
+                    var tm = p.match(/\/@([^\/?#]+)/);
+                    if (tm) return tm[1];
+                } catch(e) {}
+                return null;
+            }
+
+            function extractPoster(elem) {
+                try {
+                    if (elem) {
+                        if (elem.poster) return elem.poster;
+                        if (elem.getAttribute && elem.getAttribute('poster')) return elem.getAttribute('poster');
+                        var container = elem.closest('article, section, div[role="dialog"], ytm-reel-player-renderer, .reel-player-renderer') || elem.parentElement;
+                        if (container) {
+                            var img = container.querySelector('img[src^="http"]');
+                            if (img && img.src && !img.src.startsWith('data:') && img.naturalWidth !== 1) return img.src;
+                        }
+                    }
+                    var og = document.querySelector('meta[property="og:image"], meta[name="twitter:image"]');
+                    if (og && og.content) return og.content;
+                } catch(e) {}
+                return null;
+            }
+
+            function extractPageTitle() {
+                try {
+                    var ytShorts = document.querySelector('ytm-reel-player-header-renderer .reel-player-header-title, .reel-player-header-title, h2.shorts-title, [class*="shorts-title"]');
+                    if (ytShorts && ytShorts.textContent && ytShorts.textContent.trim()) {
+                        return ytShorts.textContent.trim();
+                    }
+                    var ogTitle = document.querySelector('meta[property="og:title"]');
+                    if (ogTitle && ogTitle.content && ogTitle.content.trim()) {
+                        return ogTitle.content.trim();
+                    }
+                } catch(e) {}
+                return document.title || '';
+            }
+
             function sendCandidate(url, poster, mime, isBlob) {
                 if (!url || typeof url !== 'string') return;
                 var trimmed = url.trim();
                 if (!trimmed || trimmed.startsWith('data:') || trimmed.length > 2048) return;
                 try {
                     var absoluteUrl = new URL(trimmed, window.location.href).href;
+                    var resolvedPoster = poster || extractPoster(null);
                     var payload = JSON.stringify({
                         url: absoluteUrl,
-                        poster: poster ? new URL(poster, window.location.href).href : null,
+                        poster: resolvedPoster ? new URL(resolvedPoster, window.location.href).href : null,
                         mime: mime || null,
-                        title: document.title || '',
+                        title: extractPageTitle(),
+                        account: extractAccount(),
                         isBlob: !!isBlob
                     });
                     if (window.$JS_INTERFACE_NAME && typeof window.$JS_INTERFACE_NAME.reportMedia === 'function') {
@@ -94,7 +155,7 @@ object BrowserScripts {
                     var videos = document.querySelectorAll('video');
                     for (var i = 0; i < videos.length; i++) {
                         var v = videos[i];
-                        var poster = v.poster || null;
+                        var poster = extractPoster(v);
                         if (v.src) {
                             sendCandidate(v.src, poster, null, v.src.startsWith('blob:'));
                         }

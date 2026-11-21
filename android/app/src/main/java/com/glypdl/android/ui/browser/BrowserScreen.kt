@@ -311,7 +311,7 @@ fun BrowserScreen(
         },
         floatingActionButton = {
             AnimatedVisibility(
-                visible = detectedMediaList.isNotEmpty(),
+                visible = detectedMediaList.isNotEmpty() && !uiState.isStartPage,
                 enter = scaleIn() + fadeIn(),
                 exit = scaleOut() + fadeOut()
             ) {
@@ -589,12 +589,8 @@ fun BrowserScreen(
                 }
             },
             onAnalyzeMedia = { media ->
-                if (media.variants.isNotEmpty()) {
-                    viewModel.onSelectQualityMedia(media)
-                } else {
-                    viewModel.hideMediaSheet()
-                    onNavigateToAnalyze(media.url)
-                }
+                viewModel.hideMediaSheet()
+                onNavigateToAnalyze(media.pageUrl.ifBlank { media.url })
             },
             onDismiss = { viewModel.hideMediaSheet() }
         )
@@ -606,6 +602,9 @@ fun BrowserScreen(
             media = qualityMedia,
             onConfirmDownload = { request ->
                 viewModel.enqueueDownloadRequest(request)
+            },
+            onAnalyzePage = { pageUrl ->
+                onNavigateToAnalyze(pageUrl)
             },
             onDismiss = { viewModel.dismissQualityPicker() }
         )
