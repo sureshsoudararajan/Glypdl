@@ -56,6 +56,11 @@
     <binary>glypdl</binary>
   </provides>
   <releases>
+    <release version="5.0.0" date="2026-11-21">
+      <description>
+        <p>Major release v5.0.0: Full in-app web browser with tabs, custom Glypdl Start Page, integrated uBlock Origin ad &amp; tracker blocking, multi-layer stream detection (HLS/DASH/MP4), dynamic Instagram Reels and YouTube Shorts capture, and reordered Settings.</p>
+      </description>
+    </release>
     <release version="4.0.0" date="2026-11-09">
       <description>
         <p>Major release v4.0.0: Added YouTube multi-language audio track selection, subtitles management, enhanced Facebook/Instagram anonymous extraction with authenticated fallback, theme alignment fixes, and unified v4.0.0 release across Android, Linux, and Windows.</p>

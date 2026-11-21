@@ -1,5 +1,5 @@
 Name:           glypdl
-Version:        4.0.0
+Version:        5.0.0
 Release:        1%{?dist}
 Summary:        A lightweight native Linux graphical frontend for yt-dlp
 

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0] - 2026-11-21
+
+### Added
+- **Full In-App Browser Experience**:
+  - Built-in multi-tab web browser powered by Android WebView with incognito mode and persistent session restore.
+  - Custom Glypdl Start Page with quick navigation pills, custom search engine selector (DuckDuckGo, Google, Bing, Yahoo, Ecosia, Qwant, Startpage, etc.), and Speed Dial tiles (YouTube, Instagram, Facebook, Vimeo).
+  - Integrated uBlock Origin community ad & tracker blocking engine with local asset cache and background filter updater.
+  - Multi-layer media sniffer detecting direct video streams, progressive MP4/WebM, native HLS (`.m3u8`), and DASH (`.mpd`) manifests.
+  - DRM protected stream identification and notification.
+  - Single-Page Application (SPA) real-time media sniffing for YouTube Shorts and Instagram Reels with dynamic active-reel viewport tracking.
+  - Comprehensive Bookmarks & Browsing History management with search, deletion, and quick navigation.
+
+### Improved & Fixed
+- **Settings Reorganization**:
+  - Reordered settings sections into 13 structured categories: Download Engine, App Updates, Accounts & Authentication, In-App Browser, Appearance, Downloads, Download Storage, Video & Audio Codecs, Privacy & System, Notifications, Diagnostics & Raw Terminal Logs, Author & Project, About Glypdl.
+  - Updated application version display to v5.0.0 across all client platforms.
+- **Instagram Extraction & Authentication**:
+  - Python `MozillaCookieJar` persistent session cookie compatibility.
+  - Multi-reel SPA dynamic title, author, and poster isolation avoiding stale metadata retention.
+
 ## [4.0.0] - 2026-11-09
 
 ### Added
