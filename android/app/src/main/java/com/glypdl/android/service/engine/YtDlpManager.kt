@@ -787,7 +787,13 @@ class YtDlpManager @Inject constructor(
             }
 
             val dlRequest = YoutubeDLRequest(targetUrl)
-            dlRequest.addOption("--no-playlist")
+            if (isStory && requestedStoryId == null) {
+                // Instagram story tray URLs without specific story ID (e.g. instagram.com/stories/user/)
+                // represent an active story sequence; --playlist-items 1 extracts the active/latest story.
+                dlRequest.addOption("--playlist-items", "1")
+            } else {
+                dlRequest.addOption("--no-playlist")
+            }
             dlRequest.addOption("--verbose")
 
             val isBrowserDownload = request.sourceKind?.startsWith("BROWSER") == true

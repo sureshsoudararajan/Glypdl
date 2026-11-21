@@ -102,7 +102,7 @@ class AuthCookieManagerTest {
     }
 
     @Test
-    fun testSessionCookieExpiryIsZero() {
+    fun testSessionCookieHasValidExpiry() {
         val rawCookies = "sessionid=12345abcd; regular_cookie=regular_val"
         val success = authCookieManager.saveCookies("instagram.com", rawCookies)
         assertTrue(success)
@@ -113,12 +113,14 @@ class AuthCookieManagerTest {
         val sessionLine = lines.first { it.contains("sessionid") }
         val sessionFields = sessionLine.split("\t")
         assertEquals(7, sessionFields.size)
-        // Session cookie field 4 (0-indexed) is expiry, should be 0
-        assertEquals("0", sessionFields[4])
+        // Session cookie expiry must be in the future so Python's http.cookiejar doesn't discard it as expired
+        val expiry = sessionFields[4].toLong()
+        assertTrue(expiry > System.currentTimeMillis() / 1000)
 
         val regularLine = lines.first { it.contains("regular_cookie") }
         val regularFields = regularLine.split("\t")
-        assertNotEquals("0", regularFields[4])
+        val regularExpiry = regularFields[4].toLong()
+        assertTrue(regularExpiry > System.currentTimeMillis() / 1000)
     }
 
     @Test

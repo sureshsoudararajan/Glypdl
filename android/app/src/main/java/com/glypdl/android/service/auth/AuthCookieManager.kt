@@ -118,16 +118,9 @@ class AuthCookieManager @Inject constructor(
                     val name = pair.substringBefore("=").trim()
                     val value = pair.substringAfter("=").trim()
                     if (name.isNotEmpty() && seenKeys.add(name)) {
-                        // Standard Netscape format uses expiry 0 for session cookies
-                        val isSession = name.equals("sessionid", ignoreCase = true) ||
-                                       name.equals("c_user", ignoreCase = true) ||
-                                       name.equals("xs", ignoreCase = true) ||
-                                       name.equals("ds_user_id", ignoreCase = true) ||
-                                       name.equals("csrftoken", ignoreCase = true) ||
-                                       name.equals("auth_token", ignoreCase = true) ||
-                                       name.equals("SAPISID", ignoreCase = true) ||
-                                       name.equals("SSID", ignoreCase = true)
-                        val expiry = if (isSession) 0L else (System.currentTimeMillis() / 1000) + (30L * 24 * 3600)
+                        // Netscape cookie format: Python's MozillaCookieJar drops cookies with expiry=0 as expired (1970).
+                        // Use a persistent 1-year future epoch so Python's http.cookiejar treats session cookies as active.
+                        val expiry = (System.currentTimeMillis() / 1000) + (365L * 24 * 3600)
 
                         writer.write("$dotDomain\tTRUE\t/\tTRUE\t$expiry\t$name\t$value\n")
                         if (domainKey.contains("instagram")) {

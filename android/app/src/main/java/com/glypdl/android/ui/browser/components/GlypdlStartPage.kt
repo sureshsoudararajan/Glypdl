@@ -52,23 +52,36 @@ import com.glypdl.android.data.model.SearchEngine
 data class QuickAccessTile(
     val title: String,
     val url: String,
-    val letter: String,
-    val color: Long
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val iconColor: Color = Color.White,
+    val backgroundColor: Color
 )
 
 val DEFAULT_SPEED_DIAL = listOf(
-    QuickAccessTile("YouTube", "https://m.youtube.com", "YT", 0xFFFF0000),
-    QuickAccessTile("Instagram", "https://www.instagram.com", "IG", 0xFFE1306C),
-    QuickAccessTile("Reddit", "https://www.reddit.com", "RD", 0xFFFF4500),
-    QuickAccessTile("X / Twitter", "https://x.com", "X", 0xFF1DA1F2),
-    QuickAccessTile("TikTok", "https://www.tiktok.com", "TT", 0xFF000000),
-    QuickAccessTile("Facebook", "https://m.facebook.com", "FB", 0xFF1877F2),
-    QuickAccessTile("Twitch", "https://m.twitch.tv", "TV", 0xFF9146FF),
-    QuickAccessTile("Wikipedia", "https://en.wikipedia.org", "W", 0xFF333333),
-    QuickAccessTile("SoundCloud", "https://m.soundcloud.com", "SC", 0xFFFF5500),
-    QuickAccessTile("Vimeo", "https://vimeo.com", "VM", 0xFF1AB7EA),
-    QuickAccessTile("Dailymotion", "https://www.dailymotion.com", "DM", 0xFF0066DC),
-    QuickAccessTile("GitHub", "https://github.com", "GH", 0xFF24292E)
+    QuickAccessTile(
+        title = "YouTube",
+        url = "https://m.youtube.com",
+        icon = Icons.Default.PlayArrow,
+        backgroundColor = Color(0xFFFF0000)
+    ),
+    QuickAccessTile(
+        title = "Instagram",
+        url = "https://www.instagram.com",
+        icon = Icons.Default.PhotoCamera,
+        backgroundColor = Color(0xFFE1306C)
+    ),
+    QuickAccessTile(
+        title = "Facebook",
+        url = "https://m.facebook.com",
+        icon = Icons.Default.Public,
+        backgroundColor = Color(0xFF1877F2)
+    ),
+    QuickAccessTile(
+        title = "Video",
+        url = "https://m.youtube.com/feed/trending",
+        icon = Icons.Default.VideoLibrary,
+        backgroundColor = Color(0xFF7C4DFF)
+    )
 )
 
 @Composable
@@ -443,17 +456,16 @@ private fun SpeedDialItem(
     ) {
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = Color(tile.color),
-            shadowElevation = 2.dp,
-            modifier = Modifier.size(52.dp)
+            color = tile.backgroundColor,
+            shadowElevation = 3.dp,
+            modifier = Modifier.size(54.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = tile.letter,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
-                    textAlign = TextAlign.Center
+                Icon(
+                    imageVector = tile.icon,
+                    contentDescription = tile.title,
+                    tint = tile.iconColor,
+                    modifier = Modifier.size(26.dp)
                 )
             }
         }
@@ -461,7 +473,8 @@ private fun SpeedDialItem(
         Text(
             text = tile.title,
             style = MaterialTheme.typography.bodySmall,
-            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            fontSize = 12.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,

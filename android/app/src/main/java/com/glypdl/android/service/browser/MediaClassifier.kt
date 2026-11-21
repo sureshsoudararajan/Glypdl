@@ -182,6 +182,11 @@ object MediaClassifier {
         return null
     }
 
+    val IGNORED_ACCOUNT_NAMES = setOf(
+        "null", "undefined", "notifications", "explore", "messages", "direct",
+        "home", "search", "reels", "stories", "login", "accounts", "instagram", "video"
+    )
+
     /**
      * Generates a descriptive media title including account handle, platform context, and story/reel IDs.
      */
@@ -194,31 +199,37 @@ object MediaClassifier {
         val safeUrl = pageUrl ?: ""
         val safeTitle = pageTitle?.trim() ?: ""
 
+        val cleanAccount = accountName?.trim()?.removePrefix("@")?.takeIf {
+            it.isNotBlank() && it.lowercase(Locale.ROOT) !in IGNORED_ACCOUNT_NAMES
+        }
+
         // 1. Instagram Stories: e.g. https://www.instagram.com/stories/username/334455/
         val instaStoryRegex = Regex("(?i)instagram\\.com/stories/([a-zA-Z0-9._]+)(?:/([0-9]+))?")
         val storyMatch = instaStoryRegex.find(safeUrl)
         if (storyMatch != null) {
-            val user = storyMatch.groupValues.getOrNull(1) ?: accountName ?: "User"
+            val user = storyMatch.groupValues.getOrNull(1)?.takeIf { it.lowercase(Locale.ROOT) !in IGNORED_ACCOUNT_NAMES }
+                ?: cleanAccount ?: "User"
             val storyId = storyMatch.groupValues.getOrNull(2)
             return if (!storyId.isNullOrBlank()) "@$user • Story #$storyId" else "@$user • Story"
         }
 
-        // 2. Instagram Reels / Posts: e.g. https://www.instagram.com/reel/C7xyz123/
-        val instaReelRegex = Regex("(?i)instagram\\.com/(?:reel|p)/([a-zA-Z0-9_-]+)")
+        // 2. Instagram Reels / Posts: e.g. https://www.instagram.com/reel/C7xyz123/ or /reels/Dc7oII...
+        val instaReelRegex = Regex("(?i)instagram\\.com/(?:reel|reels|p)/([a-zA-Z0-9_-]+)")
         val reelMatch = instaReelRegex.find(safeUrl)
         if (reelMatch != null) {
             val reelId = reelMatch.groupValues[1]
-            if (safeTitle.contains(" on Instagram:", ignoreCase = true)) {
-                val author = safeTitle.substringBefore(" on Instagram:", "").trim()
-                val desc = safeTitle.substringAfter(" on Instagram:", "").trim('"', ' ', '\'')
-                if (desc.isNotBlank()) {
-                    val preview = if (desc.length > 40) desc.take(40) + "..." else desc
-                    return "@$author: $preview"
+            if (safeTitle.contains(" on Instagram", ignoreCase = true)) {
+                val author = safeTitle.substringBefore(" on Instagram", "").trim().removePrefix("@")
+                val cleanAuthor = author.takeIf { it.isNotBlank() && it.lowercase(Locale.ROOT) !in IGNORED_ACCOUNT_NAMES }
+                val desc = safeTitle.substringAfter(":", "").trim('"', ' ', '\'')
+                if (desc.isNotBlank() && desc != safeTitle) {
+                    val preview = if (desc.length > 35) desc.take(35) + "..." else desc
+                    return if (cleanAuthor != null) "@$cleanAuthor: $preview" else "Reel • $preview"
                 }
-                if (author.isNotBlank()) return "@$author • Reel"
+                if (cleanAuthor != null) return "@$cleanAuthor • Reel"
             }
-            if (!accountName.isNullOrBlank()) {
-                return "@$accountName • Reel"
+            if (cleanAccount != null) {
+                return "@$cleanAccount • Reel"
             }
             return "Instagram Reel • $reelId"
         }
@@ -269,13 +280,17 @@ object MediaClassifier {
         }
 
         // Fallback: If title is meaningful and not a generic site title
-        val genericTitles = setOf("instagram", "youtube", "stories • instagram", "browser", "new tab", "video", "")
-        if (safeTitle.lowercase() !in genericTitles) {
+        val genericTitles = setOf("instagram", "youtube", "stories • instagram", "browser", "new tab", "video", "", "null")
+        if (safeTitle.lowercase(Locale.ROOT) !in genericTitles && !safeTitle.contains("null", ignoreCase = true)) {
             return safeTitle
         }
 
-        if (!accountName.isNullOrBlank()) {
-            return "@$accountName Video"
+        if (cleanAccount != null) {
+            return "@$cleanAccount Video"
+        }
+
+        if (safeUrl.contains("instagram.com", ignoreCase = true)) {
+            return "Instagram Video"
         }
 
         // Fallback: clean media filename from candidateUrl

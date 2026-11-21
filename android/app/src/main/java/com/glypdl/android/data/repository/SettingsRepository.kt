@@ -118,6 +118,12 @@ class SettingsRepository @Inject constructor(
 
         /** Whether the in-app browser blocks ads and trackers. */
         val BROWSER_AD_BLOCK_ENABLED = booleanPreferencesKey("browser_ad_block_enabled")
+
+        /** JSON representation of open browser tabs from last session. */
+        val BROWSER_LAST_SESSION_TABS = stringPreferencesKey("browser_last_session_tabs")
+
+        /** Active tab ID from last session. */
+        val BROWSER_LAST_ACTIVE_TAB_ID = stringPreferencesKey("browser_last_active_tab_id")
     }
 
     // Reactive Flow Getters
@@ -270,4 +276,15 @@ class SettingsRepository @Inject constructor(
     suspend fun setBrowserAutoDetect(value: Boolean) { dataStore.edit { it[BROWSER_AUTO_DETECT] = value } }
     suspend fun setBrowserDesktopModeDefault(value: Boolean) { dataStore.edit { it[BROWSER_DESKTOP_MODE_DEFAULT] = value } }
     suspend fun setBrowserAdBlockEnabled(value: Boolean) { dataStore.edit { it[BROWSER_AD_BLOCK_ENABLED] = value } }
+
+    /** Browser session persistence */
+    val browserLastSessionTabs: Flow<String?> = dataStore.data.map { it[BROWSER_LAST_SESSION_TABS] }
+    val browserLastActiveTabId: Flow<String?> = dataStore.data.map { it[BROWSER_LAST_ACTIVE_TAB_ID] }
+
+    suspend fun saveBrowserSession(tabsJson: String, activeTabId: String) {
+        dataStore.edit {
+            it[BROWSER_LAST_SESSION_TABS] = tabsJson
+            it[BROWSER_LAST_ACTIVE_TAB_ID] = activeTabId
+        }
+    }
 }

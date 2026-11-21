@@ -18,6 +18,8 @@
 
 package com.glypdl.android.ui.browser.components
 
+import android.net.Uri
+import android.text.format.DateUtils
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,9 +32,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.glypdl.android.data.local.entity.BookmarkEntity
 import com.glypdl.android.data.local.entity.BrowserHistoryEntity
 
@@ -51,6 +55,7 @@ fun BookmarksHistorySheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var selectedTabIndex by remember { mutableIntStateOf(initialTab) }
     var searchQuery by remember { mutableStateOf("") }
+    var showClearHistoryDialog by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -64,28 +69,40 @@ fun BookmarksHistorySheet(
                 .padding(horizontal = 16.dp)
                 .padding(bottom = 32.dp)
         ) {
+            // Header Row: Tab Switcher & Close
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 8.dp),
+                    .padding(bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TabRow(
+                PrimaryTabRow(
                     selectedTabIndex = selectedTabIndex,
                     modifier = Modifier.weight(1f),
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    divider = {}
                 ) {
                     Tab(
                         selected = selectedTabIndex == 0,
                         onClick = { selectedTabIndex = 0 },
-                        text = { Text("Bookmarks") },
+                        text = {
+                            Text(
+                                "Bookmarks (${bookmarks.size})",
+                                fontWeight = if (selectedTabIndex == 0) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
                         icon = { Icon(Icons.Default.Bookmark, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )
                     Tab(
                         selected = selectedTabIndex == 1,
                         onClick = { selectedTabIndex = 1 },
-                        text = { Text("History") },
+                        text = {
+                            Text(
+                                "History (${history.size})",
+                                fontWeight = if (selectedTabIndex == 1) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
                         icon = { Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )
                 }
@@ -99,69 +116,60 @@ fun BookmarksHistorySheet(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                placeholder = { Text("Search title or URL...", style = MaterialTheme.typography.bodyMedium) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(20.dp)) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = "Clear")
+                            Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
                         }
                     }
                 },
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                shape = RoundedCornerShape(24.dp)
+                    .padding(vertical = 6.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+                )
             )
 
             if (selectedTabIndex == 0) {
                 // Bookmarks Tab
                 val filteredBookmarks = remember(bookmarks, searchQuery) {
                     if (searchQuery.isBlank()) bookmarks
-                    else bookmarks.filter { it.title.contains(searchQuery, ignoreCase = true) || it.url.contains(searchQuery, ignoreCase = true) }
+                    else bookmarks.filter {
+                        it.title.contains(searchQuery, ignoreCase = true) || it.url.contains(searchQuery, ignoreCase = true)
+                    }
                 }
 
                 if (filteredBookmarks.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 40.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("No bookmarks saved yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    EmptyStateView(
+                        icon = Icons.Default.BookmarkBorder,
+                        title = if (searchQuery.isBlank()) "No Bookmarks Yet" else "No Matching Bookmarks",
+                        subtitle = if (searchQuery.isBlank()) "Pages you bookmark in the browser will appear here." else "Try a different search query."
+                    )
                 } else {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 350.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .heightIn(max = 400.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 8.dp)
                     ) {
                         items(filteredBookmarks, key = { it.id }) { b ->
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { onSelectUrl(b.url) },
-                                color = MaterialTheme.colorScheme.surfaceVariant
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(text = b.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(text = b.url, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    }
-                                    IconButton(onClick = { onDeleteBookmark(b.id) }) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Delete bookmark", tint = MaterialTheme.colorScheme.error)
-                                    }
-                                }
-                            }
+                            BrowserListItemCard(
+                                title = b.title.ifBlank { b.url },
+                                url = b.url,
+                                timestamp = b.createdAt,
+                                icon = Icons.Default.Bookmark,
+                                iconTint = MaterialTheme.colorScheme.primary,
+                                iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                onClick = { onSelectUrl(b.url) },
+                                onDelete = { onDeleteBookmark(b.id) }
+                            )
                         }
                     }
                 }
@@ -169,64 +177,239 @@ fun BookmarksHistorySheet(
                 // History Tab
                 val filteredHistory = remember(history, searchQuery) {
                     if (searchQuery.isBlank()) history
-                    else history.filter { it.title.contains(searchQuery, ignoreCase = true) || it.url.contains(searchQuery, ignoreCase = true) }
+                    else history.filter {
+                        it.title.contains(searchQuery, ignoreCase = true) || it.url.contains(searchQuery, ignoreCase = true)
+                    }
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onClearHistory) {
-                        Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Clear All History", color = MaterialTheme.colorScheme.error)
+                if (filteredHistory.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${filteredHistory.size} visited pages",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(
+                            onClick = { showClearHistoryDialog = true },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.error)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Clear History", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium)
+                        }
                     }
                 }
 
                 if (filteredHistory.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 40.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("No browsing history", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    EmptyStateView(
+                        icon = Icons.Default.HistoryToggleOff,
+                        title = if (searchQuery.isBlank()) "No Browsing History" else "No Matching History",
+                        subtitle = if (searchQuery.isBlank()) "Pages you visit will appear here for fast access." else "Try a different search query."
+                    )
                 } else {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 350.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .heightIn(max = 400.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 4.dp)
                     ) {
                         items(filteredHistory, key = { it.id }) { h ->
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { onSelectUrl(h.url) },
-                                color = MaterialTheme.colorScheme.surfaceVariant
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(text = h.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(text = h.url, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    }
-                                    IconButton(onClick = { onDeleteHistoryItem(h.id) }) {
-                                        Icon(Icons.Default.Close, contentDescription = "Delete item", modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                            }
+                            BrowserListItemCard(
+                                title = h.title.ifBlank { h.url },
+                                url = h.url,
+                                timestamp = h.visitedAt,
+                                icon = Icons.Default.Language,
+                                iconTint = MaterialTheme.colorScheme.secondary,
+                                iconContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                onClick = { onSelectUrl(h.url) },
+                                onDelete = { onDeleteHistoryItem(h.id) }
+                            )
                         }
                     }
                 }
             }
+        }
+    }
+
+    if (showClearHistoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearHistoryDialog = false },
+            icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Clear Browsing History?") },
+            text = { Text("This will permanently remove all visited sites from your history.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onClearHistory()
+                        showClearHistoryDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Clear All")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHistoryDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun BrowserListItemCard(
+    title: String,
+    url: String,
+    timestamp: Long,
+    icon: ImageVector,
+    iconTint: androidx.compose.ui.graphics.Color,
+    iconContainerColor: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val host = remember(url) {
+        try {
+            Uri.parse(url).host ?: url.substringBefore('?').substringAfter("://").substringBefore('/')
+        } catch (_: Exception) {
+            url
+        }
+    }
+
+    val relativeTime = remember(timestamp) {
+        DateUtils.getRelativeTimeSpanString(
+            timestamp,
+            System.currentTimeMillis(),
+            DateUtils.MINUTE_IN_MILLIS,
+            DateUtils.FORMAT_ABBREV_RELATIVE
+        ).toString()
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        tonalElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Leading Icon Badge
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = iconContainerColor,
+                modifier = Modifier.size(38.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Title & Host/Time
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = host,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "•",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    Text(
+                        text = relativeTime,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            // Delete Action
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "Delete",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyStateView(
+    icon: ImageVector,
+    title: String,
+    subtitle: String
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 48.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f),
+                modifier = Modifier.size(52.dp)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp
+            )
         }
     }
 }

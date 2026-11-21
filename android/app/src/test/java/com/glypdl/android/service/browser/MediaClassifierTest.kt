@@ -114,6 +114,26 @@ class MediaClassifierTest {
     }
 
     @Test
+    fun generateSmartTitle_instagramReelsPlural_rejectsNullAccount() {
+        val title = MediaClassifier.generateSmartTitle(
+            pageUrl = "https://www.instagram.com/reels/Dc7oII/",
+            pageTitle = "Instagram",
+            accountName = "null"
+        )
+        assertEquals("Instagram Reel • Dc7oII", title)
+    }
+
+    @Test
+    fun generateSmartTitle_rejectsGenericNotificationsAccount() {
+        val title = MediaClassifier.generateSmartTitle(
+            pageUrl = "https://www.instagram.com/",
+            pageTitle = "Instagram",
+            accountName = "Notifications"
+        )
+        assertEquals("Instagram Video", title)
+    }
+
+    @Test
     fun generateSmartTitle_youtubeShorts() {
         val title = MediaClassifier.generateSmartTitle(
             pageUrl = "https://m.youtube.com/shorts/dQw4w9WgXcQ",

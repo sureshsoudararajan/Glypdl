@@ -69,30 +69,50 @@ object BrowserScripts {
             // Failsafe timer for dynamic single-page applications like YouTube Shorts
             setInterval(notifyUrlChange, 750);
 
-            function extractAccount() {
+            var IGNORED_ACCOUNTS = ['null', 'undefined', 'notifications', 'explore', 'messages', 'direct', 'home', 'search', 'reels', 'stories', 'login', 'accounts', 'instagram', 'video'];
+
+            function isCleanUser(u) {
+                if (!u || typeof u !== 'string') return false;
+                var clean = u.trim().toLowerCase().replace(/^@/, '');
+                if (clean.length < 2 || clean.length > 35) return false;
+                if (IGNORED_ACCOUNTS.indexOf(clean) !== -1) return false;
+                if (clean.indexOf(' ') !== -1) return false;
+                return true;
+            }
+
+            function extractAccount(elem) {
                 try {
                     var p = window.location.pathname;
                     var sm = p.match(/\/stories\/([^\/?#]+)/);
-                    if (sm) return sm[1];
-                    var rm = p.match(/\/(?:reel|p)\/([^\/?#]+)/);
+                    if (sm && isCleanUser(sm[1])) return sm[1];
+                    var rm = p.match(/\/(?:reel|reels|p)\/([^\/?#]+)/);
                     if (rm) {
                         var ogT = document.querySelector('meta[property="og:title"]');
                         if (ogT && ogT.content) {
                             var author = ogT.content.split(' on Instagram')[0];
-                            if (author) return author.trim();
+                            if (author && isCleanUser(author)) return author.trim();
                         }
                     }
                     var ytChan = document.querySelector('ytm-reel-player-header-renderer .reel-player-header-channel-title, .shorts-author-name, [class*="channel-title"]');
-                    if (ytChan && ytChan.textContent && ytChan.textContent.trim()) {
-                        return ytChan.textContent.trim().replace(/^@/, '');
+                    if (ytChan && ytChan.textContent) {
+                        var ytU = ytChan.textContent.trim().replace(/^@/, '');
+                        if (isCleanUser(ytU)) return ytU;
                     }
-                    var instaUser = document.querySelector('header a[href^="/"], a[href^="/stories/"]');
-                    if (instaUser && instaUser.textContent && instaUser.textContent.trim()) {
-                        var u = instaUser.textContent.trim().replace(/^@/, '');
-                        if (u && u.length < 35 && u.indexOf(' ') === -1) return u;
+
+                    // Feed post / article container author
+                    if (elem) {
+                        var art = elem.closest('article, section, div[role="dialog"]');
+                        if (art) {
+                            var artUser = art.querySelector('header a[href^="/"], a[role="link"][href^="/"]');
+                            if (artUser && artUser.textContent) {
+                                var au = artUser.textContent.trim().replace(/^@/, '');
+                                if (isCleanUser(au)) return au;
+                            }
+                        }
                     }
+
                     var tm = p.match(/\/@([^\/?#]+)/);
-                    if (tm) return tm[1];
+                    if (tm && isCleanUser(tm[1])) return tm[1];
                 } catch(e) {}
                 return null;
             }
@@ -128,7 +148,7 @@ object BrowserScripts {
                 return document.title || '';
             }
 
-            function sendCandidate(url, poster, mime, isBlob) {
+            function sendCandidate(url, poster, mime, isBlob, elem) {
                 if (!url || typeof url !== 'string') return;
                 var trimmed = url.trim();
                 if (!trimmed || trimmed.startsWith('data:') || trimmed.length > 2048) return;
@@ -140,13 +160,13 @@ object BrowserScripts {
                     );
                     var candidateTarget = isPlatformBlob ? window.location.href : trimmed;
                     var absoluteUrl = new URL(candidateTarget, window.location.href).href;
-                    var resolvedPoster = poster || extractPoster(null);
+                    var resolvedPoster = poster || extractPoster(elem);
                     var payload = JSON.stringify({
                         url: absoluteUrl,
                         poster: resolvedPoster ? new URL(resolvedPoster, window.location.href).href : null,
                         mime: mime || (isPlatformBlob ? "video/mp4" : null),
                         title: extractPageTitle(),
-                        account: extractAccount(),
+                        account: extractAccount(elem),
                         isBlob: isPlatformBlob ? false : !!isBlob
                     });
                     if (window.$JS_INTERFACE_NAME && typeof window.$JS_INTERFACE_NAME.reportMedia === 'function') {
@@ -160,10 +180,10 @@ object BrowserScripts {
                     // Instagram Story / Reel / Post: promote page URL when video element is present
                     if (window.location.hostname.indexOf('instagram.com') !== -1) {
                         var path = window.location.pathname;
-                        if (path.indexOf('/stories/') !== -1 || path.indexOf('/reel/') !== -1 || path.indexOf('/p/') !== -1) {
+                        if (path.indexOf('/stories/') !== -1 || path.indexOf('/reel/') !== -1 || path.indexOf('/reels/') !== -1 || path.indexOf('/p/') !== -1) {
                             var igVideo = document.querySelector('video');
                             if (igVideo) {
-                                sendCandidate(window.location.href, extractPoster(igVideo), "video/mp4", false);
+                                sendCandidate(window.location.href, extractPoster(igVideo), "video/mp4", false, igVideo);
                             }
                         }
                     }
@@ -174,15 +194,15 @@ object BrowserScripts {
                         var v = videos[i];
                         var poster = extractPoster(v);
                         if (v.src) {
-                            sendCandidate(v.src, poster, null, v.src.startsWith('blob:'));
+                            sendCandidate(v.src, poster, null, v.src.startsWith('blob:'), v);
                         }
                         if (v.currentSrc && v.currentSrc !== v.src) {
-                            sendCandidate(v.currentSrc, poster, null, v.currentSrc.startsWith('blob:'));
+                            sendCandidate(v.currentSrc, poster, null, v.currentSrc.startsWith('blob:'), v);
                         }
                         var sources = v.querySelectorAll('source');
                         for (var j = 0; j < sources.length; j++) {
                             if (sources[j].src) {
-                                sendCandidate(sources[j].src, poster, sources[j].type, sources[j].src.startsWith('blob:'));
+                                sendCandidate(sources[j].src, poster, sources[j].type, sources[j].src.startsWith('blob:'), v);
                             }
                         }
                     }
@@ -192,15 +212,15 @@ object BrowserScripts {
                     for (var k = 0; k < audios.length; k++) {
                         var a = audios[k];
                         if (a.src) {
-                            sendCandidate(a.src, null, null, a.src.startsWith('blob:'));
+                            sendCandidate(a.src, null, null, a.src.startsWith('blob:'), a);
                         }
                         if (a.currentSrc && a.currentSrc !== a.src) {
-                            sendCandidate(a.currentSrc, null, null, a.currentSrc.startsWith('blob:'));
+                            sendCandidate(a.currentSrc, null, null, a.currentSrc.startsWith('blob:'), a);
                         }
                         var aSources = a.querySelectorAll('source');
                         for (var l = 0; l < aSources.length; l++) {
                             if (aSources[l].src) {
-                                sendCandidate(aSources[l].src, null, aSources[l].type, aSources[l].src.startsWith('blob:'));
+                                sendCandidate(aSources[l].src, null, aSources[l].type, aSources[l].src.startsWith('blob:'), a);
                             }
                         }
                     }

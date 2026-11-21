@@ -141,6 +141,47 @@ class BrowserViewModel @Inject constructor(
                 _uiState.update { it.copy(isAdBlockEnabled = enabled) }
             }
         }
+
+        // Restore previous browser session tabs & URL if opened without explicit intent
+        val hasExplicitUrl = savedStateHandle.get<String>("url") != null
+        if (!hasExplicitUrl) {
+            viewModelScope.launch {
+                val savedTabsJson = settingsRepository.browserLastSessionTabs.firstOrNull()
+                val savedActiveTabId = settingsRepository.browserLastActiveTabId.firstOrNull()
+                if (!savedTabsJson.isNullOrBlank()) {
+                    try {
+                        val jsonArr = org.json.JSONArray(savedTabsJson)
+                        val restoredTabs = mutableListOf<BrowserTab>()
+                        for (i in 0 until jsonArr.length()) {
+                            val obj = jsonArr.getJSONObject(i)
+                            val tUrl = obj.getString("url")
+                            if (tUrl.isNotBlank()) {
+                                restoredTabs.add(
+                                    BrowserTab(
+                                        id = obj.getString("id"),
+                                        url = tUrl,
+                                        title = obj.optString("title", "Browser"),
+                                        isIncognito = false
+                                    )
+                                )
+                            }
+                        }
+                        if (restoredTabs.isNotEmpty()) {
+                            val activeTab = restoredTabs.find { it.id == savedActiveTabId } ?: restoredTabs.last()
+                            _uiState.update {
+                                it.copy(
+                                    tabs = restoredTabs,
+                                    activeTabId = activeTab.id,
+                                    currentUrl = activeTab.url,
+                                    inputUrl = if (activeTab.url == START_PAGE_URL) "" else activeTab.url,
+                                    title = activeTab.title
+                                )
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+        }
     }
 
     fun setSearchEngine(engine: SearchEngine) {
@@ -235,6 +276,7 @@ class BrowserViewModel @Inject constructor(
                 }
             }
         }
+        persistSession()
     }
 
     /**
@@ -275,6 +317,7 @@ class BrowserViewModel @Inject constructor(
                 browserRepository.recordVisit(newUrl, title ?: _uiState.value.title)
             }
         }
+        persistSession()
     }
 
     fun onProgressChanged(progress: Int) {
@@ -390,6 +433,7 @@ class BrowserViewModel @Inject constructor(
         } else {
             mediaSniffer.resetForPage(START_PAGE_URL)
         }
+        persistSession()
     }
 
     fun navigateToStartPage() {
@@ -408,6 +452,7 @@ class BrowserViewModel @Inject constructor(
                 errorMessage = null
             )
         }
+        persistSession()
     }
 
     fun switchTab(tabId: String) {
@@ -430,6 +475,7 @@ class BrowserViewModel @Inject constructor(
         } else {
             mediaSniffer.resetForPage(targetTab.url)
         }
+        persistSession()
     }
 
     fun closeTab(tabId: String) {
@@ -449,6 +495,7 @@ class BrowserViewModel @Inject constructor(
                     isTabSwitcherVisible = false
                 )
             }
+            persistSession()
             return
         }
 
@@ -476,6 +523,7 @@ class BrowserViewModel @Inject constructor(
         } else {
             mediaSniffer.resetForPage(nextActiveTab.url)
         }
+        persistSession()
     }
 
     fun closeAllTabs() {
@@ -492,6 +540,7 @@ class BrowserViewModel @Inject constructor(
                 isTabSwitcherVisible = false
             )
         }
+        persistSession()
     }
 
     // Bookmarks and History
@@ -795,5 +844,30 @@ class BrowserViewModel @Inject constructor(
         }
 
         return engine.buildSearchUrl(trimmed)
+    }
+
+    fun persistSession() {
+        val nonIncognitoTabs = _uiState.value.tabs.filter { !it.isIncognito }
+        if (nonIncognitoTabs.isEmpty()) return
+        val activeTabId = _uiState.value.activeTabId
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val jsonArr = org.json.JSONArray()
+                for (tab in nonIncognitoTabs) {
+                    val obj = org.json.JSONObject().apply {
+                        put("id", tab.id)
+                        put("url", tab.url)
+                        put("title", tab.title)
+                    }
+                    jsonArr.put(obj)
+                }
+                settingsRepository.saveBrowserSession(jsonArr.toString(), activeTabId)
+            } catch (_: Exception) {}
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        persistSession()
     }
 }

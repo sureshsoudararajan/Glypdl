@@ -72,6 +72,8 @@ class BrowserViewModelTest {
         every { settingsRepository.browserAutoDetect } returns flowOf(true)
         every { settingsRepository.browserDesktopModeDefault } returns flowOf(false)
         every { settingsRepository.browserAdBlockEnabled } returns flowOf(true)
+        every { settingsRepository.browserLastSessionTabs } returns flowOf(null)
+        every { settingsRepository.browserLastActiveTabId } returns flowOf(null)
     }
 
     @After
