@@ -925,7 +925,137 @@ fun SettingsScreen(
                 }
             }
 
-            // 3. DOWNLOADS SECTION
+            // 4. IN-APP BROWSER SECTION
+            item {
+                SettingsGroupCard(title = "In-App Browser") {
+                    SettingsSelectRow(
+                        icon = Icons.Default.Language,
+                        title = "Search engine",
+                        subtitle = "Default search engine used in address bar",
+                        currentValue = SearchEngine.fromId(browserSearchEngine).name,
+                        onClick = { searchEngineDialogVisible = true }
+                    )
+
+                    SettingsItemDivider()
+
+                    SettingsSwitchRow(
+                        icon = Icons.Default.VideoLibrary,
+                        title = "Automatic media detection",
+                        subtitle = "Automatically detect downloadable videos and streams",
+                        checked = browserAutoDetect,
+                        onCheckedChange = { viewModel.setBrowserAutoDetect(it) }
+                    )
+
+                    SettingsItemDivider()
+
+                    SettingsSwitchRow(
+                        icon = Icons.Default.DesktopWindows,
+                        title = "Desktop mode default",
+                        subtitle = "Request desktop websites by default in new tabs",
+                        checked = browserDesktopModeDefault,
+                        onCheckedChange = { viewModel.setBrowserDesktopModeDefault(it) }
+                    )
+
+                    SettingsItemDivider()
+
+                    SettingsSwitchRow(
+                        icon = Icons.Default.Shield,
+                        title = "Block ads & trackers (uBlock Origin)",
+                        subtitle = "Community rules maintained by uBlock Origin & uAssets",
+                        checked = browserAdBlockEnabled,
+                        onCheckedChange = { viewModel.setBrowserAdBlockEnabled(it) }
+                    )
+
+                    if (browserAdBlockEnabled) {
+                        SettingsItemDivider()
+
+                        SettingsLinkRow(
+                            icon = Icons.Default.CloudSync,
+                            title = "Update uBlock filters",
+                            subtitle = if (isUpdatingAdBlock) "Updating filters from uBlock Origin..." else "Sync latest community filter rules from GitHub",
+                            onClick = { viewModel.updateUblockFilters(context) }
+                        )
+                    }
+
+                    SettingsItemDivider()
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { clearBrowsingDataDialogVisible = true }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.DeleteSweep,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Clear browsing data",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = "Clear history, cookies, and cached web data",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 5. APPEARANCE SECTION
+            item {
+                SettingsGroupCard(title = "Appearance") {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            SettingsIconBadge(
+                                icon = Icons.Default.Palette,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column {
+                                Text(
+                                    text = "App Theme",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = "Choose light, dark, or system matching theme",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Modern 3-Segmented Pill Selector
+                        SettingsThemeSegmentedPicker(
+                            selectedTheme = theme,
+                            onThemeSelected = { newTheme ->
+                                scope.launch { viewModel.setTheme(newTheme) }
+                            },
+                            modifier = Modifier.padding(start = 54.dp)
+                        )
+                    }
+                }
+            }
+
+            // 6. DOWNLOADS SECTION
             item {
                 SettingsGroupCard(title = "Downloads") {
                     // Default quality picker row
@@ -1024,7 +1154,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 4. DOWNLOAD STORAGE SECTION
+            // 7. DOWNLOAD STORAGE SECTION
             item {
                 SettingsGroupCard(title = "Download Storage") {
                     val dirPickerLauncher = rememberLauncherForActivityResult(
@@ -1112,7 +1242,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 5. VIDEO & AUDIO SECTION
+            // 8. VIDEO & AUDIO SECTION
             item {
                 SettingsGroupCard(title = "Video & Audio Codecs") {
                     SettingsSelectRow(
@@ -1135,7 +1265,20 @@ fun SettingsScreen(
                 }
             }
 
-            // 6. NOTIFICATIONS SECTION
+            // 9. PRIVACY & SYSTEM SECTION
+            item {
+                SettingsGroupCard(title = "Privacy & System") {
+                    SettingsSwitchRow(
+                        icon = Icons.Default.ContentPaste,
+                        title = "Clipboard detection",
+                        subtitle = "Prompt to analyze video links copied from other apps",
+                        checked = clipboardDetection,
+                        onCheckedChange = { scope.launch { viewModel.setClipboardDetection(it) } }
+                    )
+                }
+            }
+
+            // 10. NOTIFICATIONS SECTION
             item {
                 SettingsGroupCard(title = "Notifications") {
                     SettingsSwitchRow(
@@ -1168,213 +1311,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 7. APPEARANCE SECTION
-            item {
-                SettingsGroupCard(title = "Appearance") {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            SettingsIconBadge(
-                                icon = Icons.Default.Palette,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(14.dp))
-                            Column {
-                                Text(
-                                    text = "App Theme",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Text(
-                                    text = "Choose light, dark, or system matching theme",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Modern 3-Segmented Pill Selector
-                        SettingsThemeSegmentedPicker(
-                            selectedTheme = theme,
-                            onThemeSelected = { newTheme ->
-                                scope.launch { viewModel.setTheme(newTheme) }
-                            },
-                            modifier = Modifier.padding(start = 54.dp)
-                        )
-                    }
-                }
-            }
-
-            // 8. PRIVACY SECTION
-            item {
-                SettingsGroupCard(title = "Privacy & System") {
-                    SettingsSwitchRow(
-                        icon = Icons.Default.ContentPaste,
-                        title = "Clipboard detection",
-                        subtitle = "Prompt to analyze video links copied from other apps",
-                        checked = clipboardDetection,
-                        onCheckedChange = { scope.launch { viewModel.setClipboardDetection(it) } }
-                    )
-                }
-            }
-
-            // 8.5 IN-APP BROWSER SECTION
-            item {
-                SettingsGroupCard(title = "In-App Browser") {
-                    SettingsSelectRow(
-                        icon = Icons.Default.Language,
-                        title = "Search engine",
-                        subtitle = "Default search engine used in address bar",
-                        currentValue = SearchEngine.fromId(browserSearchEngine).name,
-                        onClick = { searchEngineDialogVisible = true }
-                    )
-
-                    SettingsItemDivider()
-
-                    SettingsSwitchRow(
-                        icon = Icons.Default.VideoLibrary,
-                        title = "Automatic media detection",
-                        subtitle = "Automatically detect downloadable videos and streams",
-                        checked = browserAutoDetect,
-                        onCheckedChange = { viewModel.setBrowserAutoDetect(it) }
-                    )
-
-                    SettingsItemDivider()
-
-                    SettingsSwitchRow(
-                        icon = Icons.Default.DesktopWindows,
-                        title = "Desktop mode default",
-                        subtitle = "Request desktop websites by default in new tabs",
-                        checked = browserDesktopModeDefault,
-                        onCheckedChange = { viewModel.setBrowserDesktopModeDefault(it) }
-                    )
-
-                    SettingsItemDivider()
-
-                    SettingsSwitchRow(
-                        icon = Icons.Default.Shield,
-                        title = "Block ads & trackers (uBlock Origin)",
-                        subtitle = "Community rules maintained by uBlock Origin & uAssets",
-                        checked = browserAdBlockEnabled,
-                        onCheckedChange = { viewModel.setBrowserAdBlockEnabled(it) }
-                    )
-
-                    if (browserAdBlockEnabled) {
-                        SettingsItemDivider()
-
-                        SettingsLinkRow(
-                            icon = Icons.Default.CloudSync,
-                            title = "Update uBlock filters",
-                            subtitle = if (isUpdatingAdBlock) "Updating filters from uBlock Origin..." else "Sync latest community filter rules from GitHub",
-                            onClick = { viewModel.updateUblockFilters(context) }
-                        )
-                    }
-
-                    SettingsItemDivider()
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { clearBrowsingDataDialogVisible = true }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Default.DeleteSweep,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Clear browsing data",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            Text(
-                                text = "Clear history, cookies, and cached web data",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 9. AUTHOR & PROJECT SECTION
-            item {
-                SettingsGroupCard(title = "Author & Project") {
-                    // Author Row
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        SettingsIconBadge(
-                            icon = Icons.Default.Person,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column {
-                            Text(
-                                text = "Author",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = "Suresh Soundararajan",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    SettingsItemDivider()
-
-                    // Website Row
-                    SettingsLinkRow(
-                        icon = Icons.Default.Language,
-                        title = "Website",
-                        subtitle = "https://github.com/sureshsoudararajan/Glypdl",
-                        onClick = {
-                            try {
-                                uriHandler.openUri("https://github.com/sureshsoudararajan/Glypdl")
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        }
-                    )
-
-                    SettingsItemDivider()
-
-                    // Issue Submit Row
-                    SettingsLinkRow(
-                        icon = Icons.Default.BugReport,
-                        title = "Submit an Issue",
-                        subtitle = "https://github.com/sureshsoudararajan/Glypdl/issues",
-                        onClick = {
-                            try {
-                                uriHandler.openUri("https://github.com/sureshsoudararajan/Glypdl/issues")
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        }
-                    )
-                }
-            }
-
-            // 9.5 TERMINAL & DIAGNOSTIC LOGS SECTION
+            // 11. TERMINAL & DIAGNOSTIC LOGS SECTION
             item {
                 SettingsGroupCard(title = "Diagnostics & Raw Terminal Logs") {
                     Column(
@@ -1543,6 +1480,69 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                     }
+                }
+            }
+
+            // 12. AUTHOR & PROJECT SECTION
+            item {
+                SettingsGroupCard(title = "Author & Project") {
+                    // Author Row
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SettingsIconBadge(
+                            icon = Icons.Default.Person,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                text = "Author",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "Suresh Soundararajan",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    SettingsItemDivider()
+
+                    // Website Row
+                    SettingsLinkRow(
+                        icon = Icons.Default.Language,
+                        title = "Website",
+                        subtitle = "https://github.com/sureshsoudararajan/Glypdl",
+                        onClick = {
+                            try {
+                                uriHandler.openUri("https://github.com/sureshsoudararajan/Glypdl")
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    )
+
+                    SettingsItemDivider()
+
+                    // Issue Submit Row
+                    SettingsLinkRow(
+                        icon = Icons.Default.BugReport,
+                        title = "Submit an Issue",
+                        subtitle = "https://github.com/sureshsoudararajan/Glypdl/issues",
+                        onClick = {
+                            try {
+                                uriHandler.openUri("https://github.com/sureshsoudararajan/Glypdl/issues")
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    )
                 }
             }
 

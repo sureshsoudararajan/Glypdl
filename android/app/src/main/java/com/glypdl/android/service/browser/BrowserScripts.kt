@@ -29,13 +29,41 @@ object BrowserScripts {
 
             var lastReportedHref = window.location.href;
 
+            function findActiveVideo() {
+                var videos = document.querySelectorAll('video');
+                if (!videos || videos.length === 0) return null;
+                for (var i = 0; i < videos.length; i++) {
+                    var v = videos[i];
+                    if (!v.paused && !v.ended && v.currentTime > 0) {
+                        return v;
+                    }
+                }
+                var winH = window.innerHeight || document.documentElement.clientHeight || 800;
+                var centerY = winH / 2;
+                var best = null;
+                var minDist = Infinity;
+                for (var j = 0; j < videos.length; j++) {
+                    var rect = videos[j].getBoundingClientRect();
+                    if (rect.bottom > 50 && rect.top < winH - 50) {
+                        var dist = Math.abs((rect.top + rect.bottom) / 2 - centerY);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            best = videos[j];
+                        }
+                    }
+                }
+                return best || videos[videos.length - 1];
+            }
+
             function notifyUrlChange() {
                 try {
                     var current = window.location.href;
                     if (current && current !== lastReportedHref) {
                         lastReportedHref = current;
+                        var activeV = findActiveVideo();
+                        var currentTitle = extractPageTitle(activeV);
                         if (window.$JS_INTERFACE_NAME && typeof window.$JS_INTERFACE_NAME.reportUrlChange === 'function') {
-                            window.$JS_INTERFACE_NAME.reportUrlChange(current, document.title || '');
+                            window.$JS_INTERFACE_NAME.reportUrlChange(current, currentTitle || document.title || '');
                         }
                         scanElements();
                     }
@@ -82,33 +110,40 @@ object BrowserScripts {
 
             function extractAccount(elem) {
                 try {
+                    var isIg = window.location.hostname.indexOf('instagram.com') !== -1;
                     var p = window.location.pathname;
                     var sm = p.match(/\/stories\/([^\/?#]+)/);
                     if (sm && isCleanUser(sm[1])) return sm[1];
+
+                    // Check scoped container first for active video's author
+                    if (elem) {
+                        var art = elem.closest('article, section, div[role="dialog"], div[role="presentation"], ytm-reel-player-renderer, .reel-player-renderer') || elem.parentElement;
+                        if (art) {
+                            var links = art.querySelectorAll('a[role="link"][href^="/"], header a[href^="/"], a[href^="/"]');
+                            for (var k = 0; k < links.length; k++) {
+                                var href = links[k].getAttribute('href') || '';
+                                var m = href.match(/^\/([a-zA-Z0-9._]+)\/?$/);
+                                if (m && isCleanUser(m[1])) return m[1];
+                                var linkText = links[k].textContent ? links[k].textContent.trim().replace(/^@/, '') : '';
+                                if (linkText && isCleanUser(linkText)) return linkText;
+                            }
+                        }
+                    }
+
+                    // Only use og:title if NOT in an Instagram SPA reels/stories view (since og:title is static and never updates)
                     var rm = p.match(/\/(?:reel|reels|p)\/([^\/?#]+)/);
-                    if (rm) {
+                    if (rm && !isIg) {
                         var ogT = document.querySelector('meta[property="og:title"]');
                         if (ogT && ogT.content) {
                             var author = ogT.content.split(' on Instagram')[0];
                             if (author && isCleanUser(author)) return author.trim();
                         }
                     }
+
                     var ytChan = document.querySelector('ytm-reel-player-header-renderer .reel-player-header-channel-title, .shorts-author-name, [class*="channel-title"]');
                     if (ytChan && ytChan.textContent) {
                         var ytU = ytChan.textContent.trim().replace(/^@/, '');
                         if (isCleanUser(ytU)) return ytU;
-                    }
-
-                    // Feed post / article container author
-                    if (elem) {
-                        var art = elem.closest('article, section, div[role="dialog"]');
-                        if (art) {
-                            var artUser = art.querySelector('header a[href^="/"], a[role="link"][href^="/"]');
-                            if (artUser && artUser.textContent) {
-                                var au = artUser.textContent.trim().replace(/^@/, '');
-                                if (isCleanUser(au)) return au;
-                            }
-                        }
                     }
 
                     var tm = p.match(/\/@([^\/?#]+)/);
@@ -119,30 +154,56 @@ object BrowserScripts {
 
             function extractPoster(elem) {
                 try {
+                    var isIg = window.location.hostname.indexOf('instagram.com') !== -1;
+                    var isReelsOrStories = isIg && (window.location.pathname.indexOf('/reel') !== -1 || window.location.pathname.indexOf('/stories') !== -1);
                     if (elem) {
                         if (elem.poster) return elem.poster;
                         if (elem.getAttribute && elem.getAttribute('poster')) return elem.getAttribute('poster');
-                        var container = elem.closest('article, section, div[role="dialog"], ytm-reel-player-renderer, .reel-player-renderer') || elem.parentElement;
+                        var container = elem.closest('article, section, div[role="dialog"], div[role="presentation"], ytm-reel-player-renderer, .reel-player-renderer') || elem.parentElement;
                         if (container) {
-                            var img = container.querySelector('img[src^="http"]');
-                            if (img && img.src && !img.src.startsWith('data:') && img.naturalWidth !== 1) return img.src;
+                            var imgs = container.querySelectorAll('img[src*="fbcdn"], img[src*="cdninstagram"], img[src^="http"]');
+                            for (var i = 0; i < imgs.length; i++) {
+                                var src = imgs[i].src || '';
+                                if (src.startsWith('data:') || src.indexOf('1x1') !== -1) continue;
+                                var w = imgs[i].naturalWidth || imgs[i].clientWidth || 0;
+                                var h = imgs[i].naturalHeight || imgs[i].clientHeight || 0;
+                                if (w > 80 || h > 80 || (!w && !h && (src.indexOf('/v/t51.') !== -1 || src.indexOf('_n.jpg') !== -1))) {
+                                    return src;
+                                }
+                            }
+                            if (imgs.length > 0 && !imgs[0].src.startsWith('data:')) {
+                                return imgs[0].src;
+                            }
                         }
                     }
-                    var og = document.querySelector('meta[property="og:image"], meta[name="twitter:image"]');
-                    if (og && og.content) return og.content;
+                    // NEVER fall back to static og:image on Instagram Reels/Stories SPA navigation
+                    if (!isReelsOrStories) {
+                        var og = document.querySelector('meta[property="og:image"], meta[name="twitter:image"]');
+                        if (og && og.content) return og.content;
+                    }
                 } catch(e) {}
                 return null;
             }
 
-            function extractPageTitle() {
+            function extractPageTitle(elem) {
                 try {
+                    var isIg = window.location.hostname.indexOf('instagram.com') !== -1;
+                    var isReelsOrStories = isIg && (window.location.pathname.indexOf('/reel') !== -1 || window.location.pathname.indexOf('/stories') !== -1);
+                    if (isReelsOrStories) {
+                        var acc = extractAccount(elem);
+                        if (acc) {
+                            return '@' + acc + ' • Reel';
+                        }
+                    }
                     var ytShorts = document.querySelector('ytm-reel-player-header-renderer .reel-player-header-title, .reel-player-header-title, h2.shorts-title, [class*="shorts-title"]');
                     if (ytShorts && ytShorts.textContent && ytShorts.textContent.trim()) {
                         return ytShorts.textContent.trim();
                     }
-                    var ogTitle = document.querySelector('meta[property="og:title"]');
-                    if (ogTitle && ogTitle.content && ogTitle.content.trim()) {
-                        return ogTitle.content.trim();
+                    if (!isReelsOrStories) {
+                        var ogTitle = document.querySelector('meta[property="og:title"]');
+                        if (ogTitle && ogTitle.content && ogTitle.content.trim()) {
+                            return ogTitle.content.trim();
+                        }
                     }
                 } catch(e) {}
                 return document.title || '';
@@ -165,7 +226,7 @@ object BrowserScripts {
                         url: absoluteUrl,
                         poster: resolvedPoster ? new URL(resolvedPoster, window.location.href).href : null,
                         mime: mime || (isPlatformBlob ? "video/mp4" : null),
-                        title: extractPageTitle(),
+                        title: extractPageTitle(elem),
                         account: extractAccount(elem),
                         isBlob: isPlatformBlob ? false : !!isBlob
                     });
@@ -177,13 +238,14 @@ object BrowserScripts {
 
             function scanElements() {
                 try {
-                    // Instagram Story / Reel / Post: promote page URL when video element is present
+                    var activeVideo = findActiveVideo();
+
+                    // Instagram Story / Reel / Post: promote page URL when active video is present
                     if (window.location.hostname.indexOf('instagram.com') !== -1) {
                         var path = window.location.pathname;
                         if (path.indexOf('/stories/') !== -1 || path.indexOf('/reel/') !== -1 || path.indexOf('/reels/') !== -1 || path.indexOf('/p/') !== -1) {
-                            var igVideo = document.querySelector('video');
-                            if (igVideo) {
-                                sendCandidate(window.location.href, extractPoster(igVideo), "video/mp4", false, igVideo);
+                            if (activeVideo) {
+                                sendCandidate(window.location.href, extractPoster(activeVideo), "video/mp4", false, activeVideo);
                             }
                         }
                     }

@@ -77,10 +77,10 @@ val DEFAULT_SPEED_DIAL = listOf(
         backgroundColor = Color(0xFF1877F2)
     ),
     QuickAccessTile(
-        title = "Video",
-        url = "https://m.youtube.com/feed/trending",
-        icon = Icons.Default.VideoLibrary,
-        backgroundColor = Color(0xFF7C4DFF)
+        title = "Vimeo",
+        url = "https://vimeo.com",
+        icon = Icons.Default.SmartDisplay,
+        backgroundColor = Color(0xFF1AB7EA)
     )
 )
 
