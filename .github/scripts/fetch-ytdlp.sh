@@ -111,9 +111,10 @@ main() {
   [[ "$tag" =~ $TAG_RE ]] || die "unexpected yt-dlp release tag '$tag'"
 
   local base="https://github.com/$REPO/releases/download/$tag"
-  local tmp
-  tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' EXIT
+  # Global (not local) so the EXIT trap can still see it after this function returns.
+  TMPDIR_YTDLP="$(mktemp -d)"
+  trap 'rm -rf "${TMPDIR_YTDLP:-}"' EXIT
+  local tmp="$TMPDIR_YTDLP"
 
   echo "Downloading yt-dlp release $tag ($asset)..."
   curl "${curl_opts[@]}" -o "$tmp/$asset" "$base/$asset" || die "download of $asset failed"
