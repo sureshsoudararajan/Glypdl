@@ -23,7 +23,7 @@
 
 **Glypdl** is an ultra-fast, modern, fully open-source cross-platform media downloader powered by **yt-dlp** and **FFmpeg**. Designed from the ground up to feel completely native on every operating system, Glypdl avoids slow web wrappers in favor of first-class native UI frameworks:
 
-* 📱 **Android Edition**: 100% native **Kotlin** and **Jetpack Compose (Material 3)**. Features background foreground service with persistent notifications, built-in in-app authenticated browser with cookie preservation, YouTube multi-language audio track selection, subtitles support, and Android system share sheet integration.
+* 📱 **Android Edition**: 100% native **Kotlin** and **Jetpack Compose (Material 3)**. Features background foreground service with persistent notifications, a full built-in browser (multi-tab, incognito, ad blocking and automatic video/audio detection) with cookie preservation, YouTube multi-language audio track selection, subtitles support, and Android system share sheet integration.
 * 🪟 **Windows Edition**: Native **WinUI 3**, **C#**, and **.NET 8** with Windows 11 Fluent 2 design, translucent Mica material backdrops, automatic dark/light theme switching, and an Inno Setup installer.
 * 🐧 **Linux Edition**: Native **GTK4**, **libadwaita**, and **Python 3.10+** adhering to the GNOME Human Interface Guidelines (HIG), packaged as standalone AppImage, Flatpak, Deb, RPM, and Arch Linux packages, complete with a Firefox/LibreWolf companion extension.
 
@@ -95,6 +95,12 @@
 * **Cookie File (`--cookies`)**: Full support for importing standard Netscape `cookies.txt` files across all platforms.
 * **Strict Privacy Guarantee**: Cookies remain strictly local to your device and are never uploaded or transmitted to third-party servers.
 
+### 🌐 3b. Built-in Browser with Media Detection *(Android)*
+* **Full Multi-Tab Browser**: Android WebView with incognito mode, session restore, bookmarks, history, a custom start page and a choice of search engines.
+* **Automatic Media Sniffer**: Detects direct video streams, progressive MP4/WebM, HLS (`.m3u8`) and DASH (`.mpd`) manifests, plus YouTube Shorts and Instagram Reels, and offers them for download.
+* **Ad & Tracker Blocking**: Built-in uBlock Origin community filter engine with a background list updater.
+* **Hardened by Default**: Pages cannot spoof the address bar or history, and can only open other apps (`intent://`, `mailto:`, `tel:` ...) after a real tap.
+
 ### 📑 4. Visual Playlist Downloader
 * **Interactive Playlist Inspector**: Displays full track lists with 16:9 thumbnail previews, index numbering, titles, uploaders, and durations.
 * **Flexible Batch Control**:
@@ -102,6 +108,7 @@
   - Individual item checkboxes for selective downloading.
   - Real-time status counter (e.g. `12 of 20 items selected`).
   - Batch action button (e.g. *"Download 12 Selected Videos"*).
+* **Reliable Large Batches**: every selected video is queued even when you leave the screen immediately, and the concurrent-downloads limit controls how many run at once.
 
 ### ⚡ 5. Real-Time Download Queue & Explorer Integration
 * **Live Telemetry**: Real-time progress bar, transfer speed (MB/s), ETA countdown, downloaded and total file sizes.
@@ -117,6 +124,7 @@
 
 ### ⚙️ 7. Automated Engine Provisioning & One-Click Updates
 * **Zero Configuration**: Bundled with official `yt-dlp` and `FFmpeg` binaries. On Android, QuickJS (`libqjs.so`) and FFmpeg (`libffmpeg.so`) are packaged natively into architecture splits.
+* **Verified Release Binaries**: Every release build downloads `yt-dlp` from the official GitHub release and verifies it against the release's `SHA2-256SUMS` (plus size and file-type checks) before bundling. See [Security](#-security).
 * **In-App Engine Updates**: Check for and install the latest `yt-dlp` stable releases directly from Settings with one tap.
 
 ### 🦊 8. Firefox & LibreWolf Companion Extension *(Linux)*
@@ -272,6 +280,9 @@ Glypdl/
 │   │   └── src/test/java/          # Android unit test suite
 │   ├── build.gradle.kts            # Android Gradle project build file
 │   └── settings.gradle.kts         # Android Gradle settings
+├── .github/
+│   ├── scripts/fetch-ytdlp.sh      # Downloads and checksum-verifies the bundled yt-dlp
+│   └── workflows/                  # CI: Android, Windows, Linux builds and release publishing
 ├── data/                           # App icons, metadata, and screenshots
 ├── packaging/                      # Linux packaging (Deb, RPM, Flatpak, Arch, AppImage)
 ├── src/glypdl/                     # Linux GTK4 / Python application source
@@ -310,6 +321,18 @@ Glypdl/
 * **Database**: `/data/user/0/com.glypdl.android/databases/glypdl.db`
 * **Cookies**: `/data/user/0/com.glypdl.android/files/cookies/`
 * **Downloads**: `/storage/emulated/0/Download/Glypdl/`
+
+---
+
+## 🔒 Security
+
+* **TLS verification is always on.** Glypdl never passes `--no-check-certificates` to yt-dlp.
+* **Verified yt-dlp in releases.** CI runs `.github/scripts/fetch-ytdlp.sh`, which downloads the official asset and checks it against the release `SHA2-256SUMS`, a minimum size and the expected file signature. A mismatch fails the build.
+  * By default the latest yt-dlp release is used. To pin it, set repository variables `YTDLP_VERSION` (for example `2026.10.26`) and `YTDLP_SHA256` (Android/Linux) or `YTDLP_EXE_SHA256` (Windows). The pinned hash protects against a compromised upstream release; the checksum file alone only catches corruption and tampering in transit.
+* **Local-only credentials.** Cookies stay on your device, and diagnostic logs redact cookies, auth headers, credential arguments and token-like URL parameters before they are saved or exported.
+* **Known limitation:** the in-app `yt-dlp` updater (Settings) does not yet verify checksums.
+
+Found a vulnerability? Please open a private security advisory on GitHub instead of a public issue.
 
 ---
 
