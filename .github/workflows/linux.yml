@@ -53,8 +53,14 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 libgtk-4-1 libadwaita-1-0 xvfb ffmpeg
-          sudo curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
-          sudo chmod a+rx /usr/local/bin/yt-dlp
+
+      - name: Fetch and Verify Official yt-dlp Binary
+        env:
+          YTDLP_VERSION: ${{ vars.YTDLP_VERSION }}
+          YTDLP_SHA256: ${{ vars.YTDLP_SHA256 }}
+        run: |
+          bash .github/scripts/fetch-ytdlp.sh "$RUNNER_TEMP/yt-dlp"
+          sudo install -m 0755 "$RUNNER_TEMP/yt-dlp" /usr/local/bin/yt-dlp
 
       - name: Run Test Suite
         env:

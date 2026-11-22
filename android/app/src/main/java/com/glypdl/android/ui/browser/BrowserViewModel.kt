@@ -270,7 +270,7 @@ class BrowserViewModel @Inject constructor(
                 browserRepository.recordVisit(url, _uiState.value.title)
             }
             // Auto-synchronize browser login session cookies with AuthCookieManager for yt-dlp & Settings
-            if (url.contains("instagram.com") || url.contains("facebook.com") || url.contains("youtube.com") || url.contains("twitter.com") || url.contains("x.com") || url.contains("tiktok.com")) {
+            if (isCookieSyncHost(url)) {
                 viewModelScope.launch(Dispatchers.IO) {
                     authCookieManager.syncCookiesFromCookieManager(url)
                 }
@@ -283,9 +283,12 @@ class BrowserViewModel @Inject constructor(
      * Handles single-page application (SPA) dynamic client-side URL changes
      * (e.g. YouTube Shorts, Instagram Reels, Twitter) reported via JavaScript history interception.
      */
-    fun onUrlChangedViaJs(newUrl: String, title: String?) {
-        if (newUrl.isBlank() || newUrl.startsWith("about:") || newUrl.startsWith("data:")) return
+    fun onUrlChangedViaJs(newUrl: String, rawTitle: String?) {
+        // Only real web URLs. Callers must pass the WebView's own current URL, never a URL that
+        // page JavaScript supplied (see the bridge in BrowserScreen), so reject anything else.
+        if (!newUrl.startsWith("http://", ignoreCase = true) && !newUrl.startsWith("https://", ignoreCase = true)) return
         if (newUrl == _uiState.value.currentUrl) return
+        val title = rawTitle?.take(300)
 
         _uiState.update { state ->
             val updatedTabs = state.tabs.map { tab ->
@@ -307,7 +310,7 @@ class BrowserViewModel @Inject constructor(
 
         val currentTab = _uiState.value.tabs.find { it.id == _uiState.value.activeTabId }
         val isIncognito = currentTab?.isIncognito ?: _uiState.value.isIncognito
-        if (!isIncognito && (newUrl.contains("instagram.com") || newUrl.contains("facebook.com") || newUrl.contains("youtube.com") || newUrl.contains("twitter.com") || newUrl.contains("x.com") || newUrl.contains("tiktok.com"))) {
+        if (!isIncognito && isCookieSyncHost(newUrl)) {
             viewModelScope.launch(Dispatchers.IO) {
                 authCookieManager.syncCookiesFromCookieManager(newUrl)
             }
@@ -318,6 +321,21 @@ class BrowserViewModel @Inject constructor(
             }
         }
         persistSession()
+    }
+
+    /**
+     * True only when the URL's host is one of the sites whose login cookies Glypdl syncs, either
+     * exactly or as a subdomain. A plain `contains("x.com")` also matched unrelated sites such as
+     * netflix.com or dropbox.com.
+     */
+    private fun isCookieSyncHost(url: String): Boolean {
+        val host = try {
+            java.net.URI(url).host?.lowercase()
+        } catch (_: Exception) {
+            null
+        } ?: return false
+        val domains = listOf("instagram.com", "facebook.com", "youtube.com", "twitter.com", "x.com", "tiktok.com")
+        return domains.any { host == it || host.endsWith(".$it") }
     }
 
     fun onProgressChanged(progress: Int) {
