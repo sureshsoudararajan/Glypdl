@@ -81,7 +81,18 @@ object DiagnosticLogger {
         }
     }
 
-    fun log(tag: String, message: String, level: LogLevel = LogLevel.INFO) {
+    private val SENSITIVE_PATTERNS: List<Pair<Regex, String>> = listOf(
+        Regex("(?i)(authorization|cookie|set-cookie|x-csrftoken|x-ig-[a-z-]+)(\\s*[:=]\\s*)[^\\n]*") to "$1$2[REDACTED]",
+        Regex("(?i)(--cookies|--username|--password|--video-password|--add-header)(\\s+)\\S+") to "$1$2[REDACTED]",
+        Regex("(?i)([?&;\\s\"'](?:access_token|token|sessionid|csrftoken|sig|signature|key|password|auth)=)[^&\\s\"']+") to "$1[REDACTED]"
+    )
+
+    /** Masks credentials, cookies and tokens so exported diagnostics are safe to share. */
+    internal fun redact(message: String): String =
+        SENSITIVE_PATTERNS.fold(message) { acc, (regex, repl) -> regex.replace(acc, repl) }
+
+    fun log(tag: String, rawMessage: String, level: LogLevel = LogLevel.INFO) {
+        val message = redact(rawMessage)
         val now = System.currentTimeMillis()
         val entry = LogEntry(
             id = ++entryCounter,
