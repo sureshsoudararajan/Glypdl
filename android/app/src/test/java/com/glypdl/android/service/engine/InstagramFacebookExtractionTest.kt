@@ -136,4 +136,34 @@ class InstagramFacebookExtractionTest {
         assertEquals("Extractor Limitation", error.userTitle)
         assertTrue(error.requiresUpdate)
     }
+
+    @Test
+    fun testTlsCertificateVerificationIsNeverDisabled() {
+        val urls = listOf(
+            "https://www.instagram.com/reel/DfgXse5Icb7/",
+            "https://www.facebook.com/share/r/1TLQtRtVQW/",
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://example.com/video.mp4"
+        )
+        for (url in urls) {
+            val plain = YoutubeDLRequest(url)
+            ytDlpManager.applyPlatformOptions(plain, url, cookieFile = null)
+            assertFalse(
+                "TLS verification must stay enabled for $url",
+                plain.buildCommand().contains("--no-check-certificates")
+            )
+
+            val withBrowserHeaders = YoutubeDLRequest(url)
+            ytDlpManager.applyPlatformOptions(
+                withBrowserHeaders,
+                url,
+                cookieFile = null,
+                customHeaders = mapOf("Referer" to "https://example.com/", "User-Agent" to "Mozilla/5.0")
+            )
+            assertFalse(
+                "TLS verification must stay enabled for browser-sourced $url",
+                withBrowserHeaders.buildCommand().contains("--no-check-certificates")
+            )
+        }
+    }
 }

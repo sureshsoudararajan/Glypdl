@@ -347,4 +347,42 @@ class BrowserViewModelTest {
 
         coVerify { browserRepository.recordVisit("https://m.youtube.com/shorts/OnJPmKH", "Exciting Short Video") }
     }
+
+    @Test
+    fun `onUrlChangedViaJs ignores non-http(s) URLs`() {
+        val viewModel = createViewModel()
+        viewModel.onPageStarted("https://example.com/")
+
+        listOf(
+            "javascript:alert(1)",
+            "file:///data/data/com.glypdl.android/databases/glypdl.db",
+            "intent://scan/#Intent;scheme=zxing;end",
+            "data:text/html,<h1>x</h1>",
+            "about:blank",
+            ""
+        ).forEach { viewModel.onUrlChangedViaJs(it, "Spoofed title") }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("https://example.com/", viewModel.uiState.value.currentUrl)
+        coVerify(exactly = 0) { browserRepository.recordVisit(any(), any()) }
+    }
+
+    @Test
+    fun `cookie sync only runs for supported sites, not look-alike hosts`() {
+        val viewModel = createViewModel()
+        viewModel.onPageStarted("https://example.com/")
+
+        // "netflix.com" and "dropbox.com" contain the text "x.com" but are not x.com
+        viewModel.onUrlChangedViaJs("https://www.netflix.com/title/1", null)
+        viewModel.onUrlChangedViaJs("https://www.dropbox.com/home", null)
+        viewModel.onUrlChangedViaJs("https://m.youtube.com/shorts/abc", null)
+        viewModel.onUrlChangedViaJs("https://x.com/home", null)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 0) { authCookieManager.syncCookiesFromCookieManager("https://www.netflix.com/title/1") }
+        coVerify(exactly = 0) { authCookieManager.syncCookiesFromCookieManager("https://www.dropbox.com/home") }
+        // The sync runs on Dispatchers.IO, so allow a moment for it to complete.
+        coVerify(timeout = 3000, exactly = 1) { authCookieManager.syncCookiesFromCookieManager("https://m.youtube.com/shorts/abc") }
+        coVerify(timeout = 3000, exactly = 1) { authCookieManager.syncCookiesFromCookieManager("https://x.com/home") }
+    }
 }

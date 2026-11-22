@@ -342,7 +342,9 @@ class YtDlpManager @Inject constructor(
         val isFacebook = UrlValidator.isFacebookUrl(url)
         val isYouTube = UrlValidator.isYouTubeUrl(url)
 
-        request.addOption("--no-check-certificates")
+        // TLS certificate verification stays ON. Never pass --no-check-certificates here: these
+        // requests can carry session cookies and auth headers, which an on-path attacker (e.g.
+        // on public Wi-Fi) could capture if certificates were not verified.
 
         // If custom headers provided (e.g. from browser detection), prioritize them
         if (!customHeaders.isNullOrEmpty()) {

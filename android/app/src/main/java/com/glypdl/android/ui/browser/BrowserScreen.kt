@@ -360,6 +360,7 @@ fun BrowserScreen(
                         }
 
                         // Layer B: Add Javascript Interface for DOM reported media and SPA URL changes
+                        val bridgeWebView = this
                         addJavascriptInterface(
                             object {
                                 @JavascriptInterface
@@ -369,10 +370,17 @@ fun BrowserScreen(
                                     }
                                 }
 
+                                // SECURITY: page JavaScript (including embedded third-party iframes) can call
+                                // this, so the URL it passes is NEVER trusted. Otherwise a hostile page could
+                                // spoof the address bar / lock icon, poison browsing history, or trigger a
+                                // cookie sync for another site. The call is only a "something changed" hint:
+                                // the URL that is shown and recorded is always the WebView's own current URL.
                                 @JavascriptInterface
+                                @Suppress("UNUSED_PARAMETER")
                                 fun reportUrlChange(newUrl: String, title: String?) {
                                     post {
-                                        viewModel.onUrlChangedViaJs(newUrl, title)
+                                        val realUrl = bridgeWebView.url ?: return@post
+                                        viewModel.onUrlChangedViaJs(realUrl, title)
                                     }
                                 }
                             },

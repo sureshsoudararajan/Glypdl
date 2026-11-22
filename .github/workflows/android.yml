@@ -65,13 +65,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Fetch Latest Official yt-dlp Binary
-        run: |
-          mkdir -p android/app/src/main/res/raw
-          echo "Downloading latest official yt-dlp binary..."
-          curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o android/app/src/main/res/raw/ytdlp
-          chmod 644 android/app/src/main/res/raw/ytdlp
-          echo "Bundled yt-dlp size: $(ls -lh android/app/src/main/res/raw/ytdlp | awk '{print $5}')"
+      - name: Fetch and Verify Official yt-dlp Binary
+        # Downloads the newest official release (or the one pinned via repo variables), checks it
+        # against the release's SHA2-256SUMS (and YTDLP_SHA256 if set) and fails the build on any
+        # mismatch. See .github/scripts/fetch-ytdlp.sh.
+        env:
+          YTDLP_VERSION: ${{ vars.YTDLP_VERSION }}
+          YTDLP_SHA256: ${{ vars.YTDLP_SHA256 }}
+        run: bash .github/scripts/fetch-ytdlp.sh android/app/src/main/res/raw/ytdlp
 
       - name: Run Unit Tests
         run: |
@@ -96,13 +97,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Fetch Latest Official yt-dlp Binary
-        run: |
-          mkdir -p android/app/src/main/res/raw
-          echo "Downloading latest official yt-dlp binary..."
-          curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o android/app/src/main/res/raw/ytdlp
-          chmod 644 android/app/src/main/res/raw/ytdlp
-          echo "Bundled yt-dlp size: $(ls -lh android/app/src/main/res/raw/ytdlp | awk '{print $5}')"
+      - name: Fetch and Verify Official yt-dlp Binary
+        # Downloads the newest official release (or the one pinned via repo variables), checks it
+        # against the release's SHA2-256SUMS (and YTDLP_SHA256 if set) and fails the build on any
+        # mismatch. See .github/scripts/fetch-ytdlp.sh.
+        env:
+          YTDLP_VERSION: ${{ vars.YTDLP_VERSION }}
+          YTDLP_SHA256: ${{ vars.YTDLP_SHA256 }}
+        run: bash .github/scripts/fetch-ytdlp.sh android/app/src/main/res/raw/ytdlp
 
       - name: Determine Build Type
         id: build_type
