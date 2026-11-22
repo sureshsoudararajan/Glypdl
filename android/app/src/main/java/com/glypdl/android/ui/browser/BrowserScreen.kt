@@ -455,8 +455,23 @@ fun BrowserScreen(
                                     return false
                                 }
 
+                                // SECURITY: a page must not launch other apps on its own. Only react to a
+                                // real user gesture, and only for a small allow-list of schemes.
+                                if (!request.hasGesture()) return true
+
                                 try {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(urlStr))
+                                    val intent = when (scheme) {
+                                        "intent" -> Intent.parseUri(urlStr, Intent.URI_INTENT_SCHEME).apply {
+                                            // Strip anything that could target a specific component or
+                                            // reach non-browsable activities.
+                                            component = null
+                                            selector = null
+                                            addCategory(Intent.CATEGORY_BROWSABLE)
+                                        }
+                                        "mailto", "tel", "sms", "market", "geo" ->
+                                            Intent(Intent.ACTION_VIEW, Uri.parse(urlStr))
+                                        else -> return true
+                                    }
                                     ctx.startActivity(intent)
                                 } catch (e: Exception) {}
                                 return true
