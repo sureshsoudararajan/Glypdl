@@ -330,7 +330,8 @@ Glypdl/
 * **Verified yt-dlp in releases.** CI runs `.github/scripts/fetch-ytdlp.sh`, which downloads the official asset and checks it against the release `SHA2-256SUMS`, a minimum size and the expected file signature. A mismatch fails the build.
   * By default the latest yt-dlp release is used. To pin it, set repository variables `YTDLP_VERSION` (for example `2026.10.26`) and `YTDLP_SHA256` (Android/Linux) or `YTDLP_EXE_SHA256` (Windows). The pinned hash protects against a compromised upstream release; the checksum file alone only catches corruption and tampering in transit.
 * **Local-only credentials.** Cookies stay on your device, and diagnostic logs redact cookies, auth headers, credential arguments and token-like URL parameters before they are saved or exported.
-* **Known limitation:** the in-app `yt-dlp` updater (Settings) does not yet verify checksums.
+* **Verified updates.** The in-app `yt-dlp` updater installs a new engine only if it matches the release `SHA2-256SUMS` (and rolls back if it fails to run). App (APK) updates are only downloaded from GitHub release hosts and must match the SHA-256 GitHub publishes for the asset before installation.
+* **Hardened browser.** The media-detection bridge only accepts messages from the top-level page (not ads or iframes), and workflow actions are pinned to commit SHAs with Dependabot keeping them current.
 
 Found a vulnerability? Please open a private security advisory on GitHub instead of a public issue.
 

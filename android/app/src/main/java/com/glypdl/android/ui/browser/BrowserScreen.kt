@@ -359,33 +359,36 @@ fun BrowserScreen(
                             false
                         }
 
-                        // Layer B: Add Javascript Interface for DOM reported media and SPA URL changes
+                        // Layer B: DOM-reported media and SPA URL changes.
+                        // SECURITY: uses a WebMessageListener instead of addJavascriptInterface, because
+                        // the latter is exposed to EVERY frame (ads, third-party iframes). Here messages
+                        // are accepted only from the top-level frame, and the URL the page claims is never
+                        // trusted: the address bar / history always use the WebView's own current URL.
+                        // Without WebMessageListener support the bridge is simply not exposed (network
+                        // interception still detects media).
                         val bridgeWebView = this
-                        addJavascriptInterface(
-                            object {
-                                @JavascriptInterface
-                                fun reportMedia(jsonPayload: String) {
-                                    post {
-                                        viewModel.onDomMediaReported(jsonPayload)
+                        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+                            try {
+                                WebViewCompat.addWebMessageListener(
+                                    this,
+                                    BrowserScripts.JS_INTERFACE_NAME,
+                                    setOf("https://*", "http://*")
+                                ) { _, message, _, isMainFrame, _ ->
+                                    if (!isMainFrame) return@addWebMessageListener
+                                    val data = message.data ?: return@addWebMessageListener
+                                    if (data.length > 262_144) return@addWebMessageListener
+                                    val json = try { org.json.JSONObject(data) } catch (_: Exception) { return@addWebMessageListener }
+                                    when (json.optString("t")) {
+                                        "media" -> json.optString("payload").takeIf { it.isNotEmpty() }
+                                            ?.let { viewModel.onDomMediaReported(it) }
+                                        "url" -> {
+                                            val realUrl = bridgeWebView.url ?: return@addWebMessageListener
+                                            viewModel.onUrlChangedViaJs(realUrl, json.optString("title").ifEmpty { null })
+                                        }
                                     }
                                 }
-
-                                // SECURITY: page JavaScript (including embedded third-party iframes) can call
-                                // this, so the URL it passes is NEVER trusted. Otherwise a hostile page could
-                                // spoof the address bar / lock icon, poison browsing history, or trigger a
-                                // cookie sync for another site. The call is only a "something changed" hint:
-                                // the URL that is shown and recorded is always the WebView's own current URL.
-                                @JavascriptInterface
-                                @Suppress("UNUSED_PARAMETER")
-                                fun reportUrlChange(newUrl: String, title: String?) {
-                                    post {
-                                        val realUrl = bridgeWebView.url ?: return@post
-                                        viewModel.onUrlChangedViaJs(realUrl, title)
-                                    }
-                                }
-                            },
-                            BrowserScripts.JS_INTERFACE_NAME
-                        )
+                            } catch (_: Exception) {}
+                        }
 
                         // If DOCUMENT_START_SCRIPT is supported, inject early
                         if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {

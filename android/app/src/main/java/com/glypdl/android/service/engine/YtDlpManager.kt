@@ -291,19 +291,60 @@ class YtDlpManager @Inject constructor(
         }
     }
 
+    /**
+     * Updates yt-dlp from the official GitHub release, installing it only after it has been verified
+     * against the release's SHA2-256SUMS (plus size and header checks). If the new binary fails to
+     * run, the previous one is restored.
+     */
     suspend fun updateEngine(): Result<String> = withContext(Dispatchers.IO) {
+        val workDir = File(context.cacheDir, "ytdlp-update")
+        var backup: File? = null
+        val ytdlpDir = File(File(context.noBackupFilesDir, YoutubeDL.baseName), YoutubeDL.ytdlpDirName)
+        val ytdlpBinary = File(ytdlpDir, YoutubeDL.ytdlpBin)
         try {
-            val status = YoutubeDL.getInstance().updateYoutubeDL(context, YoutubeDL.UpdateChannel.STABLE)
-            val newVersion = getInstalledVersion()
+            workDir.deleteRecursively()
+            workDir.mkdirs()
+
+            val tag = getLatestOnlineVersion(forceRefresh = true).getOrThrow().removePrefix("v")
+            require(YtDlpReleaseVerifier.isValidTag(tag)) { "Unexpected yt-dlp release tag '$tag'" }
+
+            val base = "https://github.com/yt-dlp/yt-dlp/releases/download/$tag"
+            val candidate = File(workDir, "yt-dlp")
+            val sumsFile = File(workDir, "SHA2-256SUMS")
+            com.glypdl.android.service.update.TrustedDownloader.download("$base/yt-dlp", candidate, 64L * 1024 * 1024)
+            com.glypdl.android.service.update.TrustedDownloader.download("$base/SHA2-256SUMS", sumsFile, 1L * 1024 * 1024)
+
+            val expected = YtDlpReleaseVerifier.checksumFor(sumsFile.readText(), "yt-dlp")
+                ?: throw SecurityException("No valid SHA-256 entry for yt-dlp in the release checksums")
+            if (!YtDlpReleaseVerifier.isAcceptable(candidate, expected)) {
+                throw SecurityException("Downloaded yt-dlp failed checksum verification; not installed")
+            }
+            DiagnosticLogger.log("YtDlpManager", "Verified yt-dlp $tag (sha256=$expected)", LogLevel.INFO)
+
+            // Install, keeping the previous binary for rollback
+            ytdlpDir.mkdirs()
+            if (ytdlpBinary.exists()) {
+                backup = File(ytdlpDir, "yt-dlp.previous").also { ytdlpBinary.copyTo(it, overwrite = true) }
+            }
+            candidate.copyTo(ytdlpBinary, overwrite = true)
+
+            val running = queryInstalledVersion()
+            if (running != tag) {
+                backup?.copyTo(ytdlpBinary, overwrite = true)
+                queryInstalledVersion()
+                throw IllegalStateException("New yt-dlp did not report version $tag (got ${running ?: "none"}); rolled back")
+            }
 
             settingsRepository.setLastUpdateCheck(System.currentTimeMillis())
-            settingsRepository.setCachedLatestVersion(newVersion)
-
-            Result.success(newVersion)
+            settingsRepository.setCachedLatestVersion(tag)
+            Result.success(tag)
         } catch (e: Exception) {
             e.printStackTrace()
             val parsedError = YtDlpErrorParser.parse(e.message, getInstalledVersion())
             Result.failure(GlypdlException(parsedError))
+        } finally {
+            workDir.deleteRecursively()
+            backup?.delete()
         }
     }
 

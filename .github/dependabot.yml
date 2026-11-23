@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # Keep SHA-pinned GitHub Actions up to date
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  # Android (Gradle)
+  - package-ecosystem: "gradle"
+    directory: "/android"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+  # Windows (NuGet)
+  - package-ecosystem: "nuget"
+    directory: "/windows"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+  # Linux app (Python)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
