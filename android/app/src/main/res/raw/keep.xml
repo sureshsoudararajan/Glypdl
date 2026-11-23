@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The bundled yt-dlp binary (res/raw/ytdlp, added by CI) is only looked up at runtime with
+  Resources.getIdentifier("ytdlp", "raw", ...), so the resource shrinker would otherwise remove it.
+-->
+<resources
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/ytdlp" />

@@ -151,6 +151,13 @@ jobs:
           cp app/build/outputs/apk/release/app-armeabi-v7a-release.apk "../dist-android/Glypdl-${VERSION}-armeabi-v7a.apk"
           cp app/build/outputs/apk/release/app-x86_64-release.apk "../dist-android/Glypdl-${VERSION}-x86_64.apk"
 
+      - name: Upload R8 Mapping (for de-obfuscating crash reports)
+        if: steps.build_type.outputs.is_release == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: glypdl-android-mapping
+          path: android/app/build/outputs/mapping/release/mapping.txt
+
       - name: Upload Android Release Artifacts
         if: steps.build_type.outputs.is_release == 'true'
         uses: actions/upload-artifact@v4
@@ -164,6 +171,14 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
+
+      # Release builds only run on tags, so verify here that R8 minification still compiles.
+      - name: Verify R8 Release Build (minified)
+        if: steps.build_type.outputs.is_release != 'true'
+        run: |
+          cd android
+          ./gradlew assembleRelease --no-daemon
+          test -f app/build/outputs/mapping/release/mapping.txt
 
       - name: Upload Android Debug Artifact
         if: steps.build_type.outputs.is_release != 'true'
