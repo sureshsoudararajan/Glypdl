@@ -32,5 +32,7 @@ data class AppUpdateInfo(
     val releaseNotes: String? = null,
     val apkDownloadUrl: String? = null,
     val apkFileName: String? = null,
-    val apkFileSize: Long = 0L
+    val apkFileSize: Long = 0L,
+    /** Lowercase hex SHA-256 published by GitHub for the APK asset, if available. */
+    val apkSha256: String? = null
 )

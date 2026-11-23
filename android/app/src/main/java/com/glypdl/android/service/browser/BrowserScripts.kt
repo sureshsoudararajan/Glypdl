@@ -62,8 +62,8 @@ object BrowserScripts {
                         lastReportedHref = current;
                         var activeV = findActiveVideo();
                         var currentTitle = extractPageTitle(activeV);
-                        if (window.$JS_INTERFACE_NAME && typeof window.$JS_INTERFACE_NAME.reportUrlChange === 'function') {
-                            window.$JS_INTERFACE_NAME.reportUrlChange(current, currentTitle || document.title || '');
+                        if (window.$JS_INTERFACE_NAME && typeof window.$JS_INTERFACE_NAME.postMessage === 'function') {
+                            window.$JS_INTERFACE_NAME.postMessage(JSON.stringify({t: 'url', url: current, title: currentTitle || document.title || ''}));
                         }
                         scanElements();
                     }
@@ -230,8 +230,8 @@ object BrowserScripts {
                         account: extractAccount(elem),
                         isBlob: isPlatformBlob ? false : !!isBlob
                     });
-                    if (window.$JS_INTERFACE_NAME && typeof window.$JS_INTERFACE_NAME.reportMedia === 'function') {
-                        window.$JS_INTERFACE_NAME.reportMedia(payload);
+                    if (window.$JS_INTERFACE_NAME && typeof window.$JS_INTERFACE_NAME.postMessage === 'function') {
+                        window.$JS_INTERFACE_NAME.postMessage(JSON.stringify({t: 'media', payload: payload}));
                     }
                 } catch (e) {}
             }

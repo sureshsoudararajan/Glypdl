@@ -80,7 +80,15 @@ class AppUpdateManager @Inject constructor(
             return
         }
 
-        val fileName = info.apkFileName ?: "glypdl-v${info.latestVersion}.apk"
+        val expectedSha256 = info.apkSha256
+        if (expectedSha256.isNullOrBlank()) {
+            _downloadState.value = AppUpdateDownloadState(
+                error = "This release has no published checksum, so it cannot be verified. Please download it from GitHub."
+            )
+            return
+        }
+
+        val fileName = UpdateVerifier.safeFileName(info.apkFileName ?: "glypdl-v${info.latestVersion}.apk")
 
         cancelDownload()
         downloadJob = scope.launch {
@@ -92,7 +100,7 @@ class AppUpdateManager @Inject constructor(
                 speed = "Starting..."
             )
 
-            val result = downloadUpdate(url, fileName) { percent, downloaded, total, speed ->
+            val result = downloadUpdate(url, fileName, expectedSha256) { percent, downloaded, total, speed ->
                 _downloadState.value = AppUpdateDownloadState(
                     isDownloading = true,
                     progress = percent,
@@ -171,7 +179,8 @@ class AppUpdateManager @Inject constructor(
     private data class ApkAssetCandidate(
         val name: String,
         val downloadUrl: String,
-        val size: Long
+        val size: Long,
+        val sha256: String? = null
     )
 
     /**
@@ -186,8 +195,9 @@ class AppUpdateManager @Inject constructor(
             val name = asset.optString("name", "")
             val url = asset.optString("browser_download_url", "")
             val size = asset.optLong("size", 0L)
-            if (name.endsWith(".apk", ignoreCase = true) && url.isNotBlank()) {
-                candidates.add(ApkAssetCandidate(name, url, size))
+            val sha256 = UpdateVerifier.parseSha256Digest(asset.optString("digest", ""))
+            if (name.endsWith(".apk", ignoreCase = true) && UpdateVerifier.isTrustedDownloadUrl(url)) {
+                candidates.add(ApkAssetCandidate(name, url, size, sha256))
             }
         }
 
@@ -258,7 +268,8 @@ class AppUpdateManager @Inject constructor(
                         releaseNotes = releaseNotes,
                         apkDownloadUrl = matchingAsset?.downloadUrl,
                         apkFileName = matchingAsset?.name,
-                        apkFileSize = matchingAsset?.size ?: 0L
+                        apkFileSize = matchingAsset?.size ?: 0L,
+                        apkSha256 = matchingAsset?.sha256
                     )
                 )
             } else {
@@ -276,9 +287,13 @@ class AppUpdateManager @Inject constructor(
     suspend fun downloadUpdate(
         downloadUrl: String,
         fileName: String,
+        expectedSha256: String,
         onProgress: (percent: Float, downloaded: Long, total: Long, speed: String) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
+            if (!UpdateVerifier.isTrustedDownloadUrl(downloadUrl)) {
+                return@withContext Result.failure(Exception("Refusing to download update from an untrusted URL"))
+            }
             val updatesDir = File(context.cacheDir, "updates")
             if (!updatesDir.exists()) {
                 updatesDir.mkdirs()
@@ -307,7 +322,10 @@ class AppUpdateManager @Inject constructor(
                         ?: throw Exception("HTTP redirect missing Location header")
                     conn.disconnect()
                     activeConnection = null
-                    currentUrl = location
+                    currentUrl = URL(URL(currentUrl), location).toString()
+                    if (!UpdateVerifier.isTrustedDownloadUrl(currentUrl)) {
+                        throw Exception("Refusing to follow redirect to an untrusted host")
+                    }
                     redirects++
                     if (redirects > 10) throw Exception("Too many HTTP redirects")
                     continue
@@ -359,6 +377,14 @@ class AppUpdateManager @Inject constructor(
                     connection.disconnect()
                 } catch (_: Exception) {}
                 activeConnection = null
+            }
+
+            // SECURITY: the file must be byte-identical to the asset GitHub published.
+            if (!UpdateVerifier.matches(tempFile, expectedSha256)) {
+                tempFile.delete()
+                return@withContext Result.failure(
+                    Exception("Update failed verification: SHA-256 does not match the published release")
+                )
             }
 
             if (targetFile.exists()) {

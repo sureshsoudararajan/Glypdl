@@ -40,7 +40,7 @@ jobs:
       prev_tag: ${{ steps.detect.outputs.prev_tag }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -195,7 +195,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Prepare Release Directory
         run: |
@@ -204,49 +204,49 @@ jobs:
       # Download freshly built artifacts for platforms that were built
       - name: Download Android Artifacts
         if: needs.detect-changes.outputs.build_android == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: glypdl-android
           path: release-assets
 
       - name: Download Windows Artifacts
         if: needs.detect-changes.outputs.build_windows == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: glypdl-windows
           path: release-assets
 
       - name: Download Linux DEB
         if: needs.detect-changes.outputs.build_linux == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: glypdl-deb
           path: release-assets
 
       - name: Download Linux AppImage
         if: needs.detect-changes.outputs.build_linux == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: glypdl-appimage
           path: release-assets
 
       - name: Download Linux Arch
         if: needs.detect-changes.outputs.build_linux == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: glypdl-arch
           path: release-assets
 
       - name: Download Linux RPM
         if: needs.detect-changes.outputs.build_linux == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: glypdl-rpm
           path: release-assets
 
       - name: Download Extension Artifacts
         if: needs.detect-changes.outputs.build_extension == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: glypdl-firefox-extension
           path: release-assets
@@ -387,7 +387,7 @@ jobs:
           ls -1 release-assets
 
       - name: Create or Update GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: release-assets/*
           tag_name: ${{ needs.detect-changes.outputs.tag_name }}
