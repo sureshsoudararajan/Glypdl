@@ -180,6 +180,16 @@ jobs:
           ./gradlew assembleRelease --no-daemon
           test -f app/build/outputs/mapping/release/mapping.txt
 
+      - name: Upload Minified Release APKs (PR testing only)
+        if: steps.build_type.outputs.is_release != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: glypdl-android-minified-test
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/mapping/release/mapping.txt
+          retention-days: 7
+
       - name: Upload Android Debug Artifact
         if: steps.build_type.outputs.is_release != 'true'
         uses: actions/upload-artifact@v4
